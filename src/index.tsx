@@ -423,7 +423,8 @@ app.get('/api/admin/stats', (c) => {
 })
 
 // ============================================
-// 🖥️ 메인 UI (타이포그래피 가이드 강화 버전)
+// 🖥️ 메인 UI - 2026 BEYOND REALITY 스타일
+// 움직이는 UI/UX + 3D + 파티클 + 네온 + 마이크로인터랙션
 // ============================================
 const mainPageHtml = `
 <!DOCTYPE html>
@@ -436,401 +437,793 @@ const mainPageHtml = `
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 <style>
   /* ============================================
-     [가독성 가이드] 사장님 타이포그래피 사양 100% 반영
+     [2026 BEYOND REALITY] 움직이는 UI/UX 마스터
      ============================================ */
   :root { 
-    --naver-green: #03C75A; 
-    --sub-orange: #FF6B35;
-    --glass-bg: rgba(255,255,255,0.02);
-    --glass-border: rgba(255,255,255,0.06);
+    --neon-green: #00ff88;
+    --neon-cyan: #00f5ff;
+    --neon-purple: #bf00ff;
+    --neon-pink: #ff00aa;
+    --glass-bg: rgba(10,10,10,0.6);
+    --glass-border: rgba(255,255,255,0.08);
   }
   
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  html { scroll-behavior: smooth; }
   
   body { 
     background: #000; 
     color: #fff; 
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Pretendard', sans-serif;
-    word-break: keep-all; /* 한글 단어 단위 줄바꿈 */
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif;
+    word-break: keep-all;
     overflow-x: hidden;
+    min-height: 100vh;
   }
 
-  /* 반응형 폰트 사양 (사장님 가이드 100% 반영) */
+  /* 반응형 폰트 */
   @media (max-width: 768px) {
     body { font-size: 17px; line-height: 1.65; letter-spacing: -0.02em; }
     .content-area { padding: 0 16px; }
+    .hero-title { font-size: 2.5rem !important; }
   }
   @media (min-width: 769px) {
     body { font-size: 16px; line-height: 1.55; letter-spacing: -0.01em; }
-    .content-area { max-width: 1200px; margin: 0 auto; padding: 0 40px; }
+    .content-area { max-width: 1400px; margin: 0 auto; padding: 0 40px; }
   }
 
   /* ============================================
-     [시각적 계층 구조] CSS 클래스
+     [움직이는 배경] 파티클 + 그라디언트 애니메이션
      ============================================ */
-  
-  /* ❶ ❷ ❸ 프로세스 리스트 */
-  .ordered-list {
-    list-style: none;
-    padding-left: 0;
-    counter-reset: item;
-  }
-  .ordered-list li {
-    margin-bottom: 12px;
-    padding-left: 32px;
-    position: relative;
-    color: #e0e0e0;
-  }
-  .ordered-list li::before {
-    content: "❶";
-    position: absolute;
+  .animated-bg {
+    position: fixed;
+    top: 0;
     left: 0;
-    color: var(--naver-green);
-    font-weight: 700;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background: 
+      radial-gradient(ellipse at 20% 80%, rgba(0,255,136,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(0,245,255,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(191,0,255,0.05) 0%, transparent 60%),
+      linear-gradient(180deg, #000 0%, #0a0a0a 50%, #000 100%);
+    animation: bgPulse 8s ease-in-out infinite;
   }
-  .ordered-list li:nth-child(2)::before { content: "❷"; }
-  .ordered-list li:nth-child(3)::before { content: "❸"; }
-  .ordered-list li:nth-child(4)::before { content: "❹"; }
-  .ordered-list li:nth-child(5)::before { content: "❺"; }
   
-  /* ■ 강조 리스트 */
-  .emphasis-list {
-    list-style: none;
-    padding-left: 0;
+  @keyframes bgPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.85; }
   }
-  .emphasis-list li {
-    margin-bottom: 10px;
-    padding-left: 24px;
-    position: relative;
-    color: #fff;
-    font-weight: 500;
-  }
-  .emphasis-list li::before {
-    content: "■";
-    position: absolute;
+
+  /* 파티클 캔버스 */
+  #particles { position: fixed; top: 0; left: 0; z-index: 0; pointer-events: none; }
+
+  /* 움직이는 그리드 */
+  .moving-grid {
+    position: fixed;
+    top: 0;
     left: 0;
-    color: #fff;
+    width: 200%;
+    height: 200%;
+    background-image: 
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    animation: gridMove 20s linear infinite;
+    z-index: 0;
+    pointer-events: none;
   }
   
-  /* ✔️ 체크 리스트 */
-  .check-list {
-    list-style: none;
-    padding-left: 0;
+  @keyframes gridMove {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(-60px, -60px); }
   }
-  .check-list li {
-    margin-bottom: 8px;
-    padding-left: 28px;
-    position: relative;
-    color: #b0b0b0;
-  }
-  .check-list li::before {
-    content: "✔️";
-    position: absolute;
-    left: 0;
-  }
-  
-  /* 텍스트 강조 */
-  strong, b { font-weight: 700; color: #fff; }
-  a { color: var(--naver-green); text-decoration: none; font-weight: 500; }
-  a:hover { text-decoration: underline; }
-  
+
   /* ============================================
-     [Beyond Reality 스타일] Glassmorphism & 3D
+     [글래스모피즘] 고급 블러 카드
      ============================================ */
-  .glass-card { 
-    background: var(--glass-bg); 
-    border: 1px solid var(--glass-border); 
-    border-radius: 32px; 
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
-    transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  .glass-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 32px;
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
     position: relative;
     overflow: hidden;
+    transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
   }
   
   .glass-card::before {
     content: '';
     position: absolute;
     top: 0;
-    left: -100%;
-    width: 100%;
+    left: -150%;
+    width: 150%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
-    transition: 0.5s;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.03), rgba(255,255,255,0.06), rgba(255,255,255,0.03), transparent);
+    transform: skewX(-20deg);
+    transition: 0.8s ease;
   }
   
   .glass-card:hover {
-    transform: translateY(-10px) scale(1.01);
-    border-color: var(--naver-green);
-    box-shadow: 0 30px 60px rgba(3,199,90,0.15), 0 0 40px rgba(3,199,90,0.1);
+    border-color: rgba(0,255,136,0.3);
+    box-shadow: 
+      0 0 40px rgba(0,255,136,0.15),
+      0 30px 60px rgba(0,0,0,0.5),
+      inset 0 1px 0 rgba(255,255,255,0.1);
+    transform: translateY(-8px) scale(1.01);
   }
   
   .glass-card:hover::before {
-    left: 100%;
+    left: 150%;
   }
 
-  /* 애니메이션 */
-  @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-20px); }
+  /* ============================================
+     [3D 호버 효과] perspective 카드
+     ============================================ */
+  .card-3d {
+    perspective: 1000px;
+    transform-style: preserve-3d;
   }
   
-  @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 20px rgba(3,199,90,0.3); }
-    50% { box-shadow: 0 0 40px rgba(3,199,90,0.6); }
+  .card-3d-inner {
+    transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+    transform-style: preserve-3d;
   }
   
-  @keyframes gradient-shift {
-    0% { background-position: 0% 50%; }
+  .card-3d:hover .card-3d-inner {
+    transform: rotateX(5deg) rotateY(-5deg);
+  }
+
+  /* ============================================
+     [네온 글로우 검색창] 트렌디한 입력 필드
+     ============================================ */
+  .search-container {
+    position: relative;
+    margin: 40px auto;
+    max-width: 900px;
+  }
+  
+  .neon-input-wrapper {
+    position: relative;
+    border-radius: 28px;
+    padding: 3px;
+    background: linear-gradient(135deg, var(--neon-green), var(--neon-cyan), var(--neon-purple), var(--neon-pink));
+    background-size: 300% 300%;
+    animation: neonBorder 4s ease infinite;
+  }
+  
+  @keyframes neonBorder {
+    0%, 100% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
   }
   
-  .float-animation { animation: float 6s ease-in-out infinite; }
-  .pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
-  
-  .gradient-text {
-    background: linear-gradient(135deg, #03C75A, #00ff88, #03C75A);
-    background-size: 200% 200%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    animation: gradient-shift 3s ease infinite;
+  .neon-input-wrapper::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: 30px;
+    background: inherit;
+    filter: blur(15px);
+    opacity: 0.6;
+    z-index: -1;
+    animation: neonPulse 2s ease-in-out infinite;
   }
-
-  /* 인풋 스타일 */
-  .input-field {
-    background: rgba(0,0,0,0.5);
-    border: 2px solid rgba(255,255,255,0.1);
-    border-radius: 16px;
-    padding: 16px 20px;
-    color: #fff;
+  
+  @keyframes neonPulse {
+    0%, 100% { opacity: 0.4; filter: blur(15px); }
+    50% { opacity: 0.8; filter: blur(25px); }
+  }
+  
+  .neon-input {
     width: 100%;
+    background: rgba(0,0,0,0.9);
+    border: none;
+    border-radius: 25px;
+    padding: 24px 32px;
+    font-size: 18px;
+    color: #fff;
     outline: none;
     transition: all 0.3s ease;
   }
   
-  .input-field:focus {
-    border-color: var(--naver-green);
-    box-shadow: 0 0 20px rgba(3,199,90,0.2);
+  .neon-input::placeholder {
+    color: rgba(255,255,255,0.4);
+    transition: all 0.3s ease;
+  }
+  
+  .neon-input:focus::placeholder {
+    color: transparent;
+    transform: translateY(-20px);
+  }
+  
+  .neon-input:focus {
+    box-shadow: inset 0 0 30px rgba(0,255,136,0.1);
+  }
+  
+  /* 타이핑 커서 애니메이션 */
+  .typing-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 24px;
+    background: var(--neon-green);
+    margin-left: 4px;
+    animation: blink 0.8s ease-in-out infinite;
+    vertical-align: middle;
+  }
+  
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
   }
 
-  /* 버튼 스타일 */
-  .btn-primary {
-    background: linear-gradient(135deg, #03C75A, #02a64b);
-    border: none;
-    border-radius: 24px;
-    padding: 20px 40px;
-    font-weight: 900;
-    font-size: 20px;
-    color: #fff;
-    cursor: pointer;
-    transition: all 0.3s ease;
+  /* ============================================
+     [3D 버튼] 눌림 효과 + 네온
+     ============================================ */
+  .btn-3d {
     position: relative;
+    background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
+    border: none;
+    border-radius: 20px;
+    padding: 20px 48px;
+    font-weight: 800;
+    font-size: 18px;
+    color: #000;
+    cursor: pointer;
     overflow: hidden;
+    transform-style: preserve-3d;
+    transition: all 0.3s ease;
+    box-shadow: 
+      0 8px 0 #00994d,
+      0 15px 30px rgba(0,255,136,0.3);
   }
   
-  .btn-primary:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 15px 30px rgba(3,199,90,0.4);
+  .btn-3d::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transition: 0.5s;
   }
   
-  .btn-primary:active {
-    transform: scale(0.98);
+  .btn-3d:hover {
+    transform: translateY(-4px);
+    box-shadow: 
+      0 12px 0 #00994d,
+      0 25px 50px rgba(0,255,136,0.5);
+  }
+  
+  .btn-3d:hover::before {
+    left: 100%;
+  }
+  
+  .btn-3d:active {
+    transform: translateY(4px);
+    box-shadow: 
+      0 4px 0 #00994d,
+      0 8px 20px rgba(0,255,136,0.2);
   }
 
-  /* 칩 스타일 */
+  /* ============================================
+     [칩 버튼] 마이크로 인터랙션
+     ============================================ */
   .chip {
-    background: rgba(255,255,255,0.05);
+    position: relative;
+    background: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 12px;
-    padding: 12px 20px;
+    border-radius: 16px;
+    padding: 14px 24px;
     font-size: 14px;
-    color: #888;
+    font-weight: 500;
+    color: rgba(255,255,255,0.6);
     cursor: pointer;
-    transition: all 0.3s ease;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  
+  .chip::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(0,255,136,0.2);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
   }
   
   .chip:hover {
-    border-color: rgba(255,255,255,0.3);
     color: #fff;
+    border-color: rgba(255,255,255,0.3);
+    transform: translateY(-2px);
+  }
+  
+  .chip:hover::after {
+    width: 200px;
+    height: 200px;
   }
   
   .chip.active {
-    background: rgba(3, 199, 90, 0.2);
-    border-color: var(--naver-green);
-    color: var(--naver-green);
+    background: rgba(0,255,136,0.15);
+    border-color: var(--neon-green);
+    color: var(--neon-green);
     font-weight: 700;
+    box-shadow: 0 0 20px rgba(0,255,136,0.2);
   }
   
   .chip-gold {
-    border-color: rgba(251, 191, 36, 0.3);
-    color: #fbbf24;
+    border-color: rgba(255,200,0,0.3);
+    color: rgba(255,200,0,0.8);
+  }
+  
+  .chip-gold.active {
+    background: rgba(255,200,0,0.15);
+    border-color: #ffc800;
+    color: #ffc800;
+    box-shadow: 0 0 20px rgba(255,200,0,0.2);
   }
 
-  /* 프로그레스 바 */
-  .progress-bar {
-    height: 6px;
+  /* ============================================
+     [로고 애니메이션] 3D 회전 + 글로우
+     ============================================ */
+  .logo-container {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    perspective: 500px;
+  }
+  
+  .logo-cube {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    animation: logoCube 10s ease-in-out infinite;
+  }
+  
+  @keyframes logoCube {
+    0%, 100% { transform: rotateY(0deg) rotateX(0deg); }
+    25% { transform: rotateY(10deg) rotateX(5deg); }
+    50% { transform: rotateY(0deg) rotateX(0deg); }
+    75% { transform: rotateY(-10deg) rotateX(-5deg); }
+  }
+  
+  .logo-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #00ff88 0%, #00aa55 100%);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    font-weight: 900;
+    color: #000;
+    box-shadow: 
+      0 0 30px rgba(0,255,136,0.5),
+      inset 0 0 30px rgba(255,255,255,0.2);
+  }
+
+  /* ============================================
+     [히어로 타이틀] 글리치 + 그라디언트
+     ============================================ */
+  .hero-title {
+    font-size: 4rem;
+    font-weight: 900;
+    letter-spacing: -0.05em;
+    background: linear-gradient(135deg, #fff 0%, #00ff88 50%, #00f5ff 100%);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: titleGradient 5s ease infinite;
+    position: relative;
+  }
+  
+  @keyframes titleGradient {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  
+  .hero-title::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: linear-gradient(135deg, #00ff88, #00f5ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    opacity: 0;
+    animation: glitch 3s ease-in-out infinite;
+  }
+  
+  @keyframes glitch {
+    0%, 90%, 100% { opacity: 0; transform: translate(0); }
+    92% { opacity: 0.8; transform: translate(-2px, 2px); }
+    94% { opacity: 0.8; transform: translate(2px, -2px); }
+    96% { opacity: 0; }
+  }
+
+  /* ============================================
+     [스텝 인디케이터] 프로그레스 라인
+     ============================================ */
+  .step-indicator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: rgba(0,255,136,0.1);
+    border-radius: 12px;
+    border: 1px solid rgba(0,255,136,0.2);
+  }
+  
+  .step-number {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 14px;
+    transition: all 0.3s ease;
+  }
+  
+  .step-number.active {
+    background: var(--neon-green);
+    color: #000;
+    box-shadow: 0 0 20px rgba(0,255,136,0.4);
+  }
+  
+  .step-number.inactive {
     background: rgba(255,255,255,0.1);
-    border-radius: 3px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  /* ============================================
+     [프로그레스 바] 애니메이션
+     ============================================ */
+  .progress-container {
+    position: relative;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
     overflow: hidden;
   }
   
-  .progress-fill {
+  .progress-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, #03C75A, #00ff88);
-    border-radius: 3px;
+    background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan));
+    border-radius: 4px;
+    position: relative;
     transition: width 0.5s ease;
   }
+  
+  .progress-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: progressShine 1.5s ease-in-out infinite;
+  }
+  
+  @keyframes progressShine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
 
-  /* 엑셀 스타일 */
-  .excel-sheet { 
-    background: white; 
-    color: black; 
-    padding: 50px; 
-    border: 3px solid #000; 
-    font-family: 'Malgun Gothic', -apple-system, sans-serif; 
+  /* ============================================
+     [Select 드롭다운] 커스텀 스타일
+     ============================================ */
+  .custom-select {
+    position: relative;
+    background: rgba(0,0,0,0.6);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 18px 24px;
+    color: #fff;
+    font-size: 16px;
+    width: 100%;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+    transition: all 0.3s ease;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2300ff88' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    background-size: 20px;
+  }
+  
+  .custom-select:hover {
+    border-color: rgba(0,255,136,0.3);
+  }
+  
+  .custom-select:focus {
+    border-color: var(--neon-green);
+    box-shadow: 0 0 20px rgba(0,255,136,0.15);
+  }
+  
+  .custom-select option {
+    background: #111;
+    color: #fff;
+    padding: 12px;
+  }
+
+  /* ============================================
+     [텍스트에어리어] 네온 포커스
+     ============================================ */
+  .neon-textarea {
+    width: 100%;
+    min-height: 140px;
+    background: rgba(0,0,0,0.6);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 20px 24px;
+    color: #fff;
+    font-size: 18px;
+    line-height: 1.6;
+    resize: none;
+    outline: none;
+    transition: all 0.3s ease;
+  }
+  
+  .neon-textarea::placeholder {
+    color: rgba(255,255,255,0.3);
+  }
+  
+  .neon-textarea:focus {
+    border-color: var(--neon-green);
+    box-shadow: 
+      0 0 30px rgba(0,255,136,0.15),
+      inset 0 0 20px rgba(0,255,136,0.05);
+  }
+
+  /* ============================================
+     [결과 카드] 애니메이션 등장
+     ============================================ */
+  .result-card {
+    animation: cardSlideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  
+  @keyframes cardSlideUp {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* ============================================
+     [엑셀 시트] 프리미엄 스타일
+     ============================================ */
+  .excel-sheet {
+    background: #fff;
+    color: #000;
+    padding: 48px;
+    border-radius: 0;
+    font-family: 'Malgun Gothic', -apple-system, sans-serif;
     width: 100%;
     max-width: 700px;
-    box-shadow: 25px 25px 60px rgba(0,0,0,0.8);
-    transform: rotate(-0.5deg);
+    box-shadow: 
+      0 50px 100px rgba(0,0,0,0.8),
+      0 0 0 1px rgba(255,255,255,0.1);
+    position: relative;
+    transform: perspective(1000px) rotateX(2deg);
+    transition: transform 0.5s ease;
   }
   
-  .excel-table { 
-    width: 100%; 
-    border-collapse: collapse; 
-    border: 2px solid #000; 
-    margin-top: 20px; 
+  .excel-sheet:hover {
+    transform: perspective(1000px) rotateX(0deg) scale(1.02);
   }
   
-  .excel-table th { 
-    background: #e5e5e5; 
-    border: 1px solid #000; 
-    padding: 12px; 
-    font-size: 13px; 
+  .excel-sheet::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan), var(--neon-purple));
+  }
+  
+  .excel-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 2px solid #000;
+    margin-top: 20px;
+  }
+  
+  .excel-table th {
+    background: #1a1a1a;
+    color: #fff;
+    border: 1px solid #333;
+    padding: 14px;
+    font-size: 13px;
     font-weight: 700;
   }
   
-  .excel-table td { 
-    border: 1px solid #000; 
-    padding: 10px 14px; 
-    font-size: 13px; 
-  }
-
-  /* 스크롤바 커스텀 */
-  ::-webkit-scrollbar { width: 8px; }
-  ::-webkit-scrollbar-track { background: #111; }
-  ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: #555; }
-
-  /* 배경 효과 */
-  .bg-grid {
-    background-image: 
-      linear-gradient(rgba(3,199,90,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(3,199,90,0.03) 1px, transparent 1px);
-    background-size: 50px 50px;
+  .excel-table td {
+    border: 1px solid #ddd;
+    padding: 12px 16px;
+    font-size: 13px;
+    transition: background 0.2s ease;
   }
   
-  /* 로딩 스피너 */
-  .spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid rgba(3,199,90,0.2);
-    border-top-color: var(--naver-green);
+  .excel-table tr:hover td {
+    background: #f5f5f5;
+  }
+
+  /* ============================================
+     [스크롤바] 네온 스타일
+     ============================================ */
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-track { background: #0a0a0a; }
+  ::-webkit-scrollbar-thumb { 
+    background: linear-gradient(180deg, var(--neon-green), var(--neon-cyan));
+    border-radius: 5px;
+  }
+  ::-webkit-scrollbar-thumb:hover { 
+    background: linear-gradient(180deg, #00ff88, #00f5ff);
+  }
+
+  /* ============================================
+     [로딩 스피너] 네온 링
+     ============================================ */
+  .neon-spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(0,255,136,0.1);
+    border-top-color: var(--neon-green);
+    border-right-color: var(--neon-cyan);
     border-radius: 50%;
-    animation: spin 1s linear infinite;
+    animation: neonSpin 1s linear infinite;
   }
   
-  @keyframes spin {
+  @keyframes neonSpin {
     to { transform: rotate(360deg); }
   }
 
-  /* 콘텐츠 결과 영역 스타일 */
-  #content {
-    font-size: inherit;
-    line-height: inherit;
+  /* ============================================
+     [플로팅 요소] 장식
+     ============================================ */
+  .floating-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.5;
+    animation: floatOrb 8s ease-in-out infinite;
+  }
+  
+  @keyframes floatOrb {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(30px, -30px) scale(1.1); }
+    66% { transform: translate(-20px, 20px) scale(0.9); }
+  }
+
+  /* 타이포그래피 가이드 */
+  strong, b { font-weight: 700; color: #fff; }
+  a { color: var(--neon-green); text-decoration: none; font-weight: 500; transition: all 0.3s ease; }
+  a:hover { text-shadow: 0 0 10px rgba(0,255,136,0.5); }
+
+  /* 콘텐츠 영역 */
+  #content { font-size: inherit; line-height: 1.8; }
+  #content br { display: block; margin: 8px 0; }
+  
+  /* 모바일 최적화 */
+  @media (max-width: 768px) {
+    .hero-title { font-size: 2rem !important; }
+    .btn-3d { padding: 16px 32px; font-size: 16px; }
+    .glass-card { border-radius: 24px; }
+    .neon-input { padding: 20px 24px; font-size: 16px; }
   }
 </style>
 </head>
-<body class="bg-grid">
-  <!-- 배경 글로우 효과 -->
-  <div class="fixed inset-0 pointer-events-none overflow-hidden">
-    <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-green-500/10 rounded-full blur-3xl float-animation"></div>
-    <div class="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl float-animation" style="animation-delay: -3s;"></div>
-  </div>
+<body>
+  <!-- 움직이는 배경 -->
+  <div class="animated-bg"></div>
+  <div class="moving-grid"></div>
+  <canvas id="particles"></canvas>
+  
+  <!-- 플로팅 오브 장식 -->
+  <div class="floating-orb" style="top: 10%; left: 5%; width: 300px; height: 300px; background: var(--neon-green);"></div>
+  <div class="floating-orb" style="top: 60%; right: 10%; width: 200px; height: 200px; background: var(--neon-cyan); animation-delay: -3s;"></div>
+  <div class="floating-orb" style="bottom: 10%; left: 30%; width: 250px; height: 250px; background: var(--neon-purple); animation-delay: -5s;"></div>
 
-  <div class="content-area relative z-10 py-12 space-y-12">
+  <div class="content-area relative z-10 py-12 space-y-10">
+    
     <!-- 헤더 -->
-    <header class="glass-card p-8 md:p-12">
-      <div class="flex items-center justify-between flex-wrap gap-4">
-        <div class="flex items-center gap-4">
-          <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-green-700 rounded-2xl flex items-center justify-center font-black text-3xl shadow-lg pulse-glow">X</div>
+    <header class="glass-card p-8 md:p-10 card-3d">
+      <div class="card-3d-inner flex items-center justify-between flex-wrap gap-6">
+        <div class="flex items-center gap-5">
+          <div class="logo-container">
+            <div class="logo-cube">
+              <div class="logo-face">X</div>
+            </div>
+          </div>
           <div>
-            <h1 class="text-3xl md:text-4xl font-black tracking-tighter italic">XIVIX <span class="gradient-text">2026 PRO</span></h1>
-            <p class="text-sm text-gray-500 mt-1">상위 1% 보험 마케팅 마스터 | 타이포그래피 가이드 적용</p>
+            <h1 class="hero-title" data-text="XIVIX 2026 PRO">XIVIX <span style="color: #00ff88; -webkit-text-fill-color: #00ff88;">2026</span> PRO</h1>
+            <p class="text-sm text-gray-400 mt-2 flex items-center gap-2">
+              <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              상위 1% 보험 마케팅 마스터 엔진
+            </p>
           </div>
         </div>
         <div class="flex gap-3">
           <a href="/admin" class="chip"><i class="fas fa-cog mr-2"></i>Admin</a>
-          <a href="/api/docs" class="chip"><i class="fas fa-book mr-2"></i>API Docs</a>
+          <a href="/api/docs" class="chip"><i class="fas fa-book mr-2"></i>Docs</a>
         </div>
       </div>
     </header>
 
-    <!-- 타이포그래피 가이드 안내 -->
-    <section class="glass-card p-6 border-l-4 border-yellow-500">
-      <div class="flex items-center gap-3 text-sm">
-        <i class="fas fa-lightbulb text-yellow-500"></i>
-        <span class="text-gray-300">
-          <strong class="text-yellow-400">타이포그래피 가이드 적용:</strong> 
-          모든 콘텐츠에 <span class="text-green-400">❶❷❸</span> (프로세스), 
-          <span class="text-white">■</span> (강조), 
-          <span class="text-green-400">✔️</span> (체크) 기호가 자동 적용됩니다.
-        </span>
-      </div>
-    </section>
-
-    <!-- 메인 입력 섹션 -->
-    <section class="glass-card p-8 md:p-12 space-y-10">
-      <!-- Step 1: 타겟 선택 -->
-      <div class="space-y-4">
-        <label class="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest">
-          <span class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white text-xs">❶</span>
-          타겟 고객 선택
-        </label>
-        <div class="flex flex-wrap gap-3" id="target-chips">
-          <button class="chip active" onclick="selectChip(this, 'target')">30대 워킹맘</button>
-          <button class="chip" onclick="selectChip(this, 'target')">40대 가장</button>
-          <button class="chip" onclick="selectChip(this, 'target')">50대 은퇴예정자</button>
-          <button class="chip" onclick="selectChip(this, 'target')">법인대표/CEO</button>
-          <button class="chip" onclick="selectChip(this, 'target')">자영업자</button>
+    <!-- 네온 검색창 (핵심 고민 입력) -->
+    <section class="glass-card p-10 md:p-14 space-y-10">
+      
+      <!-- 메인 검색창 -->
+      <div class="search-container">
+        <div class="text-center mb-6">
+          <span class="text-sm font-medium text-gray-400 uppercase tracking-wider">핵심 고민 / Angle</span>
+          <h2 class="text-2xl md:text-3xl font-bold mt-2">무엇이 궁금하신가요?</h2>
+        </div>
+        <div class="neon-input-wrapper">
+          <textarea id="concern" class="neon-input resize-none" rows="3" placeholder="예: 워킹맘인데 아이 교육자금으로 증여하려면 세금이 얼마나 나올까요?"></textarea>
         </div>
       </div>
-
-      <!-- Step 2: 보험 종류 -->
-      <div class="space-y-4">
-        <label class="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest">
-          <span class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white text-xs">❷</span>
-          보험 종류 선택
-        </label>
-        <div class="flex flex-wrap gap-3" id="type-chips">
-          <button class="chip active" onclick="selectChip(this, 'insuranceType')">상속/증여</button>
-          <button class="chip chip-gold" onclick="selectChip(this, 'insuranceType')">CEO/법인</button>
-          <button class="chip chip-gold" onclick="selectChip(this, 'insuranceType')">치매/간병</button>
-          <button class="chip" onclick="selectChip(this, 'insuranceType')">유병자보험</button>
-          <button class="chip" onclick="selectChip(this, 'insuranceType')">종신보험</button>
+      
+      <!-- 설정 그리드 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-10">
+        
+        <!-- 타겟 -->
+        <div class="space-y-4">
+          <div class="step-indicator">
+            <span class="step-number active">❶</span>
+            <span class="text-sm font-medium">타겟 고객</span>
+          </div>
+          <div class="flex flex-wrap gap-2" id="target-chips">
+            <button class="chip active" onclick="selectChip(this, 'target')">30대 워킹맘</button>
+            <button class="chip" onclick="selectChip(this, 'target')">40대 가장</button>
+            <button class="chip" onclick="selectChip(this, 'target')">50대 은퇴예정자</button>
+            <button class="chip" onclick="selectChip(this, 'target')">법인대표/CEO</button>
+            <button class="chip" onclick="selectChip(this, 'target')">자영업자</button>
+          </div>
         </div>
-      </div>
 
-      <!-- Step 3: 보험사 & 스타일 -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="space-y-3">
-          <label class="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest">
-            <span class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white text-xs">❸</span>
-            보험사 선택
-          </label>
-          <select id="company" class="input-field">
+        <!-- 보험 종류 -->
+        <div class="space-y-4">
+          <div class="step-indicator">
+            <span class="step-number active">❷</span>
+            <span class="text-sm font-medium">보험 종류</span>
+          </div>
+          <div class="flex flex-wrap gap-2" id="type-chips">
+            <button class="chip active" onclick="selectChip(this, 'insuranceType')">상속/증여</button>
+            <button class="chip chip-gold" onclick="selectChip(this, 'insuranceType')">CEO/법인</button>
+            <button class="chip chip-gold" onclick="selectChip(this, 'insuranceType')">치매/간병</button>
+            <button class="chip" onclick="selectChip(this, 'insuranceType')">유병자보험</button>
+            <button class="chip" onclick="selectChip(this, 'insuranceType')">종신보험</button>
+          </div>
+        </div>
+
+        <!-- 보험사 -->
+        <div class="space-y-4">
+          <div class="step-indicator">
+            <span class="step-number active">❸</span>
+            <span class="text-sm font-medium">보험사</span>
+          </div>
+          <select id="company" class="custom-select">
             <optgroup label="생명보험사">
               <option>삼성생명</option>
               <option>한화생명</option>
@@ -849,12 +1242,14 @@ const mainPageHtml = `
             </optgroup>
           </select>
         </div>
-        <div class="space-y-3">
-          <label class="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest">
-            <span class="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white text-xs">❹</span>
-            제안서 스타일
-          </label>
-          <select id="style" class="input-field">
+
+        <!-- 스타일 -->
+        <div class="space-y-4">
+          <div class="step-indicator">
+            <span class="step-number active">❹</span>
+            <span class="text-sm font-medium">제안서 스타일</span>
+          </div>
+          <select id="style" class="custom-select">
             <option>전문가 팩트체크형</option>
             <option>감성 공감 위로형</option>
             <option>세무 절세 분석형</option>
@@ -862,39 +1257,34 @@ const mainPageHtml = `
         </div>
       </div>
 
-      <!-- Step 5: 핵심 고민 입력 -->
-      <div class="space-y-3">
-        <label class="flex items-center gap-2 text-sm font-bold text-red-400 uppercase tracking-widest">
-          <span class="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white text-xs">❺</span>
-          핵심 고민 (Angle) - 가장 중요!
-        </label>
-        <textarea id="concern" class="input-field h-32 resize-none text-xl" placeholder="예: 워킹맘인데 아이 교육자금으로 증여하려면 세금이 얼마나 나올까요?"></textarea>
-      </div>
-
       <!-- 생성 버튼 -->
-      <button onclick="generateContent()" id="generateBtn" class="btn-primary w-full text-center">
-        <i class="fas fa-rocket mr-3"></i>🚀 데이터 대입 및 전문가 콘텐츠 생성
-      </button>
+      <div class="flex justify-center pt-6">
+        <button onclick="generateContent()" id="generateBtn" class="btn-3d">
+          <i class="fas fa-bolt mr-3"></i>
+          AI 콘텐츠 생성
+        </button>
+      </div>
     </section>
 
     <!-- 프로그레스 섹션 -->
     <section id="progress-section" class="glass-card p-6 hidden">
       <div class="flex items-center justify-between mb-4">
-        <span id="progress-text" class="text-sm font-bold text-green-400">분석 중...</span>
+        <span id="progress-text" class="text-sm font-bold text-green-400">🔍 분석 중...</span>
         <span id="progress-percent" class="text-sm font-bold text-green-400">0%</span>
       </div>
-      <div class="progress-bar">
-        <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+      <div class="progress-container">
+        <div id="progress-fill" class="progress-bar-fill" style="width: 0%"></div>
       </div>
     </section>
 
     <!-- 결과 섹션 -->
     <section id="result-section" class="hidden space-y-8">
       <!-- 콘텐츠 결과 -->
-      <div class="glass-card p-8 md:p-12 border-l-8 border-green-500">
+      <div class="glass-card p-8 md:p-12 result-card" style="animation-delay: 0.1s; border-left: 4px solid var(--neon-green);">
         <div class="flex items-center justify-between mb-8 pb-4 border-b border-white/10">
-          <h2 class="text-xl font-black text-gray-400 uppercase tracking-wider">
-            <i class="fas fa-file-alt mr-2 text-green-500"></i>Generated Content
+          <h2 class="text-xl font-black flex items-center gap-3">
+            <i class="fas fa-file-alt text-green-400"></i>
+            <span>Generated Content</span>
           </h2>
           <div class="flex gap-3">
             <button onclick="downloadTxt()" class="chip"><i class="fas fa-download mr-2"></i>TXT</button>
@@ -902,28 +1292,104 @@ const mainPageHtml = `
             <button onclick="copyAll()" class="chip"><i class="fas fa-copy mr-2"></i>복사</button>
           </div>
         </div>
-        <div id="content" class="space-y-6 text-gray-200 leading-relaxed"></div>
+        <div id="content" class="space-y-4 text-gray-200"></div>
       </div>
 
       <!-- 엑셀 설계서 -->
-      <div class="glass-card p-8 md:p-12">
+      <div class="glass-card p-8 md:p-12 result-card" style="animation-delay: 0.2s;">
         <div class="flex items-center justify-between mb-8 pb-4 border-b border-white/10">
-          <h2 class="text-xl font-black text-gray-400 uppercase tracking-wider">
-            <i class="fas fa-table mr-2 text-blue-500"></i>Monochrome Excel Policy
+          <h2 class="text-xl font-black flex items-center gap-3">
+            <i class="fas fa-table text-cyan-400"></i>
+            <span>Monochrome Excel Policy</span>
           </h2>
-          <button onclick="generateExcel()" class="chip bg-blue-600 border-blue-500 text-white">
+          <button onclick="generateExcel()" class="btn-3d" style="padding: 12px 24px; font-size: 14px; box-shadow: 0 4px 0 #00994d, 0 8px 16px rgba(0,255,136,0.2);">
             <i class="fas fa-sync mr-2"></i>설계서 생성
           </button>
         </div>
-        <div id="excel-area" class="flex justify-center bg-black/30 p-10 rounded-2xl border border-dashed border-gray-700 min-h-[300px] items-center">
-          <span class="text-gray-600">설계서 생성 버튼을 클릭하세요</span>
+        <div id="excel-area" class="flex justify-center items-center min-h-[300px] bg-black/30 rounded-2xl border border-dashed border-gray-700">
+          <div class="text-center text-gray-500">
+            <i class="fas fa-file-excel text-4xl mb-4 opacity-30"></i>
+            <p>설계서 생성 버튼을 클릭하세요</p>
+          </div>
         </div>
       </div>
     </section>
+
   </div>
 
   <script>
-    // 상태 관리
+    // ============================================
+    // [파티클 시스템] Canvas 애니메이션
+    // ============================================
+    const canvas = document.getElementById('particles');
+    const ctx = canvas.getContext('2d');
+    
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    const particles = [];
+    const particleCount = 80;
+    
+    for (let i = 0; i < particleCount; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2 + 0.5,
+        speedX: (Math.random() - 0.5) * 0.5,
+        speedY: (Math.random() - 0.5) * 0.5,
+        opacity: Math.random() * 0.5 + 0.2,
+        color: ['#00ff88', '#00f5ff', '#bf00ff'][Math.floor(Math.random() * 3)]
+      });
+    }
+    
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      particles.forEach((p, i) => {
+        p.x += p.speedX;
+        p.y += p.speedY;
+        
+        if (p.x < 0) p.x = canvas.width;
+        if (p.x > canvas.width) p.x = 0;
+        if (p.y < 0) p.y = canvas.height;
+        if (p.y > canvas.height) p.y = 0;
+        
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.opacity;
+        ctx.fill();
+        
+        // 연결선
+        particles.forEach((p2, j) => {
+          if (i === j) return;
+          const dx = p.x - p2.x;
+          const dy = p.y - p2.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 120) {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = p.color;
+            ctx.globalAlpha = (1 - dist / 120) * 0.15;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          }
+        });
+      });
+      
+      ctx.globalAlpha = 1;
+      requestAnimationFrame(animateParticles);
+    }
+    animateParticles();
+
+    // ============================================
+    // [상태 관리]
+    // ============================================
     let state = {
       target: '30대 워킹맘',
       insuranceType: '상속/증여',
@@ -932,19 +1398,42 @@ const mainPageHtml = `
       concern: ''
     };
 
-    // 칩 선택
+    // ============================================
+    // [칩 선택] 리플 효과
+    // ============================================
     function selectChip(el, key) {
       const parent = el.parentElement;
       parent.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
       el.classList.add('active');
       state[key] = el.innerText;
+      
+      // 리플 효과
+      const ripple = document.createElement('span');
+      ripple.style.cssText = 'position:absolute;background:rgba(0,255,136,0.3);border-radius:50%;transform:scale(0);animation:ripple 0.6s linear;pointer-events:none;';
+      const rect = el.getBoundingClientRect();
+      ripple.style.width = ripple.style.height = Math.max(rect.width, rect.height) + 'px';
+      ripple.style.left = '50%';
+      ripple.style.top = '50%';
+      ripple.style.marginLeft = -Math.max(rect.width, rect.height) / 2 + 'px';
+      ripple.style.marginTop = -Math.max(rect.width, rect.height) / 2 + 'px';
+      el.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 600);
     }
 
-    // 콘텐츠 생성
+    // 리플 애니메이션 CSS 추가
+    const style = document.createElement('style');
+    style.textContent = '@keyframes ripple { to { transform: scale(2); opacity: 0; } }';
+    document.head.appendChild(style);
+
+    // ============================================
+    // [콘텐츠 생성] 스트리밍
+    // ============================================
     async function generateContent() {
       const concern = document.getElementById('concern').value;
       if (!concern.trim()) {
-        alert('핵심 고민(Angle)을 입력해주세요!');
+        // 커스텀 알림
+        showToast('핵심 고민(Angle)을 입력해주세요!', 'warning');
+        document.getElementById('concern').focus();
         return;
       }
 
@@ -963,6 +1452,7 @@ const mainPageHtml = `
       
       progressFill.style.width = '10%';
       progressPercent.innerText = '10%';
+      progressText.innerText = '🔍 타겟 페르소나 정밀 분석 중...';
 
       try {
         const response = await fetch('/api/generate/master', {
@@ -997,21 +1487,26 @@ const mainPageHtml = `
                 progressFill.style.width = '100%';
                 progressPercent.innerText = '100%';
                 progressText.innerText = '✅ 콘텐츠 생성 완료!';
+                showToast('콘텐츠 생성이 완료되었습니다!', 'success');
               } else if (json.type === 'error') {
                 content.innerHTML = '<span class="text-red-400">' + json.msg + '</span>';
+                showToast(json.msg, 'error');
               }
             } catch (e) {}
           }
         }
       } catch (error) {
         document.getElementById('content').innerHTML = '<span class="text-red-400">네트워크 오류가 발생했습니다.</span>';
+        showToast('네트워크 오류가 발생했습니다.', 'error');
       }
     }
 
-    // 엑셀 설계서 생성
+    // ============================================
+    // [엑셀 설계서 생성]
+    // ============================================
     async function generateExcel() {
       const area = document.getElementById('excel-area');
-      area.innerHTML = '<div class="spinner"></div>';
+      area.innerHTML = '<div class="neon-spinner"></div>';
 
       try {
         const response = await fetch('/api/generate/excel', {
@@ -1025,8 +1520,8 @@ const mainPageHtml = `
         if (json.success && json.data) {
           const d = json.data;
           let html = '<div class="excel-sheet">';
-          html += '<div style="font-size:28px; font-weight:900; border-bottom:4px solid #000; padding-bottom:15px; margin-bottom:20px; text-transform:uppercase; letter-spacing:-1px;">' + (d.product || '보험설계서') + '</div>';
-          html += '<div style="font-size:14px; margin-bottom:20px; display:flex; justify-content:space-between; border-bottom:1px solid #ddd; padding-bottom:12px;">';
+          html += '<div style="font-size:24px; font-weight:900; border-bottom:3px solid #000; padding-bottom:15px; margin-bottom:20px; letter-spacing:-1px;">' + (d.product || '보험설계서') + '</div>';
+          html += '<div style="font-size:13px; margin-bottom:20px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; border-bottom:1px solid #ddd; padding-bottom:12px;">';
           html += '<span><b>피보험자:</b> ' + d.target + ' (' + d.gender + '/' + d.age + ')</span>';
           html += '<span><b>보험사:</b> ' + (d.company || state.company) + '</span>';
           html += '<span><b>문서코드:</b> ' + Math.random().toString(36).substr(2, 9).toUpperCase() + '</span>';
@@ -1040,24 +1535,72 @@ const mainPageHtml = `
           }
           
           html += '</table>';
-          html += '<div style="text-align:right; font-size:24px; font-weight:900; margin-top:30px; border-top:3px solid #000; padding-top:20px; color:#000;">월 합계 보험료: ' + (d.total || '-') + '</div>';
-          html += '<div style="margin-top:40px; font-size:11px; color:#666; text-align:center; border:1px solid #ddd; padding:15px; background:#f9f9f9;">※ 본 제안서는 가상의 설계 예시이며, 실제 가입 시 보험사 공식 설계서를 반드시 확인하시기 바랍니다.</div>';
+          html += '<div style="text-align:right; font-size:20px; font-weight:900; margin-top:25px; border-top:2px solid #000; padding-top:15px; color:#000;">월 합계 보험료: ' + (d.total || '-') + '</div>';
+          html += '<div style="margin-top:30px; font-size:10px; color:#666; text-align:center; border:1px solid #ddd; padding:12px; background:#f9f9f9;">※ 본 제안서는 가상의 설계 예시이며, 실제 가입 시 보험사 공식 설계서를 반드시 확인하시기 바랍니다.</div>';
           html += '</div>';
           
           area.innerHTML = html;
+          showToast('설계서가 생성되었습니다!', 'success');
         } else {
           area.innerHTML = '<span class="text-red-400">설계서 생성에 실패했습니다.</span>';
+          showToast('설계서 생성에 실패했습니다.', 'error');
         }
       } catch (error) {
         area.innerHTML = '<span class="text-red-400">네트워크 오류가 발생했습니다.</span>';
+        showToast('네트워크 오류가 발생했습니다.', 'error');
       }
     }
 
-    // TXT 다운로드
+    // ============================================
+    // [토스트 알림]
+    // ============================================
+    function showToast(message, type = 'info') {
+      const colors = {
+        success: 'linear-gradient(135deg, #00ff88, #00aa55)',
+        error: 'linear-gradient(135deg, #ff4444, #cc0000)',
+        warning: 'linear-gradient(135deg, #ffaa00, #ff8800)',
+        info: 'linear-gradient(135deg, #00f5ff, #0088ff)'
+      };
+      
+      const toast = document.createElement('div');
+      toast.style.cssText = \`
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        padding: 16px 28px;
+        background: \${colors[type]};
+        color: \${type === 'warning' ? '#000' : '#fff'};
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 14px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        z-index: 9999;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+      \`;
+      toast.innerText = message;
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.transform = 'translateY(0)';
+        toast.style.opacity = '1';
+      }, 10);
+      
+      setTimeout(() => {
+        toast.style.transform = 'translateY(100px)';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 400);
+      }, 3000);
+    }
+
+    // ============================================
+    // [다운로드 기능들]
+    // ============================================
     function downloadTxt() {
       const content = document.getElementById('content').innerText;
       if (!content) {
-        alert('먼저 콘텐츠를 생성해주세요!');
+        showToast('먼저 콘텐츠를 생성해주세요!', 'warning');
         return;
       }
       
@@ -1070,13 +1613,13 @@ const mainPageHtml = `
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      showToast('TXT 파일이 다운로드되었습니다!', 'success');
     }
 
-    // PDF 다운로드
     function downloadPdf() {
       const content = document.getElementById('content').innerText;
       if (!content) {
-        alert('먼저 콘텐츠를 생성해주세요!');
+        showToast('먼저 콘텐츠를 생성해주세요!', 'warning');
         return;
       }
       
@@ -1088,7 +1631,7 @@ const mainPageHtml = `
           <title>XIVIX 2026 PRO - \${state.insuranceType}</title>
           <style>
             body { font-family: 'Malgun Gothic', sans-serif; padding: 40px; line-height: 1.8; word-break: keep-all; }
-            h1 { color: #03C75A; border-bottom: 3px solid #03C75A; padding-bottom: 10px; }
+            h1 { color: #00aa55; border-bottom: 3px solid #00aa55; padding-bottom: 10px; }
           </style>
         </head>
         <body>
@@ -1103,18 +1646,39 @@ const mainPageHtml = `
       printWindow.print();
     }
 
-    // 전체 복사
     function copyAll() {
       const content = document.getElementById('content').innerText;
       if (!content) {
-        alert('먼저 콘텐츠를 생성해주세요!');
+        showToast('먼저 콘텐츠를 생성해주세요!', 'warning');
         return;
       }
       
       navigator.clipboard.writeText(content).then(function() {
-        alert('✅ 전체 내용이 클립보드에 복사되었습니다!');
+        showToast('전체 내용이 클립보드에 복사되었습니다!', 'success');
       });
     }
+
+    // ============================================
+    // [마우스 추적 효과] 카드에 3D 효과
+    // ============================================
+    document.querySelectorAll('.card-3d').forEach(card => {
+      card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        const rotateX = (y - centerY) / 20;
+        const rotateY = (centerX - x) / 20;
+        
+        card.querySelector('.card-3d-inner').style.transform = 
+          \`rotateX(\${rotateX}deg) rotateY(\${rotateY}deg)\`;
+      });
+      
+      card.addEventListener('mouseleave', () => {
+        card.querySelector('.card-3d-inner').style.transform = 'rotateX(0) rotateY(0)';
+      });
+    });
   </script>
 </body>
 </html>
