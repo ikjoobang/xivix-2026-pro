@@ -75,7 +75,6 @@ async function callGeminiWithFallback(model: string, prompt: string, isStream: b
         return response
       }
       
-      // 429 (Rate Limit) 또는 403 (Forbidden) 시 다음 키로
       if (response.status === 429 || response.status === 403) {
         console.log(`API Key ${currentKeyIndex} failed with status ${response.status}, trying next...`)
         continue
@@ -99,11 +98,9 @@ function getPersona(target: string, concern: string) {
   const maleKeywords = ['가장', '아빠', '남편', '남성', '오빠', '형', '아들', '남자']
   const femaleKeywords = ['워킹맘', '엄마', '주부', '아내', '여성', '딸', '언니', '누나', '여자']
   
-  // 남성 키워드 우선 체크
   if (maleKeywords.some(k => target.includes(k) || concern.includes(k))) {
     gender = '남성'
   }
-  // 여성 키워드 강제 적용 (워킹맘 오류 차단)
   if (femaleKeywords.some(k => target.includes(k) || concern.includes(k))) {
     gender = '여성'
   }
@@ -116,6 +113,7 @@ function getPersona(target: string, concern: string) {
 
 // ============================================
 // [로직 2] 김미경 지사장급 초정밀 전문가 프롬프트
+// - 타이포그래피 가이드 ❶❷❸, ■, ✔️ 강제 적용
 // ============================================
 function getExpertPrompt(data: any) {
   const p = getPersona(data.target, data.concern)
@@ -130,60 +128,91 @@ function getExpertPrompt(data: any) {
 - 현재 페르소나: ${p.gender} / ${p.age}
 - 질문자 화법: 반드시 ${p.gender}의 자연스러운 말투 사용
 - 워킹맘/엄마 = 무조건 여성, 가장/아빠 = 무조건 남성
+- 보험사명 "${data.company}"을 답변에 자연스럽게 포함할 것
 
 [전문가 지식 가이드 - 절대 준수]
 1. 상속/증여: 상증법 제8조(간주상속재산) 법리, 수익자 지정에 따른 상속세 절세 원리, 10년 주기 증여 한도 소명 전략.
 2. CEO/법인: 법인세 손비처리 한도, 가지급금 정리용 퇴직금 재원, 임원배상책임 리스크 관리.
-3. 치매/간병: CDR 척도별 판정 기준, ADL(일상생활장애) 보장 공백, 체증형 일당의 화폐가치 방어 논리.
+3. 치매/간병: CDR 척도별 판정 기준(CDR 0.5~3단계), ADL(일상생활장애) 보장 공백, 체증형 일당의 화폐가치 방어 논리.
 4. 유병자보험: 간편심사 기준, 고지의무 범위, 기왕증 부담보 조건.
+
+[타이포그래피 가이드 - 필수 적용]
+- 단계별 프로세스 설명 시 반드시 ❶ ❷ ❸ 기호 사용
+- 핵심 개념 정의 시 반드시 ■ (Black Square) 기호 사용
+- 체크리스트/장점 나열 시 반드시 ✔️ (Check Mark) 기호 사용
+- 마크다운 표(|) 금지, HTML <br> 태그로 줄바꿈
+- word-break: keep-all 규칙에 맞게 한글 단어 단위 줄바꿈
 
 [콘텐츠 구성 가이드]
 - 질문: 수만 가지 상황 중 랜덤 생성 (보험 초보가 동네 형에게 묻듯 현실적으로)
-- 답변: 3가지 스타일로 작성하되 총 1,200자 이상의 압도적 정보량과 공감 제공
-- 시각 계층: ❶ ❷ ❸ (프로세스), ■ (강조), ✔️ (체크) 기호 필수 사용
-- 마크다운 표(|) 금지, HTML <br> 태그로 줄바꿈
+- 답변: 3가지 스타일로 작성하되 각 답변당 최소 1,200자 이상의 압도적 정보량과 공감 제공
+- 각 답변에 전문 용어(상증법 제8조, CDR 척도, 손비처리)를 자연스럽게 배치
 
 [알고리즘 대응 전략]
-- C-Rank: 전문 용어(상증법 제8조, CDR 척도, 손비처리)를 자연스럽게 배치
+- C-Rank: 전문 지식을 자연스럽게 녹여 '전문성' 시그널 발생
 - DIA/Agent N: '정보의 이득'을 극대화한 구체적인 수치와 해결책 제시
 
-[출력 구조]
+[출력 구조 - 반드시 이 형식으로]
+
 === SEO 노출 점수 ===
-(S/A/B/C 등급 및 점수)
+등급: S/A/B/C 중 하나
+점수: 0~100점
+예상 노출 순위: 상위 n%
 
 === 제목 (2개) ===
-1. 
-2. 
+❶ (클릭을 유도하는 제목)
+❷ (정보성을 강조하는 제목)
 
 === 키워드 (5개) ===
-1. 2. 3. 4. 5.
+✔️ 키워드1
+✔️ 키워드2
+✔️ 키워드3
+✔️ 키워드4
+✔️ 키워드5
 
 === 질문 (3개) ===
-[질문1]
-[질문2]
-[질문3]
 
-=== 전문가 답변 (3개) ===
-[답변1 - ${data.style}]
-(1,200자 이상 상세 답변)
+■ [질문1]
+(${p.gender}의 화법으로 현실적인 고민을 질문)
 
-[답변2]
-(1,200자 이상 상세 답변)
+■ [질문2]
+(다른 상황의 질문)
 
-[답변3]
-(1,200자 이상 상세 답변)
+■ [질문3]
+(또 다른 상황의 질문)
+
+=== 전문가 답변 ===
+
+■ [답변1 - ${data.style}]
+
+❶ 결론부터 말씀드리면...
+(핵심 결론 먼저 제시)
+
+❷ 상세 설명
+(전문 지식을 쉽게 풀어서 설명, 1,200자 이상)
+
+❸ 실행 가이드
+✔️ 첫 번째 할 일
+✔️ 두 번째 할 일
+✔️ 세 번째 할 일
+
+■ [답변2]
+(위와 동일한 구조로 1,200자 이상)
+
+■ [답변3]
+(위와 동일한 구조로 1,200자 이상)
 
 === 핵심 포인트 ===
-❶ 
-❷ 
-❸ 
+❶ (가장 중요한 포인트)
+❷ (두 번째 중요한 포인트)
+❸ (세 번째 중요한 포인트)
 
 === 댓글 (5개) ===
-[댓글1]
-[댓글2]
-[댓글3]
-[댓글4]
-[댓글5]`
+✔️ [댓글1] (공감하는 댓글)
+✔️ [댓글2] (질문하는 댓글)
+✔️ [댓글3] (정보 추가하는 댓글)
+✔️ [댓글4] (감사하는 댓글)
+✔️ [댓글5] (경험 공유하는 댓글)`
 }
 
 // ============================================
@@ -200,10 +229,11 @@ function getExcelPrompt(data: any) {
 - 흑백 엑셀 인쇄물용 데이터 (컬러 코드 완전 배제)
 - 15개 이상의 리얼한 담보 구성
 - 2026년 실제 시장가 기준 보험료
+- ${data.company}의 실제 상품명 스타일로 작성
 
 [출력 형식 - 반드시 JSON만 출력]
 {
-  "product": "${data.insuranceType} 마스터 플랜",
+  "product": "${data.company} ${data.insuranceType} 마스터 플랜",
   "company": "${data.company}",
   "insured": "${p.target}",
   "gender": "${p.gender}",
@@ -223,7 +253,7 @@ app.post('/api/generate/master', async (c) => {
 
   return streamText(c, async (stream) => {
     await stream.write(JSON.stringify({ type: 'status', step: 1, msg: '🔍 1단계: 타겟 페르소나 정밀 분석 중...' }) + '\n')
-    await stream.write(JSON.stringify({ type: 'status', step: 2, msg: '⚖️ 2단계: 2026년 최신 보험 법리 대입 중...' }) + '\n')
+    await stream.write(JSON.stringify({ type: 'status', step: 2, msg: `⚖️ 2단계: ${body.company} 최신 약관 및 법리 대입 중...` }) + '\n')
     await stream.write(JSON.stringify({ type: 'status', step: 3, msg: '🧠 3단계: 전문가 뇌 교체 및 콘텐츠 생성 중...' }) + '\n')
 
     try {
@@ -309,12 +339,17 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '2026.1.0',
+    version: '2026.2.0',
     engines: {
       expert: EXPERT_ENGINE,
       data: DATA_ENGINE
     },
-    apiKeysAvailable: API_KEYS.length
+    apiKeysAvailable: API_KEYS.length,
+    typographyGuide: {
+      process: '❶ ❷ ❸',
+      emphasis: '■',
+      check: '✔️'
+    }
   })
 })
 
@@ -326,14 +361,15 @@ app.get('/api/docs', (c) => {
     openapi: '3.0.0',
     info: {
       title: 'XIVIX 2026 PRO API',
-      version: '2026.1.0',
-      description: '대한민국 상위 1% 보험 마케팅 콘텐츠 생성 API'
+      version: '2026.2.0',
+      description: '대한민국 상위 1% 보험 마케팅 콘텐츠 생성 API - 타이포그래피 가이드 적용'
     },
     servers: [{ url: '/' }],
     paths: {
       '/api/generate/master': {
         post: {
           summary: 'Q&A 콘텐츠 스트리밍 생성',
+          description: '❶❷❸, ■, ✔️ 기호가 적용된 전문가 콘텐츠 생성',
           requestBody: {
             content: {
               'application/json': {
@@ -350,7 +386,7 @@ app.get('/api/docs', (c) => {
               }
             }
           },
-          responses: { '200': { description: 'Streaming response' } }
+          responses: { '200': { description: 'Streaming response with typography symbols' } }
         }
       },
       '/api/generate/excel': {
@@ -362,7 +398,7 @@ app.get('/api/docs', (c) => {
       '/api/health': {
         get: {
           summary: 'Health Check',
-          responses: { '200': { description: 'Server status' } }
+          responses: { '200': { description: 'Server status with typography guide' } }
         }
       }
     }
@@ -380,13 +416,14 @@ app.get('/api/admin/stats', (c) => {
       expert: EXPERT_ENGINE,
       data: DATA_ENGINE
     },
-    features: ['Q&A 생성', '엑셀 설계서', 'TXT 다운로드', 'PDF 생성'],
+    features: ['Q&A 생성', '엑셀 설계서', 'TXT 다운로드', 'PDF 생성', '타이포그래피 가이드'],
+    typographySymbols: ['❶❷❸ (프로세스)', '■ (강조)', '✔️ (체크)'],
     lastUpdated: new Date().toISOString()
   })
 })
 
 // ============================================
-// 🖥️ 메인 UI (Beyond Reality 스타일 + 타이포그래피 가이드)
+// 🖥️ 메인 UI (타이포그래피 가이드 강화 버전)
 // ============================================
 const mainPageHtml = `
 <!DOCTYPE html>
@@ -398,7 +435,9 @@ const mainPageHtml = `
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 <style>
-  /* 사장님 가이드 타이포그래피 반영 */
+  /* ============================================
+     [가독성 가이드] 사장님 타이포그래피 사양 100% 반영
+     ============================================ */
   :root { 
     --naver-green: #03C75A; 
     --sub-orange: #FF6B35;
@@ -413,7 +452,7 @@ const mainPageHtml = `
     color: #fff; 
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Pretendard', sans-serif;
-    word-break: keep-all;
+    word-break: keep-all; /* 한글 단어 단위 줄바꿈 */
     overflow-x: hidden;
   }
 
@@ -427,12 +466,78 @@ const mainPageHtml = `
     .content-area { max-width: 1200px; margin: 0 auto; padding: 0 40px; }
   }
 
-  /* 시각적 계층 구조 CSS */
+  /* ============================================
+     [시각적 계층 구조] CSS 클래스
+     ============================================ */
+  
+  /* ❶ ❷ ❸ 프로세스 리스트 */
+  .ordered-list {
+    list-style: none;
+    padding-left: 0;
+    counter-reset: item;
+  }
+  .ordered-list li {
+    margin-bottom: 12px;
+    padding-left: 32px;
+    position: relative;
+    color: #e0e0e0;
+  }
+  .ordered-list li::before {
+    content: "❶";
+    position: absolute;
+    left: 0;
+    color: var(--naver-green);
+    font-weight: 700;
+  }
+  .ordered-list li:nth-child(2)::before { content: "❷"; }
+  .ordered-list li:nth-child(3)::before { content: "❸"; }
+  .ordered-list li:nth-child(4)::before { content: "❹"; }
+  .ordered-list li:nth-child(5)::before { content: "❺"; }
+  
+  /* ■ 강조 리스트 */
+  .emphasis-list {
+    list-style: none;
+    padding-left: 0;
+  }
+  .emphasis-list li {
+    margin-bottom: 10px;
+    padding-left: 24px;
+    position: relative;
+    color: #fff;
+    font-weight: 500;
+  }
+  .emphasis-list li::before {
+    content: "■";
+    position: absolute;
+    left: 0;
+    color: #fff;
+  }
+  
+  /* ✔️ 체크 리스트 */
+  .check-list {
+    list-style: none;
+    padding-left: 0;
+  }
+  .check-list li {
+    margin-bottom: 8px;
+    padding-left: 28px;
+    position: relative;
+    color: #b0b0b0;
+  }
+  .check-list li::before {
+    content: "✔️";
+    position: absolute;
+    left: 0;
+  }
+  
+  /* 텍스트 강조 */
   strong, b { font-weight: 700; color: #fff; }
   a { color: var(--naver-green); text-decoration: none; font-weight: 500; }
   a:hover { text-decoration: underline; }
   
-  /* Beyond Reality 스타일 (Glassmorphism & 3D) */
+  /* ============================================
+     [Beyond Reality 스타일] Glassmorphism & 3D
+     ============================================ */
   .glass-card { 
     background: var(--glass-bg); 
     border: 1px solid var(--glass-border); 
@@ -640,6 +745,12 @@ const mainPageHtml = `
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
+
+  /* 콘텐츠 결과 영역 스타일 */
+  #content {
+    font-size: inherit;
+    line-height: inherit;
+  }
 </style>
 </head>
 <body class="bg-grid">
@@ -657,7 +768,7 @@ const mainPageHtml = `
           <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-green-700 rounded-2xl flex items-center justify-center font-black text-3xl shadow-lg pulse-glow">X</div>
           <div>
             <h1 class="text-3xl md:text-4xl font-black tracking-tighter italic">XIVIX <span class="gradient-text">2026 PRO</span></h1>
-            <p class="text-sm text-gray-500 mt-1">상위 1% 보험 마케팅 마스터</p>
+            <p class="text-sm text-gray-500 mt-1">상위 1% 보험 마케팅 마스터 | 타이포그래피 가이드 적용</p>
           </div>
         </div>
         <div class="flex gap-3">
@@ -667,12 +778,25 @@ const mainPageHtml = `
       </div>
     </header>
 
+    <!-- 타이포그래피 가이드 안내 -->
+    <section class="glass-card p-6 border-l-4 border-yellow-500">
+      <div class="flex items-center gap-3 text-sm">
+        <i class="fas fa-lightbulb text-yellow-500"></i>
+        <span class="text-gray-300">
+          <strong class="text-yellow-400">타이포그래피 가이드 적용:</strong> 
+          모든 콘텐츠에 <span class="text-green-400">❶❷❸</span> (프로세스), 
+          <span class="text-white">■</span> (강조), 
+          <span class="text-green-400">✔️</span> (체크) 기호가 자동 적용됩니다.
+        </span>
+      </div>
+    </section>
+
     <!-- 메인 입력 섹션 -->
     <section class="glass-card p-8 md:p-12 space-y-10">
       <!-- Step 1: 타겟 선택 -->
       <div class="space-y-4">
         <label class="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest">
-          <span class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white text-xs">1</span>
+          <span class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white text-xs">❶</span>
           타겟 고객 선택
         </label>
         <div class="flex flex-wrap gap-3" id="target-chips">
@@ -687,7 +811,7 @@ const mainPageHtml = `
       <!-- Step 2: 보험 종류 -->
       <div class="space-y-4">
         <label class="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest">
-          <span class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white text-xs">2</span>
+          <span class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white text-xs">❷</span>
           보험 종류 선택
         </label>
         <div class="flex flex-wrap gap-3" id="type-chips">
@@ -703,7 +827,7 @@ const mainPageHtml = `
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="space-y-3">
           <label class="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest">
-            <span class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white text-xs">3</span>
+            <span class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white text-xs">❸</span>
             보험사 선택
           </label>
           <select id="company" class="input-field">
@@ -727,7 +851,7 @@ const mainPageHtml = `
         </div>
         <div class="space-y-3">
           <label class="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest">
-            <span class="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white text-xs">4</span>
+            <span class="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white text-xs">❹</span>
             제안서 스타일
           </label>
           <select id="style" class="input-field">
@@ -738,10 +862,10 @@ const mainPageHtml = `
         </div>
       </div>
 
-      <!-- Step 4: 핵심 고민 입력 -->
+      <!-- Step 5: 핵심 고민 입력 -->
       <div class="space-y-3">
         <label class="flex items-center gap-2 text-sm font-bold text-red-400 uppercase tracking-widest">
-          <span class="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white text-xs">5</span>
+          <span class="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white text-xs">❺</span>
           핵심 고민 (Angle) - 가장 중요!
         </label>
         <textarea id="concern" class="input-field h-32 resize-none text-xl" placeholder="예: 워킹맘인데 아이 교육자금으로 증여하려면 세금이 얼마나 나올까요?"></textarea>
@@ -749,7 +873,7 @@ const mainPageHtml = `
 
       <!-- 생성 버튼 -->
       <button onclick="generateContent()" id="generateBtn" class="btn-primary w-full text-center">
-        <i class="fas fa-rocket mr-3"></i>🚀 데이터 대입 및 콘텐츠 생성 시작
+        <i class="fas fa-rocket mr-3"></i>🚀 데이터 대입 및 전문가 콘텐츠 생성
       </button>
     </section>
 
@@ -948,7 +1072,7 @@ const mainPageHtml = `
       URL.revokeObjectURL(url);
     }
 
-    // PDF 다운로드 (간이 버전)
+    // PDF 다운로드
     function downloadPdf() {
       const content = document.getElementById('content').innerText;
       if (!content) {
@@ -956,7 +1080,6 @@ const mainPageHtml = `
         return;
       }
       
-      // PDF 생성을 위한 새 창 열기
       const printWindow = window.open('', '_blank');
       printWindow.document.write(\`
         <!DOCTYPE html>
@@ -964,7 +1087,7 @@ const mainPageHtml = `
         <head>
           <title>XIVIX 2026 PRO - \${state.insuranceType}</title>
           <style>
-            body { font-family: 'Malgun Gothic', sans-serif; padding: 40px; line-height: 1.8; }
+            body { font-family: 'Malgun Gothic', sans-serif; padding: 40px; line-height: 1.8; word-break: keep-all; }
             h1 { color: #03C75A; border-bottom: 3px solid #03C75A; padding-bottom: 10px; }
           </style>
         </head>
@@ -972,7 +1095,7 @@ const mainPageHtml = `
           <h1>XIVIX 2026 PRO - \${state.insuranceType}</h1>
           <p><strong>타겟:</strong> \${state.target} | <strong>보험사:</strong> \${state.company} | <strong>스타일:</strong> \${state.style}</p>
           <hr>
-          <pre style="white-space: pre-wrap;">\${content}</pre>
+          <pre style="white-space: pre-wrap; font-family: inherit;">\${content}</pre>
         </body>
         </html>
       \`);
@@ -1010,7 +1133,7 @@ const adminPageHtml = `
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 <style>
-  body { background: #0a0a0a; color: #fff; font-family: -apple-system, sans-serif; }
+  body { background: #0a0a0a; color: #fff; font-family: -apple-system, sans-serif; word-break: keep-all; }
   .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; }
   .stat-card { transition: all 0.3s ease; }
   .stat-card:hover { transform: translateY(-5px); border-color: #03C75A; }
@@ -1024,7 +1147,7 @@ const adminPageHtml = `
         <div class="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center font-black text-xl">X</div>
         <div>
           <h1 class="text-2xl font-black">Admin Dashboard</h1>
-          <p class="text-sm text-gray-500">XIVIX 2026 PRO 관리자 패널</p>
+          <p class="text-sm text-gray-500">XIVIX 2026 PRO 관리자 패널 | 타이포그래피 가이드 v2</p>
         </div>
       </div>
       <a href="/" class="px-4 py-2 bg-gray-800 rounded-lg text-sm hover:bg-gray-700 transition">
@@ -1047,8 +1170,27 @@ const adminPageHtml = `
         <div class="text-sm text-gray-400 mt-2">데이터 엔진</div>
       </div>
       <div class="card stat-card p-6">
-        <div class="text-3xl font-black text-orange-500">v2026.1</div>
+        <div class="text-3xl font-black text-orange-500">v2026.2</div>
         <div class="text-sm text-gray-400 mt-2">시스템 버전</div>
+      </div>
+    </div>
+
+    <!-- 타이포그래피 가이드 -->
+    <div class="card p-8">
+      <h2 class="text-xl font-bold mb-6"><i class="fas fa-font mr-2 text-yellow-500"></i>타이포그래피 가이드</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="p-4 bg-black/30 rounded-lg">
+          <div class="text-2xl mb-2">❶ ❷ ❸</div>
+          <div class="text-sm text-gray-400">프로세스 / 단계별 설명</div>
+        </div>
+        <div class="p-4 bg-black/30 rounded-lg">
+          <div class="text-2xl mb-2">■</div>
+          <div class="text-sm text-gray-400">핵심 개념 / 강조 포인트</div>
+        </div>
+        <div class="p-4 bg-black/30 rounded-lg">
+          <div class="text-2xl mb-2">✔️</div>
+          <div class="text-sm text-gray-400">체크리스트 / 장점 나열</div>
+        </div>
       </div>
     </div>
 
@@ -1109,7 +1251,6 @@ const adminPageHtml = `
   </div>
 
   <script>
-    // 통계 로드
     fetch('/api/admin/stats')
       .then(r => r.json())
       .then(data => {
