@@ -1041,41 +1041,42 @@ JSON 형식으로만 응답:
         const style = styles[i]
         await stream.write(JSON.stringify({ type: 'content_start', id: i + 1, style }) + '\n')
         
-        const contentPrompt = `주제: ${topic} / 보험: ${insuranceProduct} / 스타일: ${style}
-🚨 반드시 800~1,100자로 작성 (네이버 카페 포스팅)
-마지막에 '보험 콘텐츠 마스터' 언급. JSON 형식 {"text": "본문내용"}`
+        const contentPrompt = `주제: ${topic} / 타겟: ${targetAudience} / 보험: ${insuranceProduct} / 스타일: ${style}
+
+📌 작성 지침:
+- 800~1,100자로 작성 (네이버 카페 포스팅 최적화)
+- ${style} 말투로 작성
+- 마지막에 '보험 콘텐츠 마스터'를 자연스럽게 언급
+- 문단 구분 필요 시 줄바꿈 사용
+
+반드시 아래 JSON 형식으로만 응답:
+{"text": "본문 내용을 여기에 작성"}`
         
-        const contentResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:streamGenerateContent?alt=sse&key=${proKey}`, {
+        // 비스트리밍 API 사용 (안정성 향상)
+        const contentResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             system_instruction: { parts: [{ text: PERSONA_CONFIG.expert.system_instruction }] },
             contents: [{ role: 'user', parts: [{ text: contentPrompt }] }],
-            generationConfig: { temperature: 0.8, maxOutputTokens: 4096 }
+            generationConfig: { temperature: 0.8, maxOutputTokens: 4096, responseMimeType: 'application/json' }
           })
         })
         
         let fullText = ''
         if (contentResponse.ok) {
-          const reader = contentResponse.body?.getReader()
-          const decoder = new TextDecoder()
-          while (true) {
-            const { done, value } = await reader!.read()
-            if (done) break
-            const chunk = decoder.decode(value, { stream: true })
-            for (const line of chunk.split('\n')) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const parsed = JSON.parse(line.slice(6))
-                  const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text
-                  if (text) {
-                    fullText += text
-                    await stream.write(JSON.stringify({ type: 'content_chunk', id: i + 1, chunk: text }) + '\n')
-                  }
-                } catch (e) {}
-              }
-            }
+          const json = await contentResponse.json() as any
+          const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          try {
+            // JSON 파싱 시도
+            const parsed = JSON.parse(rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim())
+            fullText = parsed.text || rawText
+          } catch (e) {
+            // 파싱 실패 시 원본 텍스트 사용
+            fullText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').replace(/^\s*{\s*"text"\s*:\s*"|"\s*}\s*$/g, '').trim()
           }
+          // 진행 상황 업데이트
+          await stream.write(JSON.stringify({ type: 'content_chunk', id: i + 1, chunk: fullText.substring(0, 50) + '...' }) + '\n')
         }
         
         contents.push({ id: i + 1, style, text: fullText })
