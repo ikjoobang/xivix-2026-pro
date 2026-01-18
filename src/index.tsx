@@ -3711,6 +3711,7 @@ async function goGenerateStream() {
   
   btn.classList.remove('loading');
   btn.disabled = false;
+  btn.innerHTML = '<span class="btn-text"><i class="fas fa-fire"></i> 미끼 질문 + 답변 세트 생성</span><div class="spinner"></div>';
   isGenerating = false;
 }
 
