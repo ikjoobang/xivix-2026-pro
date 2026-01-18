@@ -3649,6 +3649,21 @@ async function goGenerateStream() {
       throw new Error('스트림 body가 없습니다');
     }
     
+    // 🎯 응답 연결 성공 - 즉시 진행률 업데이트
+    progressFill.style.width = '10%';
+    progressPct.textContent = '10%';
+    progressText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 🔗 서버 연결 완료! AI가 분석 중입니다...';
+    console.log('[XIVIX] 스트림 연결 성공, 데이터 수신 대기 중...');
+    
+    // 타임아웃 경고 (30초 후에도 이벤트가 없으면)
+    let eventReceived = false;
+    const timeoutWarning = setTimeout(() => {
+      if (!eventReceived) {
+        progressText.innerHTML = '<i class="fas fa-hourglass-half fa-spin" style="color:var(--orange)"></i> ⏳ AI 응답 대기 중... (고품질 콘텐츠 생성에 시간이 소요됩니다)';
+      }
+    }, 15000);
+    }
+    
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -3674,6 +3689,8 @@ async function goGenerateStream() {
         try {
           const event = JSON.parse(line);
           eventCount++;
+          eventReceived = true; // 타임아웃 경고 취소
+          clearTimeout(timeoutWarning);
           console.log('[XIVIX] Event #' + eventCount + ':', event.type);
           
           switch (event.type) {
