@@ -434,17 +434,29 @@ app.get('/api/trend', async (c) => {
       const endDate = today.toISOString().split('T')[0]
       const startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
       
+      // 다양한 보험 키워드 풀 (네이버 API는 최대 5개 그룹만 허용)
+      const allKeywordGroups = [
+        { groupName: '실손보험', keywords: ['실손보험', '실손보험 4세대', '실비보험'] },
+        { groupName: '암보험', keywords: ['암보험', '암보험 추천', '암보험 비교'] },
+        { groupName: '종신보험', keywords: ['종신보험', '종신보험 해지', '종신보험 추천'] },
+        { groupName: '치매보험', keywords: ['치매보험', '치매보험 추천', '간병보험'] },
+        { groupName: '자녀보험', keywords: ['자녀보험', '어린이보험', '태아보험'] },
+        { groupName: '연금보험', keywords: ['연금보험', '연금저축', '노후대비'] },
+        { groupName: '운전자보험', keywords: ['운전자보험', '자동차보험', '운전자보험 필요성'] },
+        { groupName: '상속세', keywords: ['상속세', '상속세 절세', '상속 증여'] },
+        { groupName: '증여세', keywords: ['증여세', '증여세 면제', '증여 한도'] },
+        { groupName: '건강보험', keywords: ['건강보험', '건강보험료', '의료보험'] }
+      ]
+      
+      // 매 요청마다 랜덤으로 5개 선택 (실시간 변동 효과)
+      const shuffled = [...allKeywordGroups].sort(() => Math.random() - 0.5)
+      const selectedGroups = shuffled.slice(0, 5)
+      
       const requestBody = {
         startDate,
         endDate,
         timeUnit: 'date',
-        keywordGroups: [
-          { groupName: '실손보험', keywords: ['실손보험', '실손보험 4세대', '실손보험 추천'] },
-          { groupName: '상속세', keywords: ['상속세', '상속세 절세', '상속 보험'] },
-          { groupName: '증여세', keywords: ['증여세', '증여세 면제', '증여 보험'] },
-          { groupName: '치매보험', keywords: ['치매보험', '치매 보장', '간병보험'] },
-          { groupName: '종신보험', keywords: ['종신보험', '종신보험 추천', '종신보험 해지'] }
-        ]
+        keywordGroups: selectedGroups
       }
       
       const response = await fetch('https://openapi.naver.com/v1/datalab/search', {
@@ -3620,9 +3632,16 @@ async function goGenerateStream() {
     
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
       
-      buffer += decoder.decode(value, { stream: true });
+      if (value) {
+        buffer += decoder.decode(value, { stream: true });
+      }
+      
+      // 스트림 완료 시 남은 버퍼도 처리
+      if (done) {
+        buffer += decoder.decode(); // 남은 바이트 플러시
+      }
+      
       const lines = buffer.split(String.fromCharCode(10));
       buffer = lines.pop() || '';
       
@@ -3706,6 +3725,37 @@ async function goGenerateStream() {
         } catch (e) {
           console.error('SSE Parse Error:', e, line);
         }
+      }
+      
+      // 스트림 완료 후 루프 탈출
+      if (done) break;
+    }
+    
+    // 버퍼에 남은 마지막 데이터 처리 (개행 없이 끝난 경우)
+    if (buffer.trim()) {
+      try {
+        const event = JSON.parse(buffer.trim());
+        if (event.type === 'complete') {
+          resultData = event.package;
+          selectedTitle = 0;
+          selectedContent = 0;
+          renderSeoAudit(resultData.seo_audit || { score: 95, grade: 'S+', rank_prediction: '1-3위' });
+          renderReportData(resultData.report_data);
+          renderViralQuestions(resultData.viral_questions);
+          renderTitles(resultData.titles || []);
+          renderContents(resultData.contents || []);
+          renderExtras(resultData.comments || [], resultData.seoKeywords || [], resultData.imageAnalysis);
+          progressFill.style.width = '100%';
+          progressPct.textContent = '100%';
+          progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ SSE 스트리밍 완료! (v' + event.version + ')';
+          setTimeout(() => {
+            progressBox.style.display = 'none';
+            document.getElementById('tabNav').style.display = 'flex';
+            switchTab('titles');
+          }, 1200);
+        }
+      } catch (e) {
+        console.error('Final buffer parse error:', e);
       }
     }
     
