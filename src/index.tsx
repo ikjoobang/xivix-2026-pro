@@ -3556,25 +3556,27 @@ async function goGenerateStream() {
   if (isGenerating) return;
   isGenerating = true;
   
-  // 🚀 INP 최적화: 즉시 UI 반응 (requestAnimationFrame으로 렌더링 우선)
-  requestAnimationFrame(() => {
-    btn.classList.add('loading');
-    btn.disabled = true;
-  });
-  
-  // UI 초기화 (메인 스레드 양보 후 실행)
-  await new Promise(resolve => setTimeout(resolve, 0));
+  // ⚡ 즉시 UI 반응 - 버튼 로딩 상태
   btn.classList.add('loading');
   btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div><span class="btn-text">생성 중...</span>';
+  
+  // 결과 섹션 즉시 표시 + 로딩 오버레이
   trendSection.style.display = 'none';
   hintSection.style.display = 'none';
   resultSection.classList.add('show');
   progressBox.style.display = 'block';
   document.getElementById('tabNav').style.display = 'none';
-  document.querySelectorAll('.tab-content').forEach(c => c.innerHTML = '');
+  document.querySelectorAll('.tab-content').forEach(function(c) { c.innerHTML = ''; });
+  
+  // 🎯 사용자에게 진행 상황 즉시 안내 (대기 화면)
   progressFill.style.width = '5%';
   progressPct.textContent = '5%';
-  progressText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 🔌 SSE 스트리밍 연결 중...';
+  progressText.innerHTML = '<div style="text-align:center">' +
+    '<i class="fas fa-spinner fa-spin" style="font-size:28px;color:var(--primary);margin-bottom:12px;display:block"></i>' +
+    '<div style="font-size:15px;font-weight:600;margin-bottom:8px">🔌 AI 엔진에 연결 중...</div>' +
+    '<div style="font-size:13px;color:var(--text-muted)">잠시만 기다려주세요. 약 10~30초 소요됩니다.</div>' +
+  '</div>';
   
   // 실시간 데이터 저장용
   let streamData = {
@@ -3818,19 +3820,10 @@ body{background:#0a0a0a;color:#fff;font-family:sans-serif;padding:24px}
 </body>
 </html>`
 
-// CSP 헤더 설정 함수
+// 보안 헤더 설정 (CSP 제거 - Cloudflare 기본 정책 사용)
 const setSecurityHeaders = (c: any) => {
-  c.header('Content-Security-Policy', 
-    "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com; " +
-    "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; " +
-    "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; " +
-    "img-src 'self' data: blob: https:; " +
-    "connect-src 'self' https://generativelanguage.googleapis.com https://openapi.naver.com https://*.pages.dev;"
-  );
   c.header('X-Content-Type-Options', 'nosniff');
-  c.header('X-Frame-Options', 'DENY');
-  c.header('X-XSS-Protection', '1; mode=block');
+  c.header('X-Frame-Options', 'SAMEORIGIN');
 };
 
 app.get('/', (c) => {
