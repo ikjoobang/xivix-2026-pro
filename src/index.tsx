@@ -2805,13 +2805,25 @@ async function loadTrends() {
   }
 }
 
-// 새로고침 버튼 클릭
+// 새로고침 버튼 클릭 (에러 가드 포함)
 async function refreshTrends() {
-  refreshBtn.classList.add('loading');
-  refreshBtn.disabled = true;
-  await loadTrends();
-  refreshBtn.classList.remove('loading');
-  refreshBtn.disabled = false;
+  try {
+    // INP 최적화: 즉시 UI 반응
+    requestAnimationFrame(() => {
+      refreshBtn.classList.add('loading');
+      refreshBtn.disabled = true;
+    });
+    
+    await loadTrends();
+  } catch (e) {
+    console.error('[XIVIX] 트렌드 새로고침 오류:', e);
+    // 에러 시에도 UI 복구
+    trendsEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--orange);padding:20px">' +
+      '<i class="fas fa-exclamation-circle"></i> 트렌드 로딩 실패. 다시 시도해주세요.</div>';
+  } finally {
+    refreshBtn.classList.remove('loading');
+    refreshBtn.disabled = false;
+  }
 }
 
 // 키워드로 트렌드 선택
@@ -3544,7 +3556,14 @@ async function goGenerateStream() {
   if (isGenerating) return;
   isGenerating = true;
   
-  // UI 초기화
+  // 🚀 INP 최적화: 즉시 UI 반응 (requestAnimationFrame으로 렌더링 우선)
+  requestAnimationFrame(() => {
+    btn.classList.add('loading');
+    btn.disabled = true;
+  });
+  
+  // UI 초기화 (메인 스레드 양보 후 실행)
+  await new Promise(resolve => setTimeout(resolve, 0));
   btn.classList.add('loading');
   btn.disabled = true;
   trendSection.style.display = 'none';
@@ -3799,7 +3818,28 @@ body{background:#0a0a0a;color:#fff;font-family:sans-serif;padding:24px}
 </body>
 </html>`
 
-app.get('/', (c) => c.html(mainPageHtml))
-app.get('/admin', (c) => c.html(adminPageHtml))
+// CSP 헤더 설정 함수
+const setSecurityHeaders = (c: any) => {
+  c.header('Content-Security-Policy', 
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com; " +
+    "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; " +
+    "img-src 'self' data: blob: https:; " +
+    "connect-src 'self' https://generativelanguage.googleapis.com https://openapi.naver.com https://*.pages.dev;"
+  );
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('X-Frame-Options', 'DENY');
+  c.header('X-XSS-Protection', '1; mode=block');
+};
+
+app.get('/', (c) => {
+  setSecurityHeaders(c);
+  return c.html(mainPageHtml);
+})
+app.get('/admin', (c) => {
+  setSecurityHeaders(c);
+  return c.html(adminPageHtml);
+})
 
 export default app
