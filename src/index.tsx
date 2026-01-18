@@ -385,15 +385,8 @@ const TREND_POOL = [
 
 // 실시간 트렌드 생성 함수 (매 요청마다 랜덤 변동)
 function generateRealtimeTrends() {
-  const now = Date.now()
-  const seed = Math.floor(now / 15000) // 15초마다 변경
-  
-  // 시드 기반 셔플
-  const shuffled = [...TREND_POOL].sort((a, b) => {
-    const hashA = (seed * 31 + a.keyword.charCodeAt(0)) % 1000
-    const hashB = (seed * 31 + b.keyword.charCodeAt(0)) % 1000
-    return hashB - hashA
-  })
+  // 매 요청마다 완전 랜덤 셔플 (새로고침할 때마다 변경)
+  const shuffled = [...TREND_POOL].sort(() => Math.random() - 0.5)
   
   // 상위 8개 선택
   const selected = shuffled.slice(0, 8)
