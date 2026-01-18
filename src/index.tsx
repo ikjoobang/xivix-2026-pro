@@ -3610,7 +3610,7 @@ async function goGenerateStream() {
       if (done) break;
       
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
+      const lines = buffer.split(String.fromCharCode(10));
       buffer = lines.pop() || '';
       
       for (const line of lines) {
