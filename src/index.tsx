@@ -457,9 +457,21 @@ app.get('/api/trend', async (c) => {
         body: JSON.stringify(requestBody)
       })
       
-      if (response.ok) {
-        const data = await response.json() as any
-        const results = data.results || []
+      const responseData = await response.json() as any
+      
+      // 네이버 API 에러 시 에러 메시지 반환
+      if (!response.ok || responseData.errorCode) {
+        return c.json({
+          success: false,
+          source: 'naver_api_error',
+          error: responseData.errorMessage || 'Unknown error',
+          errorCode: responseData.errorCode,
+          status: response.status
+        })
+      }
+      
+      if (responseData.results) {
+        const results = responseData.results || []
         
         // 실제 트렌드 데이터와 시뮬레이션 병합
         const realTrends = results.map((item: any, index: number) => {
@@ -501,15 +513,22 @@ app.get('/api/trend', async (c) => {
       }
     } catch (error) {
       console.error('Naver API error:', error)
+      // 에러 정보 반환 (디버깅용)
+      return c.json({ 
+        success: false, 
+        error: String(error),
+        source: 'naver_error'
+      })
     }
   }
   
-  // Fallback: 시뮬레이션 트렌드 데이터
+  // Fallback: 시뮬레이션 트렌드 데이터 (API 키 없을 때)
   const trends = generateRealtimeTrends()
   return c.json({ 
     success: true, 
     trends, 
     source: 'realtime_simulation',
+    debug: { hasClientId: !!clientId, hasClientSecret: !!clientSecret },
     nextUpdate: 15,
     updatedAt: new Date().toISOString() 
   })
