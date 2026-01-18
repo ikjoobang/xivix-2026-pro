@@ -1264,6 +1264,7 @@ const mainPageHtml = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>XIVIX 2026 PRO</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%234f8cff'/%3E%3Ctext x='50' y='65' font-size='50' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'%3EX%3C/text%3E%3C/svg%3E">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -3515,11 +3516,29 @@ function copyAllContent() {
 // 실시간으로 진행 상황 표시 + 본문 글자 단위 출력
 // ============================================
 async function goGenerateStream() {
-  const q = searchEl.value.trim();
+  let q = searchEl.value.trim();
+  
+  // 입력이 비어있으면 랜덤 트렌드 키워드로 자동 채우기
   if (!q) {
-    alert('핵심 고민을 입력해주세요');
-    searchEl.focus();
-    return;
+    const trendItems = document.querySelectorAll('.trend-item');
+    if (trendItems.length > 0) {
+      const randomTrend = trendItems[Math.floor(Math.random() * trendItems.length)];
+      const keyword = randomTrend.getAttribute('data-keyword');
+      if (keyword) {
+        q = keyword + ' 보험 비교 분석해주세요';
+        searchEl.value = q;
+        charEl.textContent = q.length;
+        console.log('[XIVIX] 트렌드 키워드 자동 선택:', keyword);
+      }
+    }
+    
+    // 그래도 비어있으면 기본값 사용
+    if (!q) {
+      q = '30대 직장인 암보험 추천';
+      searchEl.value = q;
+      charEl.textContent = q.length;
+      console.log('[XIVIX] 기본 키워드 사용');
+    }
   }
   
   if (isGenerating) return;
@@ -3658,7 +3677,15 @@ async function goGenerateStream() {
     }
     
   } catch(e) {
-    progressBox.innerHTML = '<div style="text-align:center;color:var(--red);padding:20px"><i class="fas fa-exclamation-triangle"></i> 네트워크 오류: ' + e.message + '</div>';
+    console.error('[XIVIX] 네트워크 오류:', e);
+    progressBox.innerHTML = '<div style="text-align:center;color:var(--red);padding:20px">' +
+      '<i class="fas fa-exclamation-triangle" style="font-size:32px;margin-bottom:12px;display:block"></i>' +
+      '<div style="font-weight:600;margin-bottom:8px">네트워크 오류</div>' +
+      '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px">' + e.message + '</div>' +
+      '<button onclick="resetAndNew()" style="background:var(--primary);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600">' +
+        '<i class="fas fa-redo"></i> 다시 시도' +
+      '</button>' +
+    '</div>';
   }
   
   btn.classList.remove('loading');
