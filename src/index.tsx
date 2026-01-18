@@ -1500,7 +1500,6 @@ body{
 .upload-btn:hover{
   border-color:var(--primary);
   background:var(--primary-soft);
-  transform:translateY(-2px);
   box-shadow:0 4px 15px rgba(79,140,255,0.2);
 }
 .upload-btn input{display:none}
@@ -1576,11 +1575,11 @@ body{
   font-size:18px;
 }
 .search-btn:hover{
-  transform:translateY(-3px);
   box-shadow:0 12px 35px rgba(79,140,255,0.45);
+  filter:brightness(1.1);
 }
-.search-btn:active{transform:translateY(-1px)}
-.search-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+.search-btn:active{filter:brightness(0.95)}
+.search-btn:disabled{opacity:0.6;cursor:not-allowed}
 
 /* ============================================ */
 /* 프리미엄 트렌드 섹션 (보험설계사 고급형) */
@@ -1668,10 +1667,10 @@ body{
   box-shadow:0 4px 15px rgba(245,158,11,0.3);
 }
 .refresh-btn:hover{
-  transform:translateY(-2px);
   box-shadow:0 8px 25px rgba(245,158,11,0.4);
+  filter:brightness(1.1);
 }
-.refresh-btn:active{transform:translateY(0)}
+.refresh-btn:active{filter:brightness(0.9)}
 .refresh-btn.loading{opacity:0.7}
 .refresh-btn.loading i{animation:spin 0.7s linear infinite}
 
@@ -1688,15 +1687,15 @@ body{
   border-radius:14px;
   padding:16px 18px;
   cursor:pointer;
-  transition:all 0.25s;
+  transition:background 0.2s, border-color 0.2s, box-shadow 0.2s;
   display:flex;
   flex-direction:column;
   gap:8px;
+  contain:layout style;
 }
 .trend-item:hover{
   background:rgba(245,158,11,0.15);
   border-color:rgba(245,158,11,0.4);
-  transform:translateY(-3px);
   box-shadow:0 8px 20px rgba(0,0,0,0.3);
 }
 .trend-item.active{
