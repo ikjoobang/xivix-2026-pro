@@ -3620,15 +3620,27 @@ async function goGenerateStream() {
   }
   
   try {
+    console.log('[XIVIX] SSE 요청 시작:', requestData);
     const res = await fetch('/api/generate/full-package-stream', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(requestData)
     });
     
+    console.log('[XIVIX] SSE 응답:', res.status, res.statusText);
+    
+    // 응답 상태 및 body 체크
+    if (!res.ok) {
+      throw new Error('API 응답 오류: ' + res.status + ' ' + res.statusText);
+    }
+    if (!res.body) {
+      throw new Error('스트림 body가 없습니다');
+    }
+    
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let eventCount = 0;
     
     while (true) {
       const { done, value } = await reader.read();
@@ -3649,6 +3661,8 @@ async function goGenerateStream() {
         if (!line.trim()) continue;
         try {
           const event = JSON.parse(line);
+          eventCount++;
+          console.log('[XIVIX] Event #' + eventCount + ':', event.type);
           
           switch (event.type) {
             case 'step':
@@ -3693,6 +3707,7 @@ async function goGenerateStream() {
               break;
               
             case 'complete':
+              console.log('[XIVIX] ✅ complete 이벤트 수신!', event.package?.titles?.length + '개 제목');
               // 최종 데이터 저장
               resultData = event.package;
               selectedTitle = 0;
@@ -3712,6 +3727,7 @@ async function goGenerateStream() {
               progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ SSE 스트리밍 완료! (v' + event.version + ')';
               
               setTimeout(() => {
+                console.log('[XIVIX] 탭 전환 시작');
                 progressBox.style.display = 'none';
                 document.getElementById('tabNav').style.display = 'flex';
                 switchTab('titles');
