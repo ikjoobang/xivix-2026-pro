@@ -2867,7 +2867,7 @@ const refreshBtn = document.getElementById('refreshBtn');
 const trendTimeEl = document.getElementById('trendTime');
 const searchBox = document.getElementById('searchBox');
 const trendSection = document.getElementById('trendSection');
-const hintSection = document.getElementById('hintSection');
+const hintSection = document.getElementById('hintSection'); // 제거됨 - 안전한 null 체크 적용
 const resultSection = document.getElementById('resultSection');
 const progressBox = document.getElementById('progressBox');
 const progressText = document.getElementById('progressText');
@@ -3748,7 +3748,7 @@ async function goGenerateStream() {
   
   // 결과 섹션 즉시 표시 + 로딩 오버레이
   trendSection.style.display = 'none';
-  hintSection.style.display = 'none';
+  if (hintSection) hintSection.style.display = 'none';
   resultSection.classList.add('show');
   progressBox.style.display = 'block';
   document.getElementById('tabNav').style.display = 'none';
@@ -4008,7 +4008,7 @@ function resetAndNew() {
   selectedContent = 0;
   resultSection.classList.remove('show');
   trendSection.style.display = 'block';
-  hintSection.style.display = 'flex';
+  if (hintSection) hintSection.style.display = 'flex';
   progressBox.style.display = 'block';
   progressFill.style.width = '0';
   progressPct.textContent = '0%';
