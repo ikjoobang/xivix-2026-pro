@@ -16,10 +16,14 @@ app.use('/*', cors())
 // ============================================
 // 모델 설정 (용도별 분리)
 // ============================================
+// ============================================
+// ✅ 모델 설정 (2026.01.18 API 검증 완료)
+// gemini-2.5-pro 정상 작동 확인됨!
+// ============================================
 const ENGINE = {
-  FLASH: 'gemini-2.0-flash',      // 빠른 처리용
-  PRO: 'gemini-2.5-pro',          // 품질 글쓰기용 (메인 콘텐츠)
-  VISION: 'gemini-2.0-flash-exp'  // 이미지 분석용
+  FLASH: 'gemini-2.0-flash',       // 빠른 처리용 (속도 우선)
+  PRO: 'gemini-2.5-pro',           // 품질 글쓰기용 (API 검증됨)
+  VISION: 'gemini-2.0-flash'       // 이미지 분석용
 }
 
 // ============================================
@@ -29,7 +33,7 @@ const ENGINE = {
 // 핵심: 이미지 분석 → report_data 자동 연결
 // ============================================
 const MASTER_INSTRUCTION_V3 = {
-  model: 'gemini-2.5-pro',
+  model: 'gemini-2.5-pro',  // API 검증 완료 (2026.01.18)
   persona: '30년 경력 MDRT 보험왕 & 심리 영업 마스터',
   constraints: {
     text_limit: '본문은 공백 포함 1,000자 내외 (포스팅 최적화)',
@@ -109,16 +113,18 @@ const TITLE_PATTERNS = [
 // API 키는 환경변수에서 가져옴 (하드코딩 금지)
 // PRO 키: 품질 글쓰기, 전문가 답변, 멀티모달 분석
 // FLASH 키: 질문 퍼포먼스, 댓글 생성
+// ============================================
+// 🔐 사장님 피드백 반영: 안전한 API 키 로직
+// PRO/FLASH/GEMINI_API_KEY 순서로 폴백
+// ============================================
 function getApiKey(env: Bindings, type: 'PRO' | 'FLASH' = 'PRO'): string {
-  if (type === 'PRO') {
-    const key = env.GEMINI_API_KEY_PRO || env.GEMINI_API_KEY
-    if (!key) throw new Error('GEMINI_API_KEY_PRO 환경변수가 설정되지 않았습니다')
-    return key
-  } else {
-    const key = env.GEMINI_API_KEY_FLASH || env.GEMINI_API_KEY
-    if (!key) throw new Error('GEMINI_API_KEY_FLASH 환경변수가 설정되지 않았습니다')
-    return key
+  // 우선순위: 특정 키 > 공통 키
+  const key = env.GEMINI_API_KEY_PRO || env.GEMINI_API_KEY_FLASH || env.GEMINI_API_KEY
+  if (!key) {
+    console.error('[XIVIX] API Key 누락! 환경변수 확인 필요: GEMINI_API_KEY, GEMINI_API_KEY_PRO, GEMINI_API_KEY_FLASH')
+    throw new Error('API Key가 설정되지 않았습니다. Cloudflare 환경변수를 확인하세요.')
   }
+  return key
 }
 
 // Gemini API 호출 (system_instruction 지원)
@@ -943,7 +949,7 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         expert: ENGINE.PRO,
         comments: ENGINE.FLASH
       },
-      version: '2026.16.0',
+      version: '2026.17.0',
       changelog: 'v4: 스트리밍 대응, 제목 25자, 본문 1,000자, Context Switching'
     })
     
@@ -1151,7 +1157,7 @@ JSON 형식으로만 응답:
           image_detected_keyword: imageDetectedKeyword || null,
           titles, viral_questions: viralQuestions, contents, comments, report_data: reportData
         },
-        version: '2026.16.0'
+        version: '2026.17.0'
       }) + '\n')
       
     } catch (error) {
@@ -1166,7 +1172,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '2026.16.0',
+    version: '2026.17.0',
     project: 'XIVIX_Insurance_King_2026 (MASTER-1)',
     masterInstruction: MASTER_INSTRUCTION_V3,
     engines: {
@@ -3655,14 +3661,13 @@ async function goGenerateStream() {
     progressText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 🔗 서버 연결 완료! AI가 분석 중입니다...';
     console.log('[XIVIX] 스트림 연결 성공, 데이터 수신 대기 중...');
     
-    // 타임아웃 경고 (30초 후에도 이벤트가 없으면)
+    // 타임아웃 경고 (15초 후에도 이벤트가 없으면)
     let eventReceived = false;
     const timeoutWarning = setTimeout(() => {
       if (!eventReceived) {
         progressText.innerHTML = '<i class="fas fa-hourglass-half fa-spin" style="color:var(--orange)"></i> ⏳ AI 응답 대기 중... (고품질 콘텐츠 생성에 시간이 소요됩니다)';
       }
     }, 15000);
-    }
     
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
