@@ -1,186 +1,260 @@
-# XIVIX 2026 PRO | 보험 마케팅 마스터
+# XIVIX 2026 PRO | 보험 마케팅 마스터 (v2026.15.0)
 
-[![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deployed-Cloudflare%20Pages-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://xivix-2026-pro.pages.dev)
-[![Version](https://img.shields.io/badge/Version-2026.2.0-00ff88?style=for-the-badge)](https://xivix-2026-pro.pages.dev/api/health)
-
-## 🌐 프로젝트 개요
-- **Name**: XIVIX 2026 PRO
-- **Goal**: 대한민국 상위 1% 보험 수석 컨설턴트 수준의 네이버 카페 최적화 콘텐츠 자동 생성
-- **Version**: 2026.2.0
-- **Status**: ✅ Production Ready
+[![Version](https://img.shields.io/badge/Version-2026.15.0-00ff88?style=for-the-badge)](https://3000-i41v15mnpukpom1lv9rdi-02b9cc79.sandbox.novita.ai/api/health)
+[![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen?style=for-the-badge)]()
 
 ---
 
-## 🔗 모든 링크 (전체 확인용)
+## 📋 젠스파크 개발자 전달용 최종 가이드
 
-### ■ 프론트엔드
+### ■ 핵심 변경사항 (v2026.15.0)
+
+| 항목 | 변경 내용 |
+|------|----------|
+| **본문 길이** | 공백 포함 **약 1,000자 내외** (약 1,200~1,500 토큰) |
+| **출력 형식** | `JSON_OBJECT` (구조화된 응답) |
+| **모델** | `gemini-2.5-pro` (품질), `gemini-2.0-flash` (댓글) |
+| **UI/UX** | 탭 분할 + 대시보드 리포트 형태 |
+
+### ■ 핵심 프롬프트 엔진 (JSON v3)
+
+```json
+{
+  "model": "gemini-2.5-pro",
+  "persona": "30년 경력 MDRT 보험왕 & 심리 영업 마스터",
+  "constraints": {
+    "text_limit": "본문은 공백 포함 1,000자 내외 (포스팅 최적화)",
+    "multimodal": "이미지 첨부 시 최우선 분석하여 report_data에 반영"
+  },
+  "output_format": "JSON_OBJECT"
+}
+```
+
+---
+
+## 🔗 서비스 URL
+
+### ■ 현재 샌드박스 (테스트용)
 | 페이지 | URL |
 |--------|-----|
-| 🏠 **메인 페이지** | https://xivix-2026-pro.pages.dev |
-| 📊 **대시보드** | https://xivix-2026-pro.pages.dev (메인과 통합) |
-| ⚙️ **어드민** | https://xivix-2026-pro.pages.dev/admin |
+| 🏠 **메인** | https://3000-i41v15mnpukpom1lv9rdi-02b9cc79.sandbox.novita.ai |
+| 💚 **Health** | https://3000-i41v15mnpukpom1lv9rdi-02b9cc79.sandbox.novita.ai/api/health |
+| 📄 **Docs** | https://3000-i41v15mnpukpom1lv9rdi-02b9cc79.sandbox.novita.ai/api/docs |
 
-### ■ 백엔드 (API)
-| 엔드포인트 | URL |
-|------------|-----|
-| 🖥️ **API 서버** | https://xivix-2026-pro.pages.dev/api |
-| 📄 **API 문서 (Swagger)** | https://xivix-2026-pro.pages.dev/api/docs |
-| 💚 **Health Check** | https://xivix-2026-pro.pages.dev/api/health |
-| 📊 **통계 API** | https://xivix-2026-pro.pages.dev/api/admin/stats |
-
-### ■ GitHub 저장소
-| 항목 | URL |
-|------|-----|
-| 📁 **Backend Repository** | https://github.com/ikjoobang/xivix-2026-pro |
+### ■ Cloudflare Pages (프로덕션)
+| 페이지 | URL |
+|--------|-----|
+| 🏠 **메인** | https://xivix-2026-pro.pages.dev (배포 후) |
+| 💚 **Health** | https://xivix-2026-pro.pages.dev/api/health |
 
 ---
 
-## 📝 타이포그래피 가이드 (v2026.2.0 신규)
+## 📊 JSON 출력 구조 (v3)
 
-### ■ 필수 사용 기호
-| 기호 | 용도 | 예시 |
-|------|------|------|
-| **❶ ❷ ❸** | 단계별 프로세스 설명 | ❶ 결론부터 말씀드리면... |
-| **■** | 핵심 개념/강조 포인트 | ■ [질문1] 상속세 절감 방법 |
-| **✔️** | 체크리스트/장점 나열 | ✔️ 첫 번째 할 일 |
+### Full Package API 응답 예시
 
-### ■ 텍스트 규격
-- **모바일**: 17px / Line-height 1.65 / Letter-spacing -0.02em
-- **PC**: 16px / Line-height 1.55 / Letter-spacing -0.01em
-- **한글 규칙**: `word-break: keep-all` (단어 단위 줄바꿈)
+```json
+{
+  "success": true,
+  "package": {
+    "topic": "30대 직장인 암보험 가입 시기",
+    "target": "30대 직장인",
+    "insurance": "암보험",
+    
+    "seo_audit": {
+      "score": 97,
+      "grade": "S+",
+      "rank_prediction": "1-3위",
+      "analysis": "타겟의 불안 심리를 자극하는 키워드 조합으로 최상위 노출 확실"
+    },
+    
+    "titles": [
+      {"id": 1, "text": "[단독] 30대 암보험, 증권에 '이 단어' 없으면 10원도 못 받습니다"},
+      {"id": 2, "text": "30대 주목! 암보험 이거 모르면 100% 손해봅니다"},
+      {"id": 3, "text": "제 실제 보상 후기입니다.. 암보험 때문에 울다가 웃었네요"},
+      {"id": 4, "text": "[충격] 30대 암보험 약관 뒤집어보니 이런 함정이..."},
+      {"id": 5, "text": "30대라면 반드시 알아야 할 암보험의 진실"}
+    ],
+    
+    "viral_questions": [
+      {"id": 1, "text": "혹시 여러분도 암보험 갱신형으로 가입하셨나요? 비갱신형과 뭐가 다른지..."},
+      {"id": 2, "text": "진단비 5천만원이면 충분할까요? 아니면 1억까지?"}
+    ],
+    
+    "contents": [
+      {"id": 1, "style": "공감형", "text": "본문1 (1000자 내외, 독자의 불안을 어루만지는 따뜻한 글)"},
+      {"id": 2, "style": "팩트형", "text": "본문2 (1000자 내외, 베테랑도 모르는 약관 함정 폭로)"},
+      {"id": 3, "style": "영업형", "text": "본문3 (1000자 내외, 심리적 트리거로 상담 유도)"}
+    ],
+    
+    "seoKeywords": ["30대 암보험", "암보험 가입시기", "암보험 비교", "2026년 암보험", "직장인 보험"],
+    
+    "comments": [
+      {"id": 1, "nickname": "매의눈선배", "persona": "까칠한 선배", "text": "30대 초반이면 늦은 거 아님..."},
+      {"id": 2, "nickname": "다정한미소", "persona": "다정한 주부", "text": "저도 작년에 가입했는데..."},
+      {"id": 3, "nickname": "궁금이", "persona": "의심 많은 사회초년생", "text": "근데 진단비는 얼마가 적정인가요?"},
+      {"id": 4, "nickname": "보험고수", "persona": "베테랑 회원", "text": "전문가님 말씀 100% 공감합니다..."},
+      {"id": 5, "nickname": "지나가던초보", "persona": "지나가던 초보", "text": "저도 궁금했는데 감사합니다!"}
+    ],
+    
+    "imageAnalysis": null,
+    "report_data": [],
+    
+    "generatedAt": "2026-01-18T06:30:00.000Z"
+  },
+  "models": {
+    "vision": null,
+    "expert": "gemini-2.5-pro",
+    "comments": "gemini-2.0-flash"
+  },
+  "version": "2026.15.0"
+}
+```
 
-### ■ 금지 사항
-- ❌ 마크다운 표 (`|`) 사용 금지
-- ❌ `<br>` 태그로 줄바꿈 대체
-- ❌ Analysis, Evidence, Step 1: 등 영어 접두사 금지
+### 이미지 분석 시 report_data 예시
+
+```json
+"imageAnalysis": "📋 보험증권 분석\n🏢 삼성생명 - 무배당 간편건강보험\n\n핵심 요약...",
+"report_data": [
+  {"item": "암진단비", "current": "2,000만원", "target": "5,000만원", "status": "critical"},
+  {"item": "뇌혈관질환", "current": "1,500만원", "target": "3,000만원", "status": "essential"},
+  {"item": "급성심근경색", "current": "1,500만원", "target": "3,000만원", "status": "essential"},
+  {"item": "수술비", "current": "100만원", "target": "300만원", "status": "good"},
+  {"item": "입원일당", "current": "5만원", "target": "10만원", "status": "essential"}
+]
+```
 
 ---
 
-## ✅ 완성된 기능
+## 🎨 UI/UX 설계
 
-### 1. Q&A 마스터 스트리밍 API (`/api/generate/master`)
-- **엔진**: `gemini-1.5-pro-002` (절대 변경 금지)
-- 실시간 스트리밍 응답으로 체감 속도 5초 이내
-- 페르소나 매칭: 성별/나이 자동 판별 (워킹맘 오류 완벽 차단)
-- **1,200자 이상의 압도적 정보량** (각 답변당)
-- 타이포그래피 기호 자동 적용 (❶❷❸, ■, ✔️)
+### ■ 레이아웃 (대시보드 리포트 형태)
 
-### 2. 흑백 엑셀 설계서 API (`/api/generate/excel`)
-- **엔진**: `gemini-2.0-flash`
-- 15개 이상의 리얼한 담보 구성
-- 컬러 완전 제거 (흑백 인쇄 최적화)
-- 성별/나이 데이터 정합성 100%
+```
+┌─────────────────────────────────────────────────┐
+│  [S+] SEO 감사 리포트                           │
+│  점수: 97/100 | 예상 순위: 1-3위               │
+│  분석: 타겟의 불안 심리를 자극하는 키워드...    │
+└─────────────────────────────────────────────────┘
 
-### 3. 프리미엄 UI (Beyond Reality 스타일)
-- ✔️ Glassmorphism 유리 질감 효과
-- ✔️ 3D Hover 인터랙션
-- ✔️ 반응형 타이포그래피 (17px/16px)
-- ✔️ 플로팅 애니메이션 & 그라데이션 텍스트
-- ✔️ 파티클 시스템 (Canvas 애니메이션)
-- ✔️ 네온 글로우 검색창
+┌─────────────────────────────────────────────────┐
+│  📊 보장 분석 리포트 (이미지 분석 시)           │
+│  ┌─────────┬────────┬────────┬──────┐          │
+│  │ 항목     │ 현재    │ 권장    │ 상태 │          │
+│  ├─────────┼────────┼────────┼──────┤          │
+│  │ 암진단비 │ 2천만   │ 5천만   │ ● 위험│          │
+│  │ 뇌혈관   │ 1.5천   │ 3천만   │ ● 필수│          │
+│  └─────────┴────────┴────────┴──────┘          │
+└─────────────────────────────────────────────────┘
 
-### 4. API 키 중앙관리 시스템
-- 7개 Gemini API 키 자동 폴백
-- 429/403 에러 시 자동 키 전환
-- 모든 키 소진 시 에러 메시지 표시
+┌─────────────────────────────────────────────────┐
+│  🔥 바이럴 질문 (댓글 유도)                     │
+│  1. 혹시 여러분도 암보험 갱신형으로 가입...?    │
+│  2. 진단비 5천만원이면 충분할까요?              │
+└─────────────────────────────────────────────────┘
 
-### 5. TXT/PDF 다운로드
-- TXT: 순수 텍스트 다운로드
-- PDF: 브라우저 인쇄 기능 활용
+┌─────────────────────────────────────────────────┐
+│  [제목 선택] [본문 선택] [댓글/키워드]  (탭)    │
+│                                                 │
+│  제목 1 (선택됨) ──────────────────── [복사]    │
+│  제목 2 ─────────────────────────── [복사]    │
+│  ...                                            │
+└─────────────────────────────────────────────────┘
 
-### 6. 어드민 대시보드
-- 활성 API 키 현황
-- 엔진 버전 모니터링
-- 타이포그래피 가이드 시각화
-- 시스템 상태 확인
+┌─────────────────────────────────────────────────┐
+│        [선택한 콘텐츠 전체 복사]                │
+│        [새로운 콘텐츠 생성]                     │
+└─────────────────────────────────────────────────┘
+```
+
+### ■ 복사 기능
+- 각 제목 옆: [복사] 버튼
+- 각 본문 하단: [복사] 버튼
+- 각 댓글 옆: [복사] 버튼
+- 각 키워드: 클릭 시 복사
+- 보장 분석 테이블: [테이블 복사] 버튼
+- 하단: [선택한 콘텐츠 전체 복사] 버튼
+
+### ■ 상태 아이콘 (●)
+- `critical` (위험): 빨간색 ●
+- `essential` (필수): 주황색 ●
+- `good` (양호): 초록색 ●
 
 ---
 
-## 📋 분야별 전용 로직
+## 🔌 API 엔드포인트
 
-| 분야 | 핵심 내용 |
-|------|----------|
-| **상속/증여** | 상증법 제8조, 수익자 지정 절세, 10년 주기 증여 비과세 |
-| **CEO/법인** | 법인세 손비처리, 가지급금 정리, 퇴직금 재원 |
-| **치매/간병** | CDR 척도별 판정, ADL 보장 공백, 체증형 일당 |
-| **유병자보험** | 간편심사 기준, 고지의무, 기왕증 부담보 |
+### POST `/api/generate/full-package`
+**🌟 메인 엔드포인트 - 제목 5종 + 본문 3개 + 댓글 5개 + SEO 키워드 5개**
 
----
-
-## 🛠️ API 엔드포인트 상세
+```bash
+curl -X POST https://your-domain/api/generate/full-package \
+  -H "Content-Type: application/json" \
+  -d '{
+    "concern": "30대 직장인 암보험 가입 시기",
+    "image": "base64_encoded_image (선택)",
+    "mimeType": "image/jpeg (선택)"
+  }'
+```
 
 ### POST `/api/generate/master`
-**Q&A 콘텐츠 스트리밍 생성 (타이포그래피 적용)**
-```json
-{
-  "target": "30대 워킹맘",
-  "insuranceType": "상속/증여",
-  "company": "삼성생명",
-  "style": "전문가 팩트체크형",
-  "concern": "자녀 증여 시 세금 절약 방법"
-}
-```
+**전문가 콘텐츠 스트리밍 생성**
 
-**응답 형식 (스트리밍)**
-```
-{"type":"status","step":1,"msg":"🔍 1단계: 타겟 페르소나 정밀 분석 중..."}
-{"type":"status","step":2,"msg":"⚖️ 2단계: 삼성생명 최신 약관 및 법리 대입 중..."}
-{"type":"status","step":3,"msg":"🧠 3단계: 전문가 뇌 교체 및 콘텐츠 생성 중..."}
-{"type":"content","data":"❶ 결론부터 말씀드리면..."}
-{"type":"done"}
-```
+### POST `/api/generate/question`
+**질문 퍼포먼스 게시글 생성**
 
-### POST `/api/generate/excel`
-**흑백 엑셀 설계서 데이터 생성**
-```json
-{
-  "target": "30대 워킹맘",
-  "insuranceType": "상속/증여",
-  "company": "삼성생명",
-  "concern": "자녀 증여"
-}
-```
+### POST `/api/generate/comments`
+**댓글 5개 생성**
+
+### POST `/api/analyze/image`
+**이미지 멀티모달 분석**
+
+### GET `/api/trend`
+**실시간 네이버 보험 트렌드**
 
 ### GET `/api/health`
-**서버 상태 확인 (타이포그래피 가이드 포함)**
-```json
-{
-  "status": "healthy",
-  "timestamp": "2026-01-17T16:08:14.129Z",
-  "version": "2026.2.0",
-  "engines": {
-    "expert": "gemini-1.5-pro-002",
-    "data": "gemini-2.0-flash"
-  },
-  "apiKeysAvailable": 7,
-  "typographyGuide": {
-    "process": "❶ ❷ ❸",
-    "emphasis": "■",
-    "check": "✔️"
-  }
-}
-```
+**서버 상태 확인**
+
+### GET `/api/docs`
+**API 문서**
 
 ---
 
-## 🔧 기술 스택
-- **Framework**: Hono 4.x
-- **Runtime**: Cloudflare Workers
-- **AI Engine**: Google Gemini 1.5 Pro 002 / 2.0 Flash
-- **Frontend**: TailwindCSS CDN + Vanilla JS + Canvas Particles
-- **Build**: Vite
-- **Deploy**: Cloudflare Pages
+## 🔐 보안/배포
+
+### ■ 환경 변수
+```bash
+# Cloudflare Secrets (프로덕션)
+npx wrangler secret put GEMINI_API_KEY_PRO
+npx wrangler secret put GEMINI_API_KEY_FLASH
+npx wrangler secret put NAVER_CLIENT_ID
+npx wrangler secret put NAVER_CLIENT_SECRET
+
+# 로컬 개발 (.dev.vars)
+GEMINI_API_KEY_PRO=your_pro_key
+GEMINI_API_KEY_FLASH=your_flash_key
+```
+
+### ■ 배포 명령어
+```bash
+# 빌드
+npm run build
+
+# Cloudflare Pages 배포
+npx wrangler pages deploy dist --project-name xivix-2026-pro
+```
 
 ---
 
 ## 📦 프로젝트 구조
+
 ```
 webapp/
 ├── src/
 │   └── index.tsx           # 메인 앱 (API + UI + Admin)
 ├── dist/                   # 빌드 출력
 ├── public/                 # 정적 파일
-├── ecosystem.config.cjs    # PM2 설정
+├── ecosystem.config.cjs    # PM2 설정 (샌드박스)
 ├── wrangler.jsonc          # Cloudflare 설정
 ├── package.json
 └── README.md
@@ -188,60 +262,54 @@ webapp/
 
 ---
 
-## 🚀 배포 상태
-- **Platform**: Cloudflare Pages
-- **Status**: ✅ Production Active
-- **URL**: https://xivix-2026-pro.pages.dev
-- **Last Updated**: 2026-01-17
+## ✅ 구현 완료 기능
+
+- [x] **SEO 감사 리포트** (S+ 등급 마크, 점수, 예상 순위)
+- [x] **바이럴 질문 2종** (댓글 유도용)
+- [x] **이미지 분석 → report_data 자동 연결** (보장 분석 테이블)
+- [x] **제목 5종** (CTR 30% 이상 자극적 제목)
+- [x] **본문 3개** (공감형/팩트형/영업형, 각 1,000자 내외)
+- [x] **댓글 5개** (5명 페르소나 - 까칠한 선배, 다정한 주부, 의심 많은 사초, 베테랑, 초보)
+- [x] **SEO 키워드 5개**
+- [x] **탭 분할 UI** (제목/본문/댓글+키워드)
+- [x] **개별/전체 복사 기능**
+- [x] **JSON_OBJECT 출력 형식**
+- [x] **실시간 트렌드** (15초 갱신)
 
 ---
 
-## 📌 중요 지침 (절대 변경 금지)
+## 🎯 목표
 
-### ❶ AI 엔진 버전
-- **전문가 엔진**: `gemini-1.5-pro-002`
-- **데이터 엔진**: `gemini-2.0-flash`
+> **1분 안에 네이버 카페 포스팅 완성**
 
-### ❷ 타이포그래피 사양
-- **모바일**: 17px / Line 1.65
-- **PC**: 16px / Line 1.55
-- **기호**: ❶❷❸ (프로세스), ■ (강조), ✔️ (체크)
-
-### ❸ 성별 판별 로직
-- 워킹맘/엄마/주부/아내/여성/딸/언니/누나 = **여성**
-- 가장/아빠/남편/남성/오빠/형/아들 = **남성**
-
-### ❹ 콘텐츠 분량
-- 각 답변당 **최소 1,200자 이상**
+1. 핵심 고민 입력 (선택: 이미지 첨부)
+2. Full Package 생성 클릭
+3. 제목 1개 선택 + 본문 1개 선택
+4. [전체 복사] 클릭
+5. 네이버 카페에 붙여넣기
 
 ---
 
-## 🎯 알고리즘 대응 전략
+## 📌 중요 제약사항
 
-### C-Rank (전문성 시그널)
-- 상증법 제8조, CDR 척도, 손비처리 등 전문 용어 자연 배치
-
-### DIA / Agent N
-- '정보의 이득' 극대화
-- 구체적 수치와 실행 가능한 해결책 제시
+| 항목 | 제약 |
+|------|------|
+| **본문 길이** | 공백 포함 1,000자 내외 (네이버 카페 포스팅 최적화) |
+| **토큰** | 약 1,200~1,500 토큰 |
+| **제목** | CTR 30% 이상 보장 (자극적+신뢰감) |
+| **모델 (품질)** | gemini-2.5-pro |
+| **모델 (속도)** | gemini-2.0-flash |
+| **출력 형식** | JSON_OBJECT |
 
 ---
 
-## 🔑 환경 변수
+## 🔄 버전 히스토리
 
-### 로컬 개발 (.dev.vars)
-```
-GEMINI_API_KEY_1=your_key_1
-GEMINI_API_KEY_2=your_key_2
-...
-NAVER_CLIENT_ID=fUhHJ1HWyF6fFw_aBfkg
-NAVER_CLIENT_SECRET=gA4jUFDYK0
-```
-
-### 프로덕션 (Cloudflare Secrets)
-```bash
-npx wrangler secret put GEMINI_API_KEY_1
-```
+| 버전 | 날짜 | 변경 내용 |
+|------|------|----------|
+| 2026.15.0 | 2026-01-18 | 대시보드 UI + report_data 자동 연결 + JSON v3 구조 |
+| 2026.14.0 | 2026-01-18 | 탭 분할 UI + JSON_OBJECT 출력 |
+| 2026.13.0 | 2026-01-17 | Full Package API 통합 |
 
 ---
 

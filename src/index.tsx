@@ -3,14 +3,9 @@ import { cors } from 'hono/cors'
 import { streamText } from 'hono/streaming'
 
 type Bindings = {
-  GEMINI_API_KEY_1?: string;
-  GEMINI_API_KEY_2?: string;
-  GEMINI_API_KEY_3?: string;
-  GEMINI_API_KEY_4?: string;
-  GEMINI_API_KEY_5?: string;
-  GEMINI_API_KEY_6?: string;
-  GEMINI_API_KEY_7?: string;
-  GEMINI_API_KEY_8?: string;
+  GEMINI_API_KEY?: string;
+  GEMINI_API_KEY_PRO?: string;
+  GEMINI_API_KEY_FLASH?: string;
   NAVER_CLIENT_ID?: string;
   NAVER_CLIENT_SECRET?: string;
 }
@@ -18,1390 +13,3764 @@ type Bindings = {
 const app = new Hono<{ Bindings: Bindings }>()
 app.use('/*', cors())
 
-/**
- * ⚡ 2026 XIVIX 하이브리드 엔진 (절대 변경 금지)
- * - 전문가 지능: gemini-1.5-pro-002 (보험사 약관 및 법리 해석)
- * - 데이터 렌더링: gemini-2.0-flash (이미지 데이터, 실시간 속도)
- */
-const EXPERT_ENGINE = 'gemini-1.5-pro-002'
-const DATA_ENGINE = 'gemini-2.0-flash'
+// ============================================
+// 모델 설정 (용도별 분리)
+// ============================================
+const ENGINE = {
+  FLASH: 'gemini-2.0-flash',      // 빠른 처리용
+  PRO: 'gemini-2.5-pro',          // 품질 글쓰기용 (메인 콘텐츠)
+  VISION: 'gemini-2.0-flash-exp'  // 이미지 분석용
+}
 
 // ============================================
-// [API 키 중앙 관리 시스템 - 자동 폴백]
+// XIVIX 2026 마스터 프롬프트 엔진 v3.0 (최종)
+// 프로젝트: XIVIX_Insurance_King_2026
+// 모델: gemini-2.5-pro (품질 글쓰기용)
+// 핵심: 이미지 분석 → report_data 자동 연결
 // ============================================
-const API_KEYS = [
-  'AIzaSyCrGS-5UYdayfOxtoush_qMSyWWVuelsR0',
-  'AIzaSyAwKHI8j8AEQsqHEGXHq7gOTXcgb_6fses',
-  'AIzaSyD9ZRwGBDdamELhnN2H0gEQgggcUQHRuZU',
-  'AIzaSyAWwXPyN2pzq8UdHQG8eywBkc7H3tuJ21U',
-  'AIzaSyCqVZcoR6KJEgimH7cXazEBxd6sOIGikks',
-  'AIzaSyAjwvLFLAOxJF9xC8OC24T-YuI_SFaEKII',
-  'AIzaSyAx1ugm1G7kTAIp2enyBvc1ECYqVNfOHHc'
+const MASTER_INSTRUCTION_V3 = {
+  model: 'gemini-2.5-pro',
+  persona: '30년 경력 MDRT 보험왕 & 심리 영업 마스터',
+  constraints: {
+    text_limit: '본문은 공백 포함 1,000자 내외 (포스팅 최적화)',
+    multimodal: '이미지 첨부 시 최우선 분석하여 report_data에 반영할 것'
+  },
+  output_format: 'JSON_OBJECT'
+}
+
+const PERSONA_CONFIG = {
+  expert: {
+    role_name: "MDRT_보험왕_심리영업마스터",
+    system_instruction: `당신은 2026년 현재 30년 경력 MDRT 보험왕이자 심리 영업 마스터입니다. 단순 지식 전달자가 아니라 '고객의 불안을 확신으로 바꾸는 멘탈 코치'입니다. 
+
+[핵심 역할]
+- 업계 베테랑들도 모르는 '약관의 숨겨진 함정'과 '보상 청구의 기술' 전문가
+- 이미지(보험증권, 약관, 설계서) 분석 시 보장 항목별 현재값/목표값/상태를 정확히 추출
+- 네이버 카페 상위노출을 위한 CTR 30% 이상 보장 제목 작성
+
+[출력 규칙]
+- 반드시 유효한 JSON 형식으로만 응답
+- 본문은 공백 포함 1,000자 내외 (네이버 카페 포스팅 최적화)
+- 이미지 분석 시 report_data 필드에 보장 분석 결과 포함`,
+    writing_strategy: [
+      "질문의 의도 뒤에 숨겨진 '공포'를 먼저 어루만질 것",
+      "업계 비밀(비공개 보상 매뉴얼 등)을 언급하여 권위를 세울 것",
+      "반드시 '질문 퍼포먼스'를 통해 댓글 참여를 유도하는 열린 결말로 끝낼 것",
+      "2026년 최신 보험 정책 및 AI 기반 보상 분석 트렌드 반영"
+    ]
+  },
+  beginner: {
+    role_name: "질문_퍼포먼스의_달인",
+    system_instruction: `당신은 질문 하나로 카페를 뒤집어놓는 '어그로와 진정성 사이의 줄타기 달인'입니다. 단순히 모르는 걸 묻는 게 아니라, 누구나 겪을 법한 극도로 구체적이고 드라마틱한 상황을 설정합니다. 문장은 짧고 호흡이 빠르며, 간절함이 뚝뚝 묻어나야 합니다. '아시는 분 제발 도와주세요'라는 느낌을 극대화하세요.`
+  },
+  comment: {
+    role_name: "\ub514\ud14c\uc77c_\ub313\uae00_\ub9c8\uc2a4\ud130",
+    system_instruction: `\ub2f9\uc2e0\uc740 \uce74\ud398 \ub0b4 '\uc5ec\ub860 \uc870\uc791\uc758 \ub2ec\uc778'\uc785\ub2c8\ub2e4. \ub2e8\uc21c\ud55c \uce6d\ucc2c\uc774 \uc544\ub2c8\ub77c \uc2e4\uc81c \uacbd\ud5d8\ub2f4\uc744 \uc11e\uc5b4 \ubcf8\ubb38\uc758 \uc2e0\ub8b0\ub3c4\ub97c 200% \uc62c\ub9bd\ub2c8\ub2e4. \uc77c\ubd80\ub7ec \uc9c8\ubb38\uc790\uc5d0\uac8c \ucd94\uac00 \uc815\ubcf4\ub97c \ubb3b\uac70\ub098, \uc804\ubb38\uac00\uc758 \ub2f5\ubcc0\uc5d0 \uac10\ud0c4\ud558\uba70 \uc790\uc2e0\uc758 \uc0ac\ub840\ub97c \ub367\ubd99\uc785\ub2c8\ub2e4.`,
+    personas: [
+      { nickname: '\uae4c\uce60\ud55c \uc120\ubc30', style: '\uacf5\uaca9\uc801', tone: '\ub9d0\uc774 \ub9ce\ub124\uc694. \uadfc\ub370 \uc81c\uac00 \uc54c\uae30\ub860...', traits: ['\ud314\uc790 \ubb3b\uc5b4\ubcf4\ub294', '\ub530\ub054\ud55c'] },
+      { nickname: '\ub2e4\uc815\ud55c \uc8fc\ubd80', style: '\uc6b0\ud638\uc801', tone: '\uc800\ub3c4 \uac19\uc740 \uacbd\ud5d8 \uc788\uc5b4\uc694~ \uadf8\ub54c \uc815\ub9d0...', traits: ['\uacf5\uac10\ud558\ub294', '\uc704\ub85c\ud558\ub294'] },
+      { nickname: '\uc758\uc2ec\ub9ce\uc740 \ucd08\ub150\uc0dd', style: '\ucd94\uac00\uc9c8\ubb38\ud615', tone: '\uadf8\ub7f0\ub370 \ud639\uc2dc \uc774\uac74 \uc5b4\ub5bb\uac8c \ub418\ub294\uac74\uac00\uc694??', traits: ['\ud638\uae30\uc2ec \ub9ce\uc740', '\ubc30\uc6b0\ub824\ub294'] },
+      { nickname: '\ubca0\ud14c\ub791 \uc124\uacc4\uc0ac', style: '\uc6b0\ud638\uc801', tone: '\uc624 \uc774\uac74 \uc815\ub9d0 \uc815\ud655\ud55c \uc124\uba85\uc774\ub124\uc694. \uc81c\uac00 \ubcf4\uae30\uc5d4...', traits: ['\uc804\ubb38\uc131 \uc778\uc815', '\ucd94\uac00 \ud300 \uc81c\uacf5'] },
+      { nickname: '\ub2f9\ud55c \ubcf4\ud5d8\uc8fc', style: '\uacf5\uaca9\uc801', tone: '\uc544 \uc800\ub3c4 \uac19\uc740 \uacbd\ud5d8!! \uadf8\ub54c \uc9c4\uc9dc \uc5f4\ubc1b\uc558\ub294\ub370...', traits: ['\uacbd\ud5d8 \uacf5\uc720', '\uac10\uc815 \ud3ed\ubc1c'] }
+    ]
+  }
+}
+
+// ============================================
+// XIVIX 2026 PRO \ucd08\uc815\ubc00 \ub79c\ub364\ud654 \ub9e4\ud2b8\ub9ad\uc2a4 (\ubc31\uc5d4\ub4dc\uc6a9)
+// \uc5d4\ud2b8\ub85c\ud53c: 0.95 - \uc218\ub9cc \uac00\uc9c0 \ud655\ub960 \uc870\ud569
+// ============================================
+const RANDOMIZATION_MATRIX = {
+  persona_pool: [
+    { role: '\ubd84\ub178\ud55c 30\ub300 \uc544\ube60', style: '\uac70\uce5c \ub9d0\ud22c, \ubcf4\ud5d8\uc0ac \ubd88\uc2e0', keywords: ['\ub4a4\ud1b5\uc218', '\ub208\ud0f1\uc774', '\ud574\uc9c0\uac01'] },
+    { role: '\uae50\uae50\ud55c \uc7ac\ud14c\ud06c \uc8fc\ubd80', style: '\uc22b\uc790\uc5d0 \ubc1d\uc74c, \uc218\uc775\ub960 \ub530\uc9d0, \uc774\ubaa8\uc9c0 \ub9ce\uc774 \uc0ac\uc6a9', keywords: ['\ud658\uae09\uae08', '\ubcf5\ub9ac', '\uc0ac\uc5c5\ube44'] },
+    { role: '\ud574\ub9d1\uc740 \uc0ac\ud68c\ucd08\ub144\uc0dd', style: '\uc544\ubb34\uac83\ub3c4 \ubaa8\ub984, \uc9c8\ubb38\uc774 \uae38\uace0 \ub450\uc11c\uc5c6\uc74c', keywords: ['\uc0b4\ub824\uc8fc\uc138\uc694', '\uc120\ubc30\ub2d8\ub4e4', '\uc0ac\ud68c\ucd08\ub144\uc0dd'] },
+    { role: '\ubc30\uc2e0\uac10 \ub290\ub07c\ub294 50\ub300', style: '\uc9c0\uc778 \uc124\uacc4\uc0ac \uc6d0\ub9dd, \ud558\uc18c\uc5f0\ud558\ub294 \uae34 \ubb38\uc7a5', keywords: ['\uce5c\uad6c\ub188', '\ubbff\uc5c8\ub294\ub370', '\ubc30\uc2e0\uac10'] }
+  ],
+  situation_pool: [
+    '\uac74\uac15\uac80\uc9c4 \ud6c4 \uc6a9\uc885 \uc81c\uac70\ud588\ub294\ub370 \ubcf4\uc0c1 \uac70\uc808\ub2f9\ud568',
+    '\ubd80\ubaa8\ub2d8\uc774 20\ub144 \uc804 \ub4e4\uc5b4\uc900 \uc885\uc2e0\ubcf4\ud5d8 \uc54c\uace0 \ubcf4\ub2c8 \uc4f0\ub808\uae30',
+    '\uc720\ud29c\ube0c \uad11\uace0 \ubcf4\uace0 \uac00\uc785\ud55c \ubcf4\ud5d8\uc774 \uac31\uc2e0 \ud3ed\ud0c4 \ub9de\uc74c',
+    '\uc2e4\ube44 \uc804\ud658\ud558\ub77c\ub294 \uc804\ud654 \ubc1b\uace0 \uc2f8\uc6b0\ub2e4 \ub04a\uc74c'
+  ],
+  emotional_triggers: ['\uc5b5\uc6b8\ud568', '\ub0c9\uc18c\uc801', '\uac04\uc808\ud568', '\ub2f9\ub2f9\ud568', '\ubd84\ub178'],
+  banned_words: ['\ub9c9\ub9c9\ud558\ub2e4', '\ub3c4\uc6c0\uc694\uccad', '\ubb38\uc758\ub4dc\ub9bd\ub2c8\ub2e4', '\uacbd\ud5d8\uc774 \uc788\uc73c\uc2e0', '\ubd80\ud0c1\ub4dc\ub9bd\ub2c8\ub2e4']
+}
+
+// 제목 생성 패턴 (네이버 카페 상위 노출 최적화)
+const TITLE_PATTERNS = [
+  "[단독] {keyword} 설계사들은 절대 안 알려주는 비밀",
+  "{target} 주목! {keyword} 이거 모르면 100% 손해봅니다",
+  "제 실제 보상 후기입니다.. {keyword} 때문에 울다가 웃었네요",
+  "[충격] {keyword} 약관 뒤집어보니 이런 함정이...",
+  "{target}라면 반드시 알아야 할 {keyword} 진실"
 ]
 
-let currentKeyIndex = 0
-
-function getNextApiKey(): string {
-  const key = API_KEYS[currentKeyIndex]
-  currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length
-  return key
+// API 키는 환경변수에서 가져옴 (하드코딩 금지)
+// PRO 키: 품질 글쓰기, 전문가 답변, 멀티모달 분석
+// FLASH 키: 질문 퍼포먼스, 댓글 생성
+function getApiKey(env: Bindings, type: 'PRO' | 'FLASH' = 'PRO'): string {
+  if (type === 'PRO') {
+    const key = env.GEMINI_API_KEY_PRO || env.GEMINI_API_KEY
+    if (!key) throw new Error('GEMINI_API_KEY_PRO 환경변수가 설정되지 않았습니다')
+    return key
+  } else {
+    const key = env.GEMINI_API_KEY_FLASH || env.GEMINI_API_KEY
+    if (!key) throw new Error('GEMINI_API_KEY_FLASH 환경변수가 설정되지 않았습니다')
+    return key
+  }
 }
 
-async function callGeminiWithFallback(model: string, prompt: string, isStream: boolean = false): Promise<Response> {
-  let lastError: Error | null = null
+// Gemini API 호출 (system_instruction 지원)
+async function callGeminiWithPersona(
+  apiKey: string,
+  model: string, 
+  systemInstruction: string, 
+  userPrompt: string, 
+  isStream: boolean = false
+): Promise<Response> {
+  const endpoint = isStream 
+    ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`
+    : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
   
-  for (let attempt = 0; attempt < API_KEYS.length; attempt++) {
-    const apiKey = getNextApiKey()
-    try {
-      const endpoint = isStream 
-        ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`
-        : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
-      
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.9,
-            topP: 0.95,
-            topK: 40,
-            maxOutputTokens: 8192
-          }
-        })
-      })
-      
-      if (response.ok) {
-        return response
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      system_instruction: {
+        parts: [{ text: systemInstruction }]
+      },
+      contents: [{ 
+        role: 'user',
+        parts: [{ text: userPrompt }] 
+      }],
+      generationConfig: {
+        temperature: 0.9,
+        topP: 0.95,
+        topK: 40,
+        maxOutputTokens: 8192
       }
-      
-      if (response.status === 429 || response.status === 403) {
-        console.log(`API Key ${currentKeyIndex} failed with status ${response.status}, trying next...`)
-        continue
-      }
-      
-      return response
-    } catch (error) {
-      lastError = error as Error
-      console.log(`API Key ${currentKeyIndex} error, trying next...`)
-    }
-  }
+    })
+  })
   
-  throw lastError || new Error('All API keys exhausted')
+  return response
 }
 
-// ============================================
-// [로직 1] 성별/나이/페르소나 무결점 매핑
-// ============================================
-function getPersona(target: string, concern: string) {
-  let gender = '여성'
-  const maleKeywords = ['가장', '아빠', '남편', '남성', '오빠', '형', '아들', '남자']
-  const femaleKeywords = ['워킹맘', '엄마', '주부', '아내', '여성', '딸', '언니', '누나', '여자']
+// 타겟 분석 함수
+function analyzeTarget(topic: string) {
+  // 보험 종류 자동 감지
+  let insuranceProduct = '실손보험'
+  if (topic.includes('암')) insuranceProduct = '암보험'
+  else if (topic.includes('종신')) insuranceProduct = '종신보험'
+  else if (topic.includes('태아') || topic.includes('어린이')) insuranceProduct = '태아보험'
+  else if (topic.includes('연금')) insuranceProduct = '연금보험'
+  else if (topic.includes('치매') || topic.includes('간병')) insuranceProduct = '치매/간병보험'
+  else if (topic.includes('유병자') || topic.includes('간편심사')) insuranceProduct = '유병자보험'
+  else if (topic.includes('상속') || topic.includes('증여')) insuranceProduct = '상속/증여보험'
+  else if (topic.includes('운전자')) insuranceProduct = '운전자보험'
+  else if (topic.includes('실비') || topic.includes('실손')) insuranceProduct = '실손보험'
   
-  if (maleKeywords.some(k => target.includes(k) || concern.includes(k))) {
-    gender = '남성'
-  }
-  if (femaleKeywords.some(k => target.includes(k) || concern.includes(k))) {
-    gender = '여성'
-  }
+  // 타겟 독자 자동 감지
+  let targetAudience = '30대 직장인'
+  if (topic.includes('신혼') || topic.includes('결혼')) targetAudience = '이제 막 결혼한 신혼부부'
+  else if (topic.includes('50대') || topic.includes('은퇴')) targetAudience = '은퇴를 앞둔 50대'
+  else if (topic.includes('40대') || topic.includes('가장')) targetAudience = '40대 남성 가장'
+  else if (topic.includes('20대') || topic.includes('사회초년생')) targetAudience = '20대 사회초년생'
+  else if (topic.includes('주부') || topic.includes('엄마') || topic.includes('워킹맘')) targetAudience = '30~40대 주부/워킹맘'
+  else if (topic.includes('CEO') || topic.includes('법인') || topic.includes('사업')) targetAudience = '법인대표/CEO'
   
-  const ageMatch = target.match(/(\d+)대/) || concern.match(/(\d+)대/)
-  const age = ageMatch ? ageMatch[1] + '세' : '35세'
-  
-  return { gender, age, target }
+  return { insuranceProduct, targetAudience }
 }
 
-// ============================================
-// [로직 2] 김미경 지사장급 초정밀 전문가 프롬프트
-// ============================================
-function getExpertPrompt(data: any) {
-  const p = getPersona(data.target, data.concern)
+// 전문가 답변용 프롬프트 생성 (XIVIX 2026 초정밀 버전 - 스트리밍용)
+function buildExpertPrompt(topic: string) {
+  const { insuranceProduct, targetAudience } = analyzeTarget(topic)
   
-  return `당신은 대한민국 상위 1% 보험 수석 컨설턴트(XIVIX PRO)입니다.
-보험사: ${data.company}, 스타일: ${data.style}, 타겟: ${p.age}/${p.gender}/${p.target}
+  // 랜덤 제목 패턴 선택
+  const titleHint = TITLE_PATTERNS.map(p => 
+    p.replace('{keyword}', insuranceProduct).replace('{target}', targetAudience)
+  ).join('\n- ')
+  
+  // writing_strategy 적용
+  const strategies = PERSONA_CONFIG.expert.writing_strategy?.join('\n- ') || ''
+  
+  return `## 주제: ${topic} / 대상: ${targetAudience} / 보험: ${insuranceProduct} ##
 
-[핵심 미션]
-입력된 Angle "${data.concern}"을 분석하여 네이버 카페 알고리즘(C-Rank, DIA, Agent N)을 강제로 통과시키는 S등급 콘텐츠를 생성하십시오.
+[🎯 작성 전략 - 반드시 준수]
+- ${strategies}
 
-[페르소나 매칭 - 절대 준수]
-- 현재 페르소나: ${p.gender} / ${p.age}
-- 질문자 화법: 반드시 ${p.gender}의 자연스러운 말투 사용
-- 워킹맘/엄마 = 무조건 여성, 가장/아빠 = 무조건 남성
-- 보험사명 "${data.company}"을 답변에 자연스럽게 포함할 것
+[📌 1. 제목 생성] 
+네이버 카페 상위 노출 및 CTR 30% 이상을 보장하는 자극적이면서도 신뢰감 있는 제목 3개를 제시해줘.
+참고 패턴:
+- ${titleHint}
 
-[전문가 지식 가이드 - 절대 준수]
-1. 상속/증여: 상증법 제8조(간주상속재산) 법리, 수익자 지정에 따른 상속세 절세 원리, 10년 주기 증여 한도 소명 전략.
-2. CEO/법인: 법인세 손비처리 한도, 가지급금 정리용 퇴직금 재원, 임원배상책임 리스크 관리.
-3. 치매/간병: CDR 척도별 판정 기준(CDR 0.5~3단계), ADL(일상생활장애) 보장 공백, 체증형 일당의 화폐가치 방어 논리.
-4. 유병자보험: 간편심사 기준, 고지의무 범위, 기왕증 부담보 조건.
+[📌 2. 본문 작성] (공백 포함 1,000자 내외 - 네이버 카페 포스팅임을 명심!)
+■ 서론 (공감과 위로): 질문의 의도 뒤에 숨겨진 '공포'를 먼저 어루만지고, 독자가 "이 사람 내 마음을 아는구나"라고 느끼게 하라
+■ 본론 (핵심 정보 2~3가지 간결하게): 약관 함정, 보상 청구 팁, 2026년 트렌드
+■ 결론 (열린 질문): 댓글 참여를 유도하는 질문 퍼포먼스
 
-[타이포그래피 가이드 - 필수 적용]
-- 단계별 프로세스 설명 시 반드시 ❶ ❷ ❸ 기호 사용
-- 핵심 개념 정의 시 반드시 ■ (Black Square) 기호 사용
-- 체크리스트/장점 나열 시 반드시 ✔️ (Check Mark) 기호 사용
-- 마크다운 표(|) 금지, HTML <br> 태그로 줄바꿈
-- word-break: keep-all 규칙에 맞게 한글 단어 단위 줄바꿈
+[📌 3. 영업 포인트]
+- "이런 분들은 꼭 상담받아보세요" 형태의 CTA
+- 마지막에 '보험 콘텐츠 마스터' 언급
 
-[콘텐츠 구성 가이드]
-- 질문: 수만 가지 상황 중 랜덤 생성 (보험 초보가 동네 형에게 묻듯 현실적으로)
-- 답변: 3가지 스타일로 작성하되 각 답변당 최소 1,200자 이상의 압도적 정보량과 공감 제공
-- 각 답변에 전문 용어(상증법 제8조, CDR 척도, 손비처리)를 자연스럽게 배치
-
-[알고리즘 대응 전략]
-- C-Rank: 전문 지식을 자연스럽게 녹여 '전문성' 시그널 발생
-- DIA/Agent N: '정보의 이득'을 극대화한 구체적인 수치와 해결책 제시
-
-[출력 구조 - 반드시 이 형식으로]
-
-=== SEO 노출 점수 ===
-등급: S/A/B/C 중 하나
-점수: 0~100점
-예상 노출 순위: 상위 n%
-
-=== 제목 (2개) ===
-❶ (클릭을 유도하는 제목)
-❷ (정보성을 강조하는 제목)
-
-=== 키워드 (5개) ===
-✔️ 키워드1
-✔️ 키워드2
-✔️ 키워드3
-✔️ 키워드4
-✔️ 키워드5
-
-=== 질문 (3개) ===
-
-■ [질문1]
-(${p.gender}의 화법으로 현실적인 고민을 질문)
-
-■ [질문2]
-(다른 상황의 질문)
-
-■ [질문3]
-(또 다른 상황의 질문)
-
-=== 전문가 답변 ===
-
-■ [답변1 - ${data.style}]
-
-❶ 결론부터 말씀드리면...
-(핵심 결론 먼저 제시)
-
-❷ 상세 설명
-(전문 지식을 쉽게 풀어서 설명, 1,200자 이상)
-
-❸ 실행 가이드
-✔️ 첫 번째 할 일
-✔️ 두 번째 할 일
-✔️ 세 번째 할 일
-
-■ [답변2]
-(위와 동일한 구조로 1,200자 이상)
-
-■ [답변3]
-(위와 동일한 구조로 1,200자 이상)
-
-=== 핵심 포인트 ===
-❶ (가장 중요한 포인트)
-❷ (두 번째 중요한 포인트)
-❸ (세 번째 중요한 포인트)
-
-=== 댓글 (5개) ===
-✔️ [댓글1] (공감하는 댓글)
-✔️ [댓글2] (질문하는 댓글)
-✔️ [댓글3] (정보 추가하는 댓글)
-✔️ [댓글4] (감사하는 댓글)
-✔️ [댓글5] (경험 공유하는 댓글)`
+[📌 4. SEO 키워드] (5개)
+[📌 5. 예상 댓글] (5개)`
 }
 
-// ============================================
-// [로직 3] 흑백 엑셀 설계서 프롬프트
-// ============================================
-function getExcelPrompt(data: any) {
-  const p = getPersona(data.target, data.concern)
+// 초보 질문자용 프롬프트 생성 (XIVIX 2026 질문 퍼포먼스 버전)
+function buildBeginnerPrompt(topic: string, situation: string) {
+  const { insuranceProduct } = analyzeTarget(topic)
   
-  return `${data.insuranceType} 보험 설계서 데이터 생성.
+  return `상황: ${situation} / 상품: ${insuranceProduct}
 
-[필수 조건]
-- 피보험자: ${p.gender} / ${p.age}
-- 보험사: ${data.company}
-- 흑백 엑셀 인쇄물용 데이터 (컬러 코드 완전 배제)
-- 15개 이상의 리얼한 담보 구성
-- 2026년 실제 시장가 기준 보험료
-- ${data.company}의 실제 상품명 스타일로 작성
+[🎯 미션]
+카페 회원들이 댓글을 안 달고는 못 배기게 만드는 '간절하고 구체적인 질문글'을 작성해줘.
 
-[출력 형식 - 반드시 JSON만 출력]
-{
-  "product": "${data.company} ${data.insuranceType} 마스터 플랜",
-  "company": "${data.company}",
-  "insured": "${p.target}",
-  "gender": "${p.gender}",
-  "age": "${p.age}",
-  "items": [
-    {"name": "담보명", "amount": "가입금액", "premium": "보험료"}
-  ],
-  "total": "월 합계 보험료"
-}`
+[📌 작성 원칙]
+■ 감정 과잉이 아닌, 실제 옆집 사람이 겪는 일처럼 리얼하게
+■ 누구나 겪을 법한 극도로 구체적이고 드라마틱한 상황 설정
+■ 문장은 짧고 호흡이 빠르며, 간절함이 뚝뚝 묻어나야 함
+■ '아시는 분 제발 도와주세요'라는 느낌 극대화
+■ 약간의 오타나 신조어를 섞어 실제 사람처럼
+
+[📌 출력 형식]
+📌 제목: (클릭 안 할 수 없는 급박한 제목)
+
+📌 본문: (300~500자)
+- 구체적인 현재 상황 (날짜, 상황, 금액 등 디테일)
+- 느끼는 불안함과 막막함
+- 선배님들에게 구체적인 질문
+- 마지막에 "제발 도와주세요 ㅠㅠ" 느낌의 간절한 마무리`
 }
 
-// ============================================
-// 📝 마스터 통합 스트리밍 API
-// ============================================
+// 댓글 생성용 프롬프트 (XIVIX 2026 여론 조작 버전)
+function buildCommentPrompt(postContent: string) {
+  return `원문: ${postContent}
+
+[🎯 미션]
+위 글에 대해 '진짜 카페 회원'들이 대화하는 듯한 고도의 심리전 댓글 5개를 달아줘.
+
+[📌 댓글 작성 원칙]
+■ 단순한 칭찬이 아니라 실제 경험담을 섞어 본문의 신뢰도를 200% 올릴 것
+■ 일부러 질문자에게 추가 정보를 묻거나, 전문가의 답변에 감탄하며 자신의 사례를 덧붙일 것
+■ 3번째 댓글은 반드시 전문가의 전문성에 감탄하는 내용이어야 함
+
+[📌 5명의 페르소나]
+1. 까칠한 선배 (약간 퉁명스럽지만 핵심 정보 제공)
+2. 다정한 주부 (공감하며 본인 경험 공유)
+3. 의심 많은 사회초년생 (추가 질문으로 대화 유도)
+4. 베테랑 회원 (전문가 글에 감탄 + 보충 정보)
+5. 지나가던 초보 (단순 감사 + "저도 궁금했어요")
+
+각 댓글의 길이는 다양하게 (한 줄 ~ 3줄), 실제 카페 분위기로 작성해줘.`
+}
+
+// 메인 콘텐츠 생성 API (전문가 페르소나)
 app.post('/api/generate/master', async (c) => {
   const body = await c.req.json()
-
+  const topic = body.concern || body.topic || ''
+  
   return streamText(c, async (stream) => {
-    await stream.write(JSON.stringify({ type: 'status', step: 1, msg: '🔍 1단계: 타겟 페르소나 정밀 분석 중...' }) + '\n')
-    await stream.write(JSON.stringify({ type: 'status', step: 2, msg: `⚖️ 2단계: ${body.company} 최신 약관 및 법리 대입 중...` }) + '\n')
-    await stream.write(JSON.stringify({ type: 'status', step: 3, msg: '🧠 3단계: 전문가 뇌 교체 및 콘텐츠 생성 중...' }) + '\n')
-
+    await stream.write(JSON.stringify({ type: 'status', step: 1, msg: '🔍 주제 분석 중...' }) + '\n')
+    
+    const { insuranceProduct, targetAudience } = analyzeTarget(topic)
+    await stream.write(JSON.stringify({ type: 'status', step: 2, msg: `📋 ${insuranceProduct} / ${targetAudience} 매칭 완료` }) + '\n')
+    await stream.write(JSON.stringify({ type: 'status', step: 3, msg: '✍️ 전문가 콘텐츠 생성 중...' }) + '\n')
+    
     try {
-      const response = await callGeminiWithFallback(EXPERT_ENGINE, getExpertPrompt(body), true)
+      const apiKey = getApiKey(c.env, 'PRO')
+      const systemInstruction = PERSONA_CONFIG.expert.system_instruction
+      const userPrompt = buildExpertPrompt(topic)
       
+      // 품질 글쓰기는 PRO 모델 + PRO 키 사용
+      const response = await callGeminiWithPersona(apiKey, ENGINE.PRO, systemInstruction, userPrompt, true)
       if (!response.ok) {
-        await stream.write(JSON.stringify({ type: 'error', msg: 'API 호출 실패. 잠시 후 다시 시도해주세요.' }) + '\n')
+        const errorText = await response.text()
+        console.error('API Error:', errorText)
+        await stream.write(JSON.stringify({ type: 'error', msg: 'API 호출 실패' }) + '\n')
         return
       }
-
+      
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
-      
       while (true) {
         const { done, value } = await reader!.read()
         if (done) break
-        
         const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
-        
-        for (const line of lines) {
+        for (const line of chunk.split('\n')) {
           if (line.startsWith('data: ')) {
             try {
               const parsed = JSON.parse(line.slice(6))
               const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text
-              if (text) {
-                const clean = text
-                  .replace(/\n/g, '<br>')
-                  .replace(/Analysis|Evidence|Step \d+:/gi, '')
-                await stream.write(JSON.stringify({ type: 'content', data: clean }) + '\n')
-              }
-            } catch (e) {
-              // JSON 파싱 오류 무시
-            }
+              if (text) await stream.write(JSON.stringify({ type: 'content', data: text.replace(/\n/g, '<br>') }) + '\n')
+            } catch (e) {}
           }
         }
       }
-      
       await stream.write(JSON.stringify({ type: 'done' }) + '\n')
     } catch (error) {
-      await stream.write(JSON.stringify({ type: 'error', msg: '모든 API 키가 소진되었습니다. 관리자에게 문의하세요.' }) + '\n')
+      console.error('Stream Error:', error)
+      await stream.write(JSON.stringify({ type: 'error', msg: String(error) }) + '\n')
     }
   })
 })
 
-// ============================================
-// 📊 흑백 엑셀 설계서 API
-// ============================================
-app.post('/api/generate/excel', async (c) => {
+// 초보 질문 게시글 생성 API
+app.post('/api/generate/question', async (c) => {
   const body = await c.req.json()
-  const p = getPersona(body.target, body.concern)
-
+  const topic = body.topic || ''
+  const situation = body.situation || body.concern || ''
+  
   try {
-    const response = await callGeminiWithFallback(DATA_ENGINE, getExcelPrompt(body), false)
+    const apiKey = getApiKey(c.env, 'FLASH')
+    const systemInstruction = PERSONA_CONFIG.beginner.system_instruction
+    const userPrompt = buildBeginnerPrompt(topic, situation)
+    
+    // 초보 질문은 FLASH 모델 + FLASH 키 사용
+    const response = await callGeminiWithPersona(apiKey, ENGINE.FLASH, systemInstruction, userPrompt, false)
     const json = await response.json() as any
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
     
-    const textContent = json.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
-    const jsonMatch = textContent.match(/\{[\s\S]*\}/)
-    
-    if (jsonMatch) {
-      const data = JSON.parse(jsonMatch[0])
-      return c.json({ 
-        success: true, 
-        data: { 
-          ...data, 
-          gender: p.gender, 
-          age: p.age, 
-          target: p.target 
-        } 
-      })
-    }
-    
-    return c.json({ success: false, error: 'JSON 파싱 실패' })
+    return c.json({ success: true, content: text })
   } catch (error) {
     return c.json({ success: false, error: 'API 호출 실패' })
   }
 })
 
+// 댓글 생성 API
+app.post('/api/generate/comments', async (c) => {
+  const body = await c.req.json()
+  const postContent = body.content || ''
+  
+  try {
+    const apiKey = getApiKey(c.env, 'FLASH')
+    const systemInstruction = PERSONA_CONFIG.comment.system_instruction
+    const userPrompt = buildCommentPrompt(postContent)
+    
+    // 댓글 생성은 FLASH 모델 + FLASH 키 사용
+    const response = await callGeminiWithPersona(apiKey, ENGINE.FLASH, systemInstruction, userPrompt, false)
+    const json = await response.json() as any
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    return c.json({ success: true, comments: text })
+  } catch (error) {
+    return c.json({ success: false, error: 'API 호출 실패' })
+  }
+})
+
+// 실시간 보험 트렌드 키워드 풀 (네이버 인기검색어 기반 시뮬레이션)
+const TREND_POOL = [
+  // 상속/증여 카테고리
+  { keyword: '실손보험 4세대', category: '실손', volume: [8000, 15000] },
+  { keyword: '암보험 추천 2026', category: '암보험', volume: [6000, 12000] },
+  { keyword: '태아보험 필수특약', category: '태아', volume: [5000, 10000] },
+  { keyword: '종신보험 해지', category: '종신', volume: [4000, 9000] },
+  { keyword: '연금보험 비교', category: '연금', volume: [5500, 11000] },
+  { keyword: '운전자보험 필요성', category: '운전자', volume: [3500, 8000] },
+  { keyword: '간병보험 비용', category: '간병', volume: [4500, 9500] },
+  { keyword: '치아보험 위폴릭트', category: '치아', volume: [3000, 7000] },
+  { keyword: '상속세 절세방법', category: '상속', volume: [7000, 14000] },
+  { keyword: '증여세 면제한도 2026', category: '증여', volume: [6500, 13000] },
+  { keyword: 'CEO 퇴직금 설계', category: 'CEO', volume: [4000, 8500] },
+  { keyword: '법인보험 세금혜택', category: '법인', volume: [3800, 8200] },
+  { keyword: '유병자보험 가입조건', category: '유병자', volume: [5200, 10500] },
+  { keyword: '20대 보험 필수', category: '20대', volume: [4800, 9800] },
+  { keyword: '30대 보험 설계', category: '30대', volume: [5500, 11500] },
+  { keyword: '치매보험 가입시기', category: '치매', volume: [4200, 8800] },
+  { keyword: '건강보험 환급금', category: '건강', volume: [6000, 12500] },
+  { keyword: '저축보험 만기환급', category: '저축', volume: [3500, 7500] },
+  { keyword: '자녀보험 언제까지', category: '자녀', volume: [4000, 8500] },
+  { keyword: '보험료 인상 대비', category: '보험료', volume: [5000, 10000] },
+]
+
+// 실시간 트렌드 생성 함수 (매 요청마다 랜덤 변동)
+function generateRealtimeTrends() {
+  const now = Date.now()
+  const seed = Math.floor(now / 15000) // 15초마다 변경
+  
+  // 시드 기반 셔플
+  const shuffled = [...TREND_POOL].sort((a, b) => {
+    const hashA = (seed * 31 + a.keyword.charCodeAt(0)) % 1000
+    const hashB = (seed * 31 + b.keyword.charCodeAt(0)) % 1000
+    return hashB - hashA
+  })
+  
+  // 상위 8개 선택
+  const selected = shuffled.slice(0, 8)
+  
+  return selected.map((item, index) => {
+    // 볼륨 랜덤 생성 (범위 내)
+    const baseVolume = Math.floor(item.volume[0] + Math.random() * (item.volume[1] - item.volume[0]))
+    const volume = Math.round(baseVolume / 100) * 100
+    
+    // 변동 상태 결정
+    const changeRand = Math.random()
+    let change = 'same'
+    let changePercent = 0
+    
+    if (changeRand > 0.7) {
+      change = 'up'
+      changePercent = Math.floor(Math.random() * 20) + 5
+    } else if (changeRand > 0.5) {
+      change = 'down'
+      changePercent = Math.floor(Math.random() * 15) + 3
+    } else if (changeRand > 0.4) {
+      change = 'new'
+    }
+    
+    return {
+      rank: index + 1,
+      keyword: item.keyword,
+      category: item.category,
+      change,
+      changePercent,
+      volume: volume.toLocaleString()
+    }
+  })
+}
+
+// 네이버 실시간 검색 트렌드 API
+app.get('/api/trend', async (c) => {
+  const clientId = c.env?.NAVER_CLIENT_ID || ''
+  const clientSecret = c.env?.NAVER_CLIENT_SECRET || ''
+  
+  // 네이버 API 키가 있으면 실제 API 호출 시도
+  if (clientId && clientSecret) {
+    try {
+      const today = new Date()
+      const endDate = today.toISOString().split('T')[0]
+      const startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      
+      const requestBody = {
+        startDate,
+        endDate,
+        timeUnit: 'date',
+        keywordGroups: [
+          { groupName: '실손보험', keywords: ['실손보험', '실손보험 4세대', '실손보험 추천'] },
+          { groupName: '상속세', keywords: ['상속세', '상속세 절세', '상속 보험'] },
+          { groupName: '증여세', keywords: ['증여세', '증여세 면제', '증여 보험'] },
+          { groupName: '치매보험', keywords: ['치매보험', '치매 보장', '간병보험'] },
+          { groupName: '종신보험', keywords: ['종신보험', '종신보험 추천', '종신보험 해지'] }
+        ]
+      }
+      
+      const response = await fetch('https://openapi.naver.com/v1/datalab/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Naver-Client-Id': clientId,
+          'X-Naver-Client-Secret': clientSecret
+        },
+        body: JSON.stringify(requestBody)
+      })
+      
+      if (response.ok) {
+        const data = await response.json() as any
+        const results = data.results || []
+        
+        // 실제 트렌드 데이터와 시뮬레이션 병합
+        const realTrends = results.map((item: any, index: number) => {
+          const latestRatio = item.data?.[item.data.length - 1]?.ratio || 0
+          const prevRatio = item.data?.[item.data.length - 2]?.ratio || 0
+          let change = 'same'
+          let changePercent = 0
+          
+          if (latestRatio > prevRatio * 1.05) {
+            change = 'up'
+            changePercent = Math.round((latestRatio / prevRatio - 1) * 100)
+          } else if (latestRatio < prevRatio * 0.95) {
+            change = 'down'
+            changePercent = Math.round((1 - latestRatio / prevRatio) * 100)
+          }
+          
+          return {
+            rank: index + 1,
+            keyword: item.title,
+            category: item.title.split(' ')[0],
+            change,
+            changePercent,
+            volume: Math.round(latestRatio * 100).toLocaleString()
+          }
+        })
+        
+        // 부족한 경우 시뮬레이션 데이터 추가
+        const simTrends = generateRealtimeTrends()
+        const combined = [...realTrends, ...simTrends.slice(realTrends.length)].slice(0, 8)
+          .map((item, index) => ({ ...item, rank: index + 1 }))
+        
+        return c.json({ 
+          success: true, 
+          trends: combined,
+          source: 'naver_datalab',
+          nextUpdate: 15,
+          updatedAt: new Date().toISOString() 
+        })
+      }
+    } catch (error) {
+      console.error('Naver API error:', error)
+    }
+  }
+  
+  // Fallback: 시뮬레이션 트렌드 데이터
+  const trends = generateRealtimeTrends()
+  return c.json({ 
+    success: true, 
+    trends, 
+    source: 'realtime_simulation',
+    nextUpdate: 15,
+    updatedAt: new Date().toISOString() 
+  })
+})
+
+// 파일 업로드 API (Base64 처리)
+app.post('/api/upload', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { file, filename, mimeType } = body
+    
+    if (!file) {
+      return c.json({ success: false, error: '파일이 없습니다' }, 400)
+    }
+    
+    // Base64 데이터 크기 검증 (10MB = ~13.3MB in Base64)
+    const base64Size = file.length * 0.75 // Base64 to bytes approximate
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    
+    if (base64Size > maxSize) {
+      return c.json({ success: false, error: '파일 크기가 10MB를 초과합니다' }, 400)
+    }
+    
+    // 이미지 MIME 타입 검증
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    if (!allowedTypes.includes(mimeType)) {
+      return c.json({ success: false, error: '지원하지 않는 파일 형식입니다 (JPG, PNG, GIF, WEBP만 가능)' }, 400)
+    }
+    
+    // 파일 정보 반환 (Cloudflare Workers에서는 파일 저장 불가, R2 연동 필요 시 추가)
+    return c.json({ 
+      success: true, 
+      file: {
+        name: filename,
+        size: Math.round(base64Size),
+        mimeType,
+        preview: file.substring(0, 100) + '...',
+        uploadedAt: new Date().toISOString()
+      }
+    })
+  } catch (error) {
+    return c.json({ success: false, error: '업로드 처리 실패' }, 500)
+  }
+})
+
+// 이미지 분석 API (Vision 모델 사용 - PRO 키로 멀티모달)
+app.post('/api/analyze/image', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { image, mimeType, prompt } = body
+    
+    if (!image) {
+      return c.json({ success: false, error: '이미지가 없습니다' }, 400)
+    }
+    
+    // 멀티모달 분석은 PRO 키 사용
+    const apiKey = getApiKey(c.env, 'PRO')
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${apiKey}`
+    
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: prompt || '이 이미지에서 보험 관련 정보를 분석해주세요. 보험증권, 약관, 설계서 등이 있다면 주요 내용을 추출해주세요.' },
+            { 
+              inline_data: {
+                mime_type: mimeType || 'image/jpeg',
+                data: image
+              }
+            }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.4,
+          topP: 0.95,
+          maxOutputTokens: 4096
+        }
+      })
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Vision API Error:', errorText)
+      return c.json({ success: false, error: '이미지 분석 실패' }, 500)
+    }
+    
+    const json = await response.json() as any
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    return c.json({ 
+      success: true, 
+      analysis: text,
+      model: ENGINE.PRO
+    })
+  } catch (error) {
+    console.error('Image Analysis Error:', error)
+    return c.json({ success: false, error: '이미지 분석 처리 실패' }, 500)
+  }
+})
+
 // ============================================
-// 🏥 Health Check API
+// 🔥 FULL PACKAGE 통합 엔드포인트 v4 (SSE 스트리밍)
+// - 타임아웃 방지: 스트리밍으로 실시간 출력
+// - 제목: 25자 이내 (모바일 가독성)
+// - 본문: 1,000자 내외 (네이버 카페 최적화)
+// - 우선순위: 이미지 > 입력 텍스트 > 트렌드 (Context Switching)
 // ============================================
-app.get('/api/health', (c) => {
-  return c.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: '2026.3.0',
-    engines: {
-      expert: EXPERT_ENGINE,
-      data: DATA_ENGINE
-    },
-    apiKeysAvailable: API_KEYS.length,
-    typographyGuide: {
-      process: '❶ ❷ ❸',
-      emphasis: '■',
-      check: '✔️'
+app.post('/api/generate/full-package', async (c) => {
+  try {
+    const body = await c.req.json()
+    const inputTopic = body.concern || body.topic || ''
+    const trendKeyword = body.trend_keyword || '' // 트렌드에서 선택한 키워드
+    const image = body.image || null // Base64 이미지 (선택)
+    const mimeType = body.mimeType || 'image/jpeg'
+    
+    // ============================================
+    // 🎯 Context Priority 시스템 (이미지 > 입력 > 트렌드)
+    // ============================================
+    let contextSource = 'trend' // default
+    let topic = trendKeyword || inputTopic // 초기값
+    let imageAnalysisResult: any = null
+    
+    const proKey = getApiKey(c.env, 'PRO')
+    const flashKey = getApiKey(c.env, 'FLASH')
+    
+    let imageAnalysis = ''
+    let reportData: any[] = [] // 보장 분석 리포트 데이터
+    
+    // ============================================
+    // Step 1: 이미지 우선 분석 (Context Override)
+    // 이미지가 있으면 트렌드/입력 키워드를 무시하고 이미지 내용 우선
+    // ============================================
+    if (image) {
+      contextSource = 'image'
+      const visionPrompt = `당신은 30년 경력 MDRT 보험왕입니다. 이 이미지(보험증권, 약관, 설계서 등)를 분석하고 JSON으로 응답하세요.
+
+[📊 분석 항목]
+1. 이미지 종류 파악 (보험증권, 약관, 설계서, 청구서, 진단서 등)
+2. 보험사, 상품명, 가입일, 만기일 등 기본 정보 → 이 정보를 바탕으로 detected_keyword 필드 생성
+3. 각 보장 항목별 현재 가입금액과 권장 금액 비교
+4. 주의해야 할 약관 조항이나 함정
+5. 전문가 조언 포인트
+
+반드시 아래 JSON 형식으로만 응답하세요:
+
+{
+  "imageType": "보험증권/약관/설계서 등",
+  "company": "보험사명",
+  "productName": "상품명",
+  "detected_keyword": "이미지에서 감지된 핵심 보험 종류 (예: 암보험, 종신보험, 실손보험 등)",
+  "summary": "핵심 분석 요약 (2-3줄)",
+  "report_data": [
+    {"item": "암진단비", "current": "현재 가입금액", "target": "권장 금액", "status": "critical/essential/good"},
+    {"item": "뇌혈관질환", "current": "현재 가입금액", "target": "권장 금액", "status": "critical/essential/good"},
+    {"item": "급성심근경색", "current": "현재 가입금액", "target": "권장 금액", "status": "critical/essential/good"},
+    {"item": "수술비", "current": "현재 가입금액", "target": "권장 금액", "status": "critical/essential/good"},
+    {"item": "입원일당", "current": "현재 가입금액", "target": "권장 금액", "status": "critical/essential/good"}
+  ],
+  "warnings": ["주의사항1", "주의사항2"],
+  "advice": "전문가 핵심 조언"
+}`
+      
+      const visionEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`
+      const visionResponse = await fetch(visionEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            role: 'user',
+            parts: [
+              { text: visionPrompt },
+              { inline_data: { mime_type: mimeType, data: image } }
+            ]
+          }],
+          generationConfig: { 
+            temperature: 0.4, 
+            maxOutputTokens: 4096,
+            responseMimeType: 'application/json'
+          }
+        })
+      })
+      
+      if (visionResponse.ok) {
+        const visionJson = await visionResponse.json() as any
+        const rawText = visionJson.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        try {
+          const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+          const parsed = JSON.parse(cleanJson)
+          imageAnalysisResult = parsed
+          imageAnalysis = parsed.summary || rawText
+          reportData = parsed.report_data || []
+          
+          // 🎯 Context Override: 이미지에서 감지된 키워드로 주제 교체
+          if (parsed.detected_keyword) {
+            topic = parsed.detected_keyword
+            console.log(`[Context Switch] 이미지 감지 키워드로 주제 교체: ${topic}`)
+          }
+          
+          // 전체 분석 결과 저장
+          imageAnalysis = `📋 ${parsed.imageType || '문서'} 분석\n🏢 ${parsed.company || ''} - ${parsed.productName || ''}\n\n${parsed.summary || ''}\n\n⚠️ 주의사항:\n${(parsed.warnings || []).map((w: string) => '• ' + w).join('\n')}\n\n💡 전문가 조언:\n${parsed.advice || ''}`
+        } catch (e) {
+          console.error('Vision JSON Parse Error:', e)
+          imageAnalysis = rawText
+        }
+      }
+    } else if (inputTopic) {
+      // 입력 텍스트가 있으면 트렌드보다 우선
+      contextSource = 'input'
+      topic = inputTopic
+    }
+    
+    // 최종 주제로 타겟 분석
+    const { insuranceProduct, targetAudience } = analyzeTarget(topic)
+    
+    // Step 2: 구조화된 JSON 출력을 위한 프롬프트 (v4 - 제목 25자, 본문 1,000자 엄격 제한)
+    const strategies = PERSONA_CONFIG.expert.writing_strategy?.join(', ') || ''
+    const titleHint = TITLE_PATTERNS.map(p => 
+      p.replace('{keyword}', insuranceProduct).replace('{target}', targetAudience)
+    ).join(', ')
+    
+    // ============================================
+    // 🚨 핵심 제약 조건 (프롬프트 최상단 배치)
+    // ============================================
+    const fullPackagePrompt = `## XIVIX 2026 마케팅 콘텐츠 생성 (v4) ##
+
+🚨🚨🚨 [최우선 제약 - 반드시 준수] 🚨🚨🚨
+1. 제목: 공백 포함 25자 이내 (모바일 카페 앱에서 잘리지 않게!)
+2. 본문: 공백 포함 1,000자 내외 (800~1,100자 범위)
+3. 바이럴 질문: 공백 포함 800자 이내
+
+[📊 입력 정보]
+- 컨텍스트 소스: ${contextSource} (image > input > trend 우선순위)
+- 주제: ${topic}
+- 대상: ${targetAudience}
+- 보험: ${insuranceProduct}
+${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${imageAnalysis}` : ''}
+
+[🎯 작성 전략] ${strategies}
+
+[📌 제목 참고 패턴 - 25자 이내로 압축할 것!] ${titleHint}
+
+반드시 아래 JSON 형식으로만 응답하세요 (다른 텍스트 없이 JSON만):
+
+{
+  "seo_audit": {
+    "score": 85-99 사이 숫자,
+    "grade": "S+/S/A+/A 중 하나",
+    "rank_prediction": "1-3위/3-5위/5-10위 중 하나",
+    "analysis": "SEO 분석 한줄 요약"
+  },
+  "titles": [
+    {"id": 1, "text": "제목1 (공백 포함 25자 이내! 예: [충격] 암보험 약관 함정)"},
+    {"id": 2, "text": "제목2 (25자 이내)"},
+    {"id": 3, "text": "제목3 (25자 이내)"},
+    {"id": 4, "text": "제목4 (25자 이내)"},
+    {"id": 5, "text": "제목5 (25자 이내)"}
+  ],
+  "viral_questions": [
+    {"id": 1, "text": "바이럴 질문1 (800자 이내, 구체적 상황+간절한 말투+이미지 첨부 언급)"},
+    {"id": 2, "text": "바이럴 질문2 (800자 이내)"}
+  ],
+  "contents": [
+    {"id": 1, "style": "공감형", "text": "본문1 (800~1,100자, 독자의 불안을 어루만지는 따뜻한 글)"},
+    {"id": 2, "style": "팩트형", "text": "본문2 (800~1,100자, 약관 함정 폭로)"},
+    {"id": 3, "style": "영업형", "text": "본문3 (800~1,100자, 심리적 트리거로 상담 유도)"}
+  ],
+  "seoKeywords": ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5"]
+}`
+    
+    const expertEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`
+    const expertResponse = await fetch(expertEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: PERSONA_CONFIG.expert.system_instruction + '\n\n중요: 반드시 유효한 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON 객체만 출력합니다.' }] },
+        contents: [{ role: 'user', parts: [{ text: fullPackagePrompt }] }],
+        generationConfig: { 
+          temperature: 0.8, 
+          topP: 0.95, 
+          maxOutputTokens: 8192,
+          responseMimeType: 'application/json'
+        }
+      })
+    })
+    
+    let expertData: any = { titles: [], contents: [], seoKeywords: [] }
+    if (expertResponse.ok) {
+      const expertJson = await expertResponse.json() as any
+      const rawText = expertJson.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      try {
+        // JSON 파싱 시도
+        const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+        expertData = JSON.parse(cleanJson)
+      } catch (e) {
+        console.error('JSON Parse Error:', e)
+        // 파싱 실패 시 원본 텍스트 포함
+        expertData = { 
+          titles: [{ id: 1, text: '제목 파싱 실패' }], 
+          contents: [{ id: 1, style: '원본', text: rawText }], 
+          seoKeywords: [] 
+        }
+      }
+    } else {
+      const errorText = await expertResponse.text()
+      console.error('Expert API Error:', errorText)
+      return c.json({ success: false, error: '전문가 콘텐츠 생성 실패', detail: errorText }, 500)
+    }
+    
+    // Step 3: 댓글 5개 생성 (FLASH 모델 - JSON 형식)
+    const commentPrompt = `주제: ${topic} - ${insuranceProduct} 관련 전문가 글
+
+위 주제의 전문가 게시글에 달릴 '진짜 카페 회원' 댓글 5개를 작성해줘.
+
+5명의 페르소나:
+1. 까칠한 선배 (퉁명스럽지만 핵심 정보)
+2. 다정한 주부 (공감 + 본인 경험)
+3. 의심 많은 사회초년생 (추가 질문)
+4. 베테랑 회원 (전문가에 감탄 + 보충 정보)
+5. 지나가던 초보 (감사 + "저도 궁금했어요")
+
+반드시 아래 JSON 형식으로만 응답 (다른 텍스트 없이):
+
+{
+  "comments": [
+    {"id": 1, "nickname": "닉네임1", "persona": "까칠한 선배", "text": "댓글 내용"},
+    {"id": 2, "nickname": "닉네임2", "persona": "다정한 주부", "text": "댓글 내용"},
+    {"id": 3, "nickname": "닉네임3", "persona": "의심 많은 사회초년생", "text": "댓글 내용"},
+    {"id": 4, "nickname": "닉네임4", "persona": "베테랑 회원", "text": "댓글 내용"},
+    {"id": 5, "nickname": "닉네임5", "persona": "지나가던 초보", "text": "댓글 내용"}
+  ]
+}`
+    
+    const commentEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.FLASH}:generateContent?key=${flashKey}`
+    const commentResponse = await fetch(commentEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: PERSONA_CONFIG.comment.system_instruction + '\n\n중요: 반드시 유효한 JSON 형식으로만 응답하세요.' }] },
+        contents: [{ role: 'user', parts: [{ text: commentPrompt }] }],
+        generationConfig: { 
+          temperature: 0.9, 
+          maxOutputTokens: 4096,
+          responseMimeType: 'application/json'
+        }
+      })
+    })
+    
+    let commentsData: any = { comments: [] }
+    if (commentResponse.ok) {
+      const commentJson = await commentResponse.json() as any
+      const rawText = commentJson.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      try {
+        const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+        commentsData = JSON.parse(cleanJson)
+      } catch (e) {
+        console.error('Comment JSON Parse Error:', e)
+        commentsData = { comments: [{ id: 1, nickname: '회원', persona: '기본', text: rawText }] }
+      }
+    }
+    
+    // ============================================
+    // 🎯 제목 25자 후처리 (백엔드에서 강제 truncate)
+    // ============================================
+    const processedTitles = (expertData.titles || []).map((t: any) => ({
+      ...t,
+      text: t.text?.length > 25 ? t.text.substring(0, 22) + '...' : t.text,
+      original_length: t.text?.length || 0,
+      truncated: (t.text?.length || 0) > 25
+    }))
+    
+    // Final: 구조화된 JSON 응답 (v4 - Context Switching + 제목 25자 + 본문 1,000자)
+    return c.json({
+      success: true,
+      package: {
+        topic,
+        original_topic: inputTopic || trendKeyword,
+        context_source: contextSource, // 'image' | 'input' | 'trend'
+        context_priority: '이미지 > 입력 텍스트 > 트렌드',
+        target: targetAudience,
+        insurance: insuranceProduct,
+        seo_audit: expertData.seo_audit || { score: 95, grade: 'S+', rank_prediction: '1-3위', analysis: 'SEO 최적화 완료' },
+        imageAnalysis: imageAnalysis || null,
+        image_detected_keyword: imageAnalysisResult?.detected_keyword || null,
+        report_data: reportData, // 이미지 분석에서 추출한 보장 분석 데이터
+        titles: processedTitles,
+        title_constraint: '25자 이내 (모바일 가독성)',
+        viral_questions: expertData.viral_questions || [],
+        contents: expertData.contents || [],
+        content_constraint: '1,000자 내외 (800-1,100자)',
+        seoKeywords: expertData.seoKeywords || [],
+        comments: commentsData.comments || [],
+        generatedAt: new Date().toISOString()
+      },
+      models: {
+        vision: image ? ENGINE.PRO : null,
+        expert: ENGINE.PRO,
+        comments: ENGINE.FLASH
+      },
+      version: '2026.16.0',
+      changelog: 'v4: 스트리밍 대응, 제목 25자, 본문 1,000자, Context Switching'
+    })
+    
+  } catch (error) {
+    console.error('Full Package Error:', error)
+    return c.json({ success: false, error: 'Full Package 생성 실패', detail: String(error) }, 500)
+  }
+})
+
+// ============================================
+// 🔥 FULL PACKAGE SSE 스트리밍 엔드포인트 (타임아웃 방지)
+// - 각 단계별 진행 상황을 실시간으로 클라이언트에 전송
+// - 본문이 생성되는 대로 글자 단위로 스트리밍
+// ============================================
+app.post('/api/generate/full-package-stream', async (c) => {
+  const body = await c.req.json()
+  const inputTopic = body.concern || body.topic || ''
+  const trendKeyword = body.trend_keyword || ''
+  const image = body.image || null
+  const mimeType = body.mimeType || 'image/jpeg'
+  
+  return streamText(c, async (stream) => {
+    try {
+      // 🎯 Context Priority 시스템
+      let contextSource = 'trend'
+      let topic = trendKeyword || inputTopic
+      let imageAnalysis = ''
+      let reportData: any[] = []
+      let imageDetectedKeyword = ''
+      
+      const proKey = getApiKey(c.env, 'PRO')
+      const flashKey = getApiKey(c.env, 'FLASH')
+      
+      // Step 1: 이미지 분석 (우선순위 1)
+      await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '🔍 API 연결 및 트렌드 분석 중...' }) + '\n')
+      
+      if (image) {
+        contextSource = 'image'
+        await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '🖼️ 이미지 분석 중 (최우선 컨텍스트)...' }) + '\n')
+        
+        const visionPrompt = `이미지를 분석하고 detected_keyword(보험 종류), company(보험사), summary(요약)을 JSON으로 응답.`
+        const visionEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`
+        
+        const visionResponse = await fetch(visionEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: visionPrompt }, { inline_data: { mime_type: mimeType, data: image } }] }],
+            generationConfig: { temperature: 0.4, maxOutputTokens: 2048, responseMimeType: 'application/json' }
+          })
+        })
+        
+        if (visionResponse.ok) {
+          const visionJson = await visionResponse.json() as any
+          const rawText = visionJson.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          try {
+            const parsed = JSON.parse(rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim())
+            if (parsed.detected_keyword) {
+              topic = parsed.detected_keyword
+              imageDetectedKeyword = parsed.detected_keyword
+            }
+            imageAnalysis = parsed.summary || rawText
+            reportData = parsed.report_data || []
+            await stream.write(JSON.stringify({ type: 'context_switch', from: trendKeyword || inputTopic, to: topic, source: 'image' }) + '\n')
+          } catch (e) { imageAnalysis = rawText }
+        }
+      } else if (inputTopic) {
+        contextSource = 'input'
+        topic = inputTopic
+      }
+      
+      const { insuranceProduct, targetAudience } = analyzeTarget(topic)
+      await stream.write(JSON.stringify({ type: 'step', step: 2, msg: `🎯 ${insuranceProduct} / ${targetAudience} 매칭 완료` }) + '\n')
+      
+      // Step 2: 제목 + 바이럴 질문 생성 (스트리밍)
+      await stream.write(JSON.stringify({ type: 'step', step: 3, msg: '✍️ 제목 및 바이럴 질문 생성 중...' }) + '\n')
+      
+      const titlePrompt = `주제: ${topic} / 보험: ${insuranceProduct}
+🚨 제목 5개 생성 (각각 공백 포함 25자 이내 필수!)
+🚨 바이럴 질문 2개 생성 (800자 이내, 구체적 상황 + 간절한 말투)
+
+JSON 형식으로만 응답:
+{ "titles": [{"id":1,"text":"25자 이내 제목"},...], "viral_questions": [{"id":1,"text":"바이럴 질문"},...] }`
+      
+      const titleResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.FLASH}:generateContent?key=${flashKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: titlePrompt }] }],
+          generationConfig: { temperature: 0.9, maxOutputTokens: 2048, responseMimeType: 'application/json' }
+        })
+      })
+      
+      let titles: any[] = []
+      let viralQuestions: any[] = []
+      
+      if (titleResponse.ok) {
+        const json = await titleResponse.json() as any
+        const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        try {
+          const parsed = JSON.parse(rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim())
+          titles = (parsed.titles || []).map((t: any) => ({
+            ...t,
+            text: t.text?.length > 25 ? t.text.substring(0, 22) + '...' : t.text
+          }))
+          viralQuestions = parsed.viral_questions || []
+        } catch (e) {}
+      }
+      
+      await stream.write(JSON.stringify({ type: 'titles', data: titles }) + '\n')
+      await stream.write(JSON.stringify({ type: 'viral_questions', data: viralQuestions }) + '\n')
+      
+      // Step 3: 본문 1개씩 스트리밍 생성 (1,000자)
+      await stream.write(JSON.stringify({ type: 'step', step: 4, msg: '📝 전문가 본문 생성 중 (1,000자)...' }) + '\n')
+      
+      const styles = ['공감형', '팩트형', '영업형']
+      const contents: any[] = []
+      
+      for (let i = 0; i < 3; i++) {
+        const style = styles[i]
+        await stream.write(JSON.stringify({ type: 'content_start', id: i + 1, style }) + '\n')
+        
+        const contentPrompt = `주제: ${topic} / 보험: ${insuranceProduct} / 스타일: ${style}
+🚨 반드시 800~1,100자로 작성 (네이버 카페 포스팅)
+마지막에 '보험 콘텐츠 마스터' 언급. JSON 형식 {"text": "본문내용"}`
+        
+        const contentResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:streamGenerateContent?alt=sse&key=${proKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: PERSONA_CONFIG.expert.system_instruction }] },
+            contents: [{ role: 'user', parts: [{ text: contentPrompt }] }],
+            generationConfig: { temperature: 0.8, maxOutputTokens: 4096 }
+          })
+        })
+        
+        let fullText = ''
+        if (contentResponse.ok) {
+          const reader = contentResponse.body?.getReader()
+          const decoder = new TextDecoder()
+          while (true) {
+            const { done, value } = await reader!.read()
+            if (done) break
+            const chunk = decoder.decode(value, { stream: true })
+            for (const line of chunk.split('\n')) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const parsed = JSON.parse(line.slice(6))
+                  const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text
+                  if (text) {
+                    fullText += text
+                    await stream.write(JSON.stringify({ type: 'content_chunk', id: i + 1, chunk: text }) + '\n')
+                  }
+                } catch (e) {}
+              }
+            }
+          }
+        }
+        
+        contents.push({ id: i + 1, style, text: fullText })
+        await stream.write(JSON.stringify({ type: 'content_done', id: i + 1, length: fullText.length }) + '\n')
+      }
+      
+      // Step 4: 댓글 생성
+      await stream.write(JSON.stringify({ type: 'step', step: 5, msg: '💬 댓글 군단 생성 중...' }) + '\n')
+      
+      const commentPrompt = `주제: ${topic} 전문가 글에 달릴 댓글 5개 (5명 페르소나). JSON: {"comments":[{"nickname":"","persona":"","text":""}]}`
+      const commentResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.FLASH}:generateContent?key=${flashKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: commentPrompt }] }],
+          generationConfig: { temperature: 0.9, maxOutputTokens: 2048, responseMimeType: 'application/json' }
+        })
+      })
+      
+      let comments: any[] = []
+      if (commentResponse.ok) {
+        const json = await commentResponse.json() as any
+        const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        try {
+          comments = JSON.parse(rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()).comments || []
+        } catch (e) {}
+      }
+      
+      await stream.write(JSON.stringify({ type: 'comments', data: comments }) + '\n')
+      
+      // Final
+      await stream.write(JSON.stringify({
+        type: 'complete',
+        package: {
+          topic, context_source: contextSource, insurance: insuranceProduct, target: targetAudience,
+          image_detected_keyword: imageDetectedKeyword || null,
+          titles, viral_questions: viralQuestions, contents, comments, report_data: reportData
+        },
+        version: '2026.16.0'
+      }) + '\n')
+      
+    } catch (error) {
+      await stream.write(JSON.stringify({ type: 'error', msg: String(error) }) + '\n')
     }
   })
 })
 
-// ============================================
-// 📄 API 문서 (Swagger 스타일)
-// ============================================
-app.get('/api/docs', (c) => {
+app.get('/api/health', (c) => {
+  const hasProKey = !!c.env?.GEMINI_API_KEY_PRO || !!c.env?.GEMINI_API_KEY
+  const hasFlashKey = !!c.env?.GEMINI_API_KEY_FLASH || !!c.env?.GEMINI_API_KEY
   return c.json({
-    openapi: '3.0.0',
-    info: {
-      title: 'XIVIX 2026 PRO API',
-      version: '2026.3.0',
-      description: '대한민국 상위 1% 보험 마케팅 콘텐츠 생성 API'
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: '2026.16.0',
+    project: 'XIVIX_Insurance_King_2026 (MASTER-1)',
+    masterInstruction: MASTER_INSTRUCTION_V3,
+    engines: {
+      flash: ENGINE.FLASH,
+      pro: ENGINE.PRO,
+      vision: ENGINE.VISION
     },
-    servers: [{ url: '/' }],
-    paths: {
-      '/api/generate/master': {
-        post: {
-          summary: 'Q&A 콘텐츠 스트리밍 생성',
-          requestBody: {
+    personas: Object.keys(PERSONA_CONFIG),
+    features: [
+      '🔥 Full Package v4 (SSE 스트리밍)',
+      '⏱️ 타임아웃 방지: 실시간 글자 출력',
+      '📏 제목 25자 이내 (모바일 가독성)',
+      '📝 본문 1,000자 내외 (800-1,100자)',
+      '🎯 Context Switching: 이미지 > 입력 > 트렌드',
+      '🖼️ 멀티모달 → report_data 자동 연결',
+      '📊 SEO 감사 리포트 (점수/등급/순위)',
+      '❓ 바이럴 질문 2종 (800자 이내)',
+      '📋 대시보드 UI + S+ 등급 마크 + 보장 분석 테이블'
+    ],
+    apiKeys: {
+      pro: hasProKey ? '✅ 설정됨' : '❌ 미설정',
+      flash: hasFlashKey ? '✅ 설정됨' : '❌ 미설정'
+    },
+    outputFormat: 'JSON_OBJECT + SSE_STREAM',
+    constraints: {
+      title: '25자 이내',
+      content: '1,000자 내외 (800-1,100자)',
+      viral_question: '800자 이내'
+    },
+    contextPriority: 'image > input > trend'
+  })
+})
+
+app.get('/api/docs', (c) => c.json({
+  openapi: '3.0.0',
+  info: { 
+    title: 'XIVIX 2026 PRO API - 보험 콘텐츠 마스터 (Full Package)', 
+    version: '2026.14.0',
+    description: 'Gemini 2.5 Pro 기반 초정밀 보험 콘텐츠 생성 엔진 - JSON_OBJECT 출력'
+  },
+  paths: {
+    '/api/generate/full-package': { 
+      post: { 
+        summary: '🌟 FULL PACKAGE - 구조화된 JSON 응답 (제목5 + 본문3 + 댓글5 + SEO키워드5)',
+        description: '멀티모달 이미지 분석 포함, PRO+FLASH 모델 자동 분기, JSON_OBJECT 형식 출력',
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  concern: { type: 'string', description: '핵심 고민/주제' },
+                  image: { type: 'string', description: 'Base64 이미지 (선택)' },
+                  mimeType: { type: 'string', description: '이미지 MIME 타입' }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          '200': {
+            description: '구조화된 JSON 응답',
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
-                    target: { type: 'string', example: '30대 워킹맘' },
-                    insuranceType: { type: 'string', example: '상속/증여' },
-                    company: { type: 'string', example: '삼성생명' },
-                    style: { type: 'string', example: '전문가 팩트체크형' },
-                    concern: { type: 'string', example: '자녀 증여 시 세금 절약' }
+                    success: { type: 'boolean' },
+                    package: {
+                      type: 'object',
+                      properties: {
+                        titles: { type: 'array', items: { type: 'object', properties: { id: { type: 'number' }, text: { type: 'string' } } } },
+                        contents: { type: 'array', items: { type: 'object', properties: { id: { type: 'number' }, style: { type: 'string' }, text: { type: 'string' } } } },
+                        seoKeywords: { type: 'array', items: { type: 'string' } },
+                        comments: { type: 'array', items: { type: 'object', properties: { id: { type: 'number' }, nickname: { type: 'string' }, persona: { type: 'string' }, text: { type: 'string' } } } }
+                      }
+                    }
                   }
                 }
               }
             }
-          },
-          responses: { '200': { description: 'Streaming response' } }
+          }
         }
-      },
-      '/api/generate/excel': {
-        post: {
-          summary: '흑백 엑셀 설계서 데이터 생성',
-          responses: { '200': { description: 'JSON response' } }
-        }
-      },
-      '/api/health': {
-        get: {
-          summary: 'Health Check',
-          responses: { '200': { description: 'Server status' } }
-        }
-      }
-    }
-  })
-})
-
-// ============================================
-// 📊 어드민 대시보드 API
-// ============================================
-app.get('/api/admin/stats', (c) => {
-  return c.json({
-    totalKeys: API_KEYS.length,
-    currentKeyIndex: currentKeyIndex,
-    engines: {
-      expert: EXPERT_ENGINE,
-      data: DATA_ENGINE
+      } 
     },
-    features: ['Q&A 생성', '엑셀 설계서', 'TXT 다운로드', 'PDF 생성'],
-    lastUpdated: new Date().toISOString()
-  })
-})
+    '/api/generate/master': { post: { summary: '🔥 전문가 게시글 (PRO) - 스트리밍' } },
+    '/api/generate/question': { post: { summary: '💬 질문 퍼포먼스 (FLASH)' } },
+    '/api/generate/comments': { post: { summary: '🎭 여론 조작 댓글 (FLASH)' } },
+    '/api/analyze/image': { post: { summary: '🖼️ 멀티모달 이미지 분석 (PRO)' } },
+    '/api/trend': { get: { summary: '📈 실시간 네이버 보험 트렌드' } },
+    '/api/health': { get: { summary: '❤️ Health Check' } }
+  }
+}))
+
+app.get('/api/admin/stats', (c) => c.json({
+  project: 'XIVIX_Insurance_King_2026',
+  cloudflareProject: 'MASTER-1 (master-1-470110)',
+  version: 'v2026.14.0_JSON_OBJECT',
+  engines: ENGINE,
+  personas: PERSONA_CONFIG,
+  titlePatterns: TITLE_PATTERNS,
+  outputFormat: {
+    type: 'JSON_OBJECT',
+    constraint: '본문 공백 포함 1,000자 내외',
+    structure: {
+      titles: 'array[5] - CTR 30% 제목',
+      contents: 'array[3] - 공감형/정보형/영업형 본문',
+      seoKeywords: 'array[5] - 네이버 SEO 키워드',
+      comments: 'array[5] - 5명 페르소나 댓글'
+    }
+  },
+  apiKeys: {
+    pro: !!c.env?.GEMINI_API_KEY_PRO || !!c.env?.GEMINI_API_KEY,
+    flash: !!c.env?.GEMINI_API_KEY_FLASH || !!c.env?.GEMINI_API_KEY
+  },
+  endpoints: [
+    '/api/generate/full-package (🌟 JSON 통합)',
+    '/api/generate/master (PRO 스트리밍)',
+    '/api/generate/question (FLASH)',
+    '/api/generate/comments (FLASH)',
+    '/api/analyze/image (PRO)'
+  ],
+  lastUpdated: new Date().toISOString()
+}))
 
 // ============================================
-// 🖥️ 메인 UI - GPT 스타일 + 네이버 트렌드 검색창
-// 깔끔하고 고급스러운 느낌 + 부드러운 애니메이션
+// 첫 페이지: GPT 스타일 검색창 + 실시간 보험 트렌드 + 바로 결과 출력
 // ============================================
-const mainPageHtml = `
-<!DOCTYPE html>
+const mainPageHtml = `<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>XIVIX 2026 PRO | 보험 마케팅 마스터</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>XIVIX 2026 PRO</title>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --primary: #10B981;
-    --primary-dark: #059669;
-    --accent: #F59E0B;
-    --bg-dark: #0a0a0a;
-    --card-bg: rgba(18, 18, 18, 0.95);
-    --border: rgba(255,255,255,0.08);
-  }
-  
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  
-  body { 
-    background: var(--bg-dark);
-    color: #fff;
-    font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Segoe UI', sans-serif;
-    word-break: keep-all;
-    min-height: 100vh;
-  }
+:root {
+  --bg-dark: #0a0a0f;
+  --primary: #4f8cff;
+  --primary-soft: rgba(79, 140, 255, 0.15);
+  --accent: #7c5cff;
+  --accent-soft: rgba(124, 92, 255, 0.12);
+  --text: #e8eaed;
+  --text-muted: rgba(232, 234, 237, 0.5);
+  --border: rgba(255,255,255,0.08);
+  --card-bg: rgba(255,255,255,0.02);
+  --green: #10b981;
+  --red: #ef4444;
+  --orange: #f59e0b;
+}
 
-  /* 반응형 폰트 */
-  @media (max-width: 768px) {
-    body { font-size: 17px; line-height: 1.65; }
-  }
-  @media (min-width: 769px) {
-    body { font-size: 16px; line-height: 1.55; }
-  }
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+html,body{height:100%;overflow-x:hidden}
 
-  /* 부드러운 그라디언트 배경 */
-  .gradient-bg {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -1;
-    background: 
-      radial-gradient(ellipse at 0% 0%, rgba(16, 185, 129, 0.08) 0%, transparent 50%),
-      radial-gradient(ellipse at 100% 100%, rgba(245, 158, 11, 0.05) 0%, transparent 50%),
-      var(--bg-dark);
-  }
+body{
+  background: var(--bg-dark);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  min-height:100vh;
+  padding: clamp(16px, 4vw, 40px);
+}
 
-  /* 미세한 움직임 */
-  .gradient-bg::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
-    animation: pulse 8s ease-in-out infinite;
-  }
+/* Beyond Reality 배경 - 눈에 부드러운 색상 */
+.bg{position:fixed;inset:0;z-index:-1;overflow:hidden;background:var(--bg-dark)}
 
-  @keyframes pulse {
-    0%, 100% { transform: scale(1); opacity: 0.5; }
-    50% { transform: scale(1.1); opacity: 0.8; }
-  }
+/* 부드러운 그라디언트 오브 */
+.orb{
+  position:absolute;
+  border-radius:50%;
+  filter:blur(100px);
+  opacity:0.12;
+  animation:orbFloat 25s ease-in-out infinite;
+  will-change:transform;
+}
+.orb1{
+  width:min(60vw, 600px);
+  height:min(60vw, 600px);
+  background:radial-gradient(circle, var(--primary), transparent 70%);
+  top:-15%;
+  left:-10%;
+}
+.orb2{
+  width:min(50vw, 500px);
+  height:min(50vw, 500px);
+  background:radial-gradient(circle, var(--accent), transparent 70%);
+  bottom:-15%;
+  right:-10%;
+  animation-delay:-12s;
+}
+.orb3{
+  width:min(40vw, 400px);
+  height:min(40vw, 400px);
+  background:radial-gradient(circle, #2a5298, transparent 70%);
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  animation-delay:-8s;
+  opacity:0.08;
+}
+@keyframes orbFloat{
+  0%,100%{transform:translate(0,0) scale(1)}
+  33%{transform:translate(2vw, 1vw) scale(1.02)}
+  66%{transform:translate(-1vw, 2vw) scale(0.98)}
+}
 
-  /* 컨테이너 */
-  .container {
-    max-width: 680px;
-    margin: 0 auto;
-    padding: 24px 20px;
-  }
+/* 부드러운 그리드 */
+.grid{
+  position:absolute;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(79,140,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79,140,255,0.015) 1px, transparent 1px);
+  background-size:clamp(30px, 5vw, 60px) clamp(30px, 5vw, 60px);
+  animation:gridDrift 90s linear infinite;
+}
+@keyframes gridDrift{to{transform:translate(60px,60px)}}
 
-  /* 상단 배너 */
-  .top-banner {
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05));
-    border: 1px solid rgba(245, 158, 11, 0.3);
-    border-radius: 16px;
-    padding: 16px 20px;
-    margin-bottom: 32px;
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-  }
+/* 레이아웃 - 화면 전체 활용 */
+.wrapper{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  width:100%;
+  max-width:100%;
+  gap:clamp(20px, 3vh, 32px);
+  padding-top:clamp(20px, 4vh, 40px);
+}
 
-  .top-banner .icon {
-    font-size: 20px;
-  }
+/* 네비게이션 */
+.nav{
+  position:fixed;
+  top:clamp(12px, 2vw, 24px);
+  right:clamp(12px, 2vw, 24px);
+  display:flex;
+  gap:clamp(8px, 1.5vw, 16px);
+  z-index:100;
+}
+.nav a{
+  color:var(--text-muted);
+  text-decoration:none;
+  font-size:clamp(11px, 1.2vw, 13px);
+  padding:8px 12px;
+  border-radius:8px;
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  transition:all 0.2s;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.nav a:hover{color:var(--primary);border-color:var(--primary-soft);background:var(--primary-soft)}
 
-  .top-banner .text {
-    font-size: 14px;
-    color: rgba(255,255,255,0.9);
-    line-height: 1.5;
-  }
+/* 로고 */
+.logo{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:clamp(10px, 1.5vw, 16px);
+}
+.logo-icon{
+  width:clamp(44px, 5vw, 56px);
+  height:clamp(44px, 5vw, 56px);
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  border-radius:clamp(12px, 1.5vw, 16px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:900;
+  font-size:clamp(18px, 2.2vw, 26px);
+  color:#fff;
+  box-shadow:0 0 30px rgba(79,140,255,0.25);
+  animation:logoPulse 4s ease-in-out infinite;
+}
+@keyframes logoPulse{
+  0%,100%{box-shadow:0 0 30px rgba(79,140,255,0.25)}
+  50%{box-shadow:0 0 50px rgba(79,140,255,0.35), 0 0 80px rgba(124,92,255,0.15)}
+}
+.logo-text{
+  font-size:clamp(22px, 3vw, 32px);
+  font-weight:800;
+  letter-spacing:-0.5px;
+}
+.logo-text span{
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
 
-  .top-banner .highlight {
-    color: #10B981;
-    font-weight: 600;
-  }
+/* 타이틀 */
+.title{
+  font-size:clamp(14px, 1.8vw, 18px);
+  color:var(--text-muted);
+  font-weight:400;
+  text-align:center;
+}
 
-  /* 카드 */
-  .card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 24px;
-    padding: 32px;
-    margin-bottom: 20px;
-    backdrop-filter: blur(20px);
-    transition: all 0.3s ease;
-  }
+/* 메인 컨테이너 - 화면 전체 활용 */
+.main{
+  width:100%;
+  max-width:1200px;
+  display:flex;
+  flex-direction:column;
+  gap:clamp(20px, 3vh, 32px);
+}
 
-  .card:hover {
-    border-color: rgba(16, 185, 129, 0.2);
-  }
+/* GPT 스타일 검색창 */
+.search-box{
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-radius:clamp(16px, 2vw, 24px);
+  padding:clamp(16px, 2.5vw, 28px);
+  transition:all 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+.search-box:hover{
+  border-color:rgba(79,140,255,0.2);
+  box-shadow:0 0 40px rgba(79,140,255,0.05);
+}
+.search-box:focus-within{
+  border-color:var(--primary);
+  box-shadow:0 0 60px rgba(79,140,255,0.1), inset 0 0 0 1px rgba(79,140,255,0.1);
+}
 
-  /* 스텝 헤더 */
-  .step-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 20px;
-  }
+.search-input{
+  width:100%;
+  background:transparent;
+  border:none;
+  outline:none;
+  color:var(--text);
+  font-size:clamp(15px, 1.8vw, 18px);
+  line-height:1.7;
+  resize:none;
+  min-height:clamp(80px, 12vh, 120px);
+  font-family:inherit;
+}
+.search-input::placeholder{color:var(--text-muted)}
 
-  .step-number {
-    width: 32px;
-    height: 32px;
-    background: var(--primary);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 14px;
-    color: #000;
-    flex-shrink: 0;
-  }
+/* 파일 업로드 영역 - 크게 개선 */
+.upload-area{
+  margin-top:20px;
+  padding-top:20px;
+  border-top:1px solid var(--border);
+  display:flex;
+  flex-wrap:wrap;
+  gap:16px;
+  align-items:center;
+}
+.upload-btn{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:14px 24px;
+  background:rgba(79,140,255,0.08);
+  border:2px dashed rgba(79,140,255,0.4);
+  border-radius:14px;
+  color:var(--primary);
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all 0.25s;
+}
+.upload-btn i{
+  font-size:18px;
+}
+.upload-btn:hover{
+  border-color:var(--primary);
+  background:var(--primary-soft);
+  transform:translateY(-2px);
+  box-shadow:0 4px 15px rgba(79,140,255,0.2);
+}
+.upload-btn input{display:none}
+.upload-hint{
+  font-size:13px;
+  color:var(--text-muted);
+  background:rgba(255,255,255,0.03);
+  padding:8px 14px;
+  border-radius:8px;
+}
+.file-preview{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 16px;
+  background:var(--primary-soft);
+  border:1px solid rgba(79,140,255,0.3);
+  border-radius:12px;
+  font-size:13px;
+  color:var(--primary);
+  font-weight:500;
+}
+.file-preview img{
+  width:40px;
+  height:40px;
+  object-fit:cover;
+  border-radius:8px;
+  border:2px solid rgba(79,140,255,0.3);
+}
+.file-preview .remove{
+  cursor:pointer;
+  opacity:0.7;
+  transition:all 0.2s;
+  font-size:16px;
+  padding:4px;
+}
+.file-preview .remove:hover{opacity:1;color:#ef4444}
 
-  .step-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: #fff;
-  }
+/* 검색 푸터 - 버튼 크게 개선 */
+.search-footer{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-top:20px;
+  padding-top:20px;
+  border-top:1px solid var(--border);
+  flex-wrap:wrap;
+  gap:16px;
+}
+.char-count{
+  font-size:14px;
+  color:var(--text-muted);
+  background:rgba(255,255,255,0.03);
+  padding:8px 14px;
+  border-radius:8px;
+}
+.search-btn{
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  border:none;
+  border-radius:16px;
+  padding:18px 48px;
+  color:#fff;
+  font-size:16px;
+  font-weight:700;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  transition:all 0.25s;
+  box-shadow:0 6px 25px rgba(79,140,255,0.35);
+}
+.search-btn i{
+  font-size:18px;
+}
+.search-btn:hover{
+  transform:translateY(-3px);
+  box-shadow:0 12px 35px rgba(79,140,255,0.45);
+}
+.search-btn:active{transform:translateY(-1px)}
+.search-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none}
 
-  /* 칩 버튼 */
-  .chip-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
+/* ============================================ */
+/* 프리미엄 트렌드 섹션 (보험설계사 고급형) */
+/* ============================================ */
+.trend-section{
+  width:100%;
+  background:linear-gradient(135deg, rgba(245,158,11,0.08), rgba(234,88,12,0.05));
+  border:1px solid rgba(245,158,11,0.25);
+  border-radius:20px;
+  padding:24px;
+}
+.trend-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:20px;
+  padding-bottom:16px;
+  border-bottom:1px solid rgba(245,158,11,0.15);
+  flex-wrap:wrap;
+  gap:12px;
+}
+.trend-title-wrap{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.trend-title{
+  font-size:18px;
+  font-weight:800;
+  color:#f59e0b;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.trend-title i{
+  font-size:20px;
+  color:#f59e0b;
+  filter:drop-shadow(0 0 8px rgba(245,158,11,0.5));
+}
+.trend-subtitle{
+  font-size:12px;
+  color:var(--text-muted);
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.live-dot{
+  width:8px;height:8px;
+  background:#10b981;
+  border-radius:50%;
+  animation:pulse 1.5s ease-in-out infinite;
+  box-shadow:0 0 8px rgba(16,185,129,0.6);
+}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.6;transform:scale(0.9)}}
 
-  .chip {
-    padding: 12px 20px;
-    border-radius: 14px;
-    font-size: 15px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: rgba(255,255,255,0.7);
-  }
+.trend-timer{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.trend-time{
+  font-size:13px;
+  color:var(--text-muted);
+  background:rgba(0,0,0,0.2);
+  padding:8px 14px;
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.trend-time i{font-size:12px;opacity:0.6}
+.refresh-btn{
+  padding:12px 24px;
+  background:linear-gradient(135deg, #f59e0b, #ea580c);
+  border:none;
+  border-radius:12px;
+  color:#fff;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+  transition:all 0.25s;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  box-shadow:0 4px 15px rgba(245,158,11,0.3);
+}
+.refresh-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 25px rgba(245,158,11,0.4);
+}
+.refresh-btn:active{transform:translateY(0)}
+.refresh-btn.loading{opacity:0.7}
+.refresh-btn.loading i{animation:spin 0.7s linear infinite}
 
-  .chip:hover {
-    background: rgba(255,255,255,0.06);
-    border-color: rgba(255,255,255,0.2);
-    color: #fff;
-  }
+/* 트렌드 그리드 - 3열 레이아웃 */
+.trend-grid{
+  display:grid;
+  grid-template-columns:repeat(3, 1fr);
+  gap:12px;
+  margin-bottom:20px;
+}
+.trend-item{
+  background:rgba(0,0,0,0.25);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:14px;
+  padding:16px 18px;
+  cursor:pointer;
+  transition:all 0.25s;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.trend-item:hover{
+  background:rgba(245,158,11,0.15);
+  border-color:rgba(245,158,11,0.4);
+  transform:translateY(-3px);
+  box-shadow:0 8px 20px rgba(0,0,0,0.3);
+}
+.trend-item.active{
+  background:linear-gradient(135deg, rgba(245,158,11,0.25), rgba(234,88,12,0.2));
+  border-color:#f59e0b;
+  box-shadow:0 0 20px rgba(245,158,11,0.2);
+}
+.trend-item-header{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.trend-rank{
+  width:26px;
+  height:26px;
+  background:linear-gradient(135deg, #f59e0b, #ea580c);
+  border-radius:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:13px;
+  font-weight:900;
+  color:#fff;
+  flex-shrink:0;
+}
+.trend-rank.top3{box-shadow:0 0 12px rgba(245,158,11,0.5)}
+.trend-keyword{
+  font-size:14px;
+  font-weight:700;
+  color:#fff;
+  flex:1;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.trend-item-footer{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding-top:8px;
+  border-top:1px solid rgba(255,255,255,0.05);
+}
+.trend-volume{
+  font-size:12px;
+  color:var(--text-muted);
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+.trend-volume i{font-size:10px}
+.trend-change{
+  font-size:12px;
+  font-weight:700;
+  padding:3px 8px;
+  border-radius:6px;
+}
+.trend-change.up{
+  color:#10b981;
+  background:rgba(16,185,129,0.15);
+}
+.trend-change.down{
+  color:#ef4444;
+  background:rgba(239,68,68,0.15);
+}
+.trend-change.new{
+  color:#f59e0b;
+  background:rgba(245,158,11,0.15);
+}
+.trend-change.same{
+  color:var(--text-muted);
+  background:rgba(255,255,255,0.05);
+}
 
-  .chip.active {
-    background: var(--primary);
-    border-color: var(--primary);
-    color: #000;
-    font-weight: 600;
-  }
+/* HOT 키워드 태그 */
+.hot-keywords{
+  padding-top:16px;
+  border-top:1px solid rgba(245,158,11,0.15);
+}
+.hot-keywords-title{
+  font-size:13px;
+  font-weight:700;
+  color:#f59e0b;
+  margin-bottom:12px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.hot-keywords-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.hot-tag{
+  padding:8px 14px;
+  background:rgba(0,0,0,0.3);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:20px;
+  font-size:12px;
+  color:var(--text);
+  cursor:pointer;
+  transition:all 0.2s;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.hot-tag:hover{
+  background:rgba(245,158,11,0.2);
+  border-color:rgba(245,158,11,0.4);
+  color:#f59e0b;
+}
+.hot-tag i{font-size:10px;color:#f59e0b}
 
-  .chip.gold {
-    border-color: rgba(245, 158, 11, 0.4);
-    color: rgba(245, 158, 11, 0.9);
-  }
+/* 힌트 메시지 */
+.trend-hint{
+  margin-top:16px;
+  padding:12px 16px;
+  background:rgba(245,158,11,0.1);
+  border-radius:10px;
+  font-size:12px;
+  color:var(--text-muted);
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.trend-hint i{color:#f59e0b}
 
-  .chip.gold:hover {
-    border-color: rgba(245, 158, 11, 0.6);
-    background: rgba(245, 158, 11, 0.1);
-  }
+/* 반응형 - 2열 */
+@media(max-width:900px){
+  .trend-grid{grid-template-columns:repeat(2, 1fr)}
+}
+@media(max-width:600px){
+  .trend-grid{grid-template-columns:1fr}
+  .trend-section{padding:16px}
+}
 
-  .chip.gold.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #000;
-  }
+/* 스피너 */
+.spinner{
+  width:18px;
+  height:18px;
+  border:2px solid rgba(255,255,255,0.2);
+  border-top-color:#fff;
+  border-radius:50%;
+  animation:spin 0.7s linear infinite;
+  display:none;
+}
+.loading .spinner{display:block}
+.loading .btn-text{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-  /* 셀렉트 */
-  .custom-select {
-    width: 100%;
-    padding: 16px 20px;
-    border-radius: 14px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: #fff;
-    font-size: 15px;
-    cursor: pointer;
-    outline: none;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2310B981' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 16px center;
-    transition: all 0.2s ease;
-  }
+/* ============================================ */
+/* SEO 분석 퍼포먼스 오버레이 (XIVIX Intelligence) */
+/* ============================================ */
+.seo-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.92);
+  backdrop-filter:blur(20px);
+  z-index:9999;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:32px;
+  padding:24px;
+}
+.seo-overlay.show{display:flex}
+.seo-overlay-content{
+  max-width:500px;
+  width:100%;
+  text-align:center;
+}
+.seo-overlay-logo{
+  font-size:14px;
+  font-weight:700;
+  color:var(--primary);
+  letter-spacing:2px;
+  text-transform:uppercase;
+  margin-bottom:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+}
+.seo-overlay-logo i{font-size:18px}
+.seo-overlay-title{
+  font-size:clamp(20px, 4vw, 28px);
+  font-weight:800;
+  color:var(--text);
+  margin-bottom:12px;
+  line-height:1.3;
+}
+.seo-overlay-subtitle{
+  font-size:14px;
+  color:var(--text-muted);
+  margin-bottom:32px;
+}
+.seo-step{
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:18px 20px;
+  margin-bottom:12px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  opacity:0.4;
+  transform:translateX(-10px);
+  transition:all 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+.seo-step.active{
+  opacity:1;
+  transform:translateX(0);
+  background:var(--primary-soft);
+  border-color:rgba(79,140,255,0.3);
+}
+.seo-step.done{
+  opacity:0.7;
+  transform:translateX(0);
+}
+.seo-step.done .step-icon{
+  background:var(--green);
+}
+.seo-step.done .step-icon i:before{content:'\\f00c'}
+.step-icon{
+  width:36px;
+  height:36px;
+  background:var(--primary);
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:16px;
+  color:#fff;
+  flex-shrink:0;
+}
+.step-content{flex:1;text-align:left}
+.step-title{
+  font-size:14px;
+  font-weight:600;
+  color:var(--text);
+  margin-bottom:2px;
+}
+.step-count{
+  font-size:12px;
+  color:var(--text-muted);
+  font-family:monospace;
+}
+.step-count span{
+  color:var(--primary);
+  font-weight:700;
+}
+.seo-progress-bar{
+  height:6px;
+  background:rgba(255,255,255,0.08);
+  border-radius:3px;
+  overflow:hidden;
+  margin-top:24px;
+}
+.seo-progress-fill{
+  height:100%;
+  background:linear-gradient(90deg, var(--primary), var(--accent), var(--green));
+  background-size:200% 100%;
+  animation:gradientMove 1.5s ease infinite;
+  transition:width 0.5s;
+  width:0;
+}
+@keyframes gradientMove{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
+.seo-result-keyword{
+  margin-top:28px;
+  padding:20px 24px;
+  background:linear-gradient(135deg, rgba(16,185,129,0.15), rgba(79,140,255,0.15));
+  border:1px solid rgba(16,185,129,0.3);
+  border-radius:16px;
+  display:none;
+}
+.seo-result-keyword.show{display:block;animation:fadeInUp 0.5s}
+@keyframes fadeInUp{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.result-label{
+  font-size:12px;
+  color:var(--green);
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  margin-bottom:8px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.result-label i{font-size:14px}
+.result-title{
+  font-size:18px;
+  font-weight:700;
+  color:var(--text);
+  line-height:1.4;
+}
+.typing-cursor{
+  display:inline-block;
+  width:2px;
+  height:1.2em;
+  background:var(--primary);
+  animation:blink 0.7s infinite;
+  margin-left:2px;
+  vertical-align:text-bottom;
+}
+@keyframes blink{0%,50%{opacity:1}51%,100%{opacity:0}}
 
-  .custom-select:hover {
-    border-color: rgba(16, 185, 129, 0.3);
-  }
+/* 힌트 */
+.hint{
+  font-size:11px;
+  color:var(--text-muted);
+  text-align:center;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
+.hint i{color:var(--orange)}
 
-  .custom-select:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-  }
+/* ============================================ */
+/* 결과 영역 (대시보드 리포트 UI v3) */
+/* ============================================ */
+.result-section{
+  width:100%;
+  display:none;
+}
+.result-section.show{display:block}
 
-  .custom-select option {
-    background: #1a1a1a;
-    color: #fff;
-  }
+.progress-box{
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:20px;
+  margin-bottom:20px;
+}
+.progress-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:12px;
+}
+.progress-text{
+  font-size:14px;
+  color:var(--primary);
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.progress-pct{font-size:14px;font-weight:700;color:var(--text)}
+.progress-bar{
+  height:4px;
+  background:rgba(255,255,255,0.1);
+  border-radius:2px;
+  overflow:hidden;
+}
+.progress-fill{
+  height:100%;
+  background:linear-gradient(90deg, var(--primary), var(--accent));
+  transition:width 0.3s;
+  width:0;
+}
 
-  /* 텍스트에어리어 (네이버 트렌드 스타일) */
-  .search-input {
-    width: 100%;
-    min-height: 120px;
-    padding: 20px;
-    border-radius: 16px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: #fff;
-    font-size: 16px;
-    line-height: 1.6;
-    resize: none;
-    outline: none;
-    transition: all 0.2s ease;
-  }
+/* SEO 감사 리포트 (대시보드 상단) */
+.seo-audit-card{
+  background:linear-gradient(135deg, rgba(79,140,255,0.15), rgba(124,92,255,0.15));
+  border:1px solid rgba(79,140,255,0.3);
+  border-radius:20px;
+  padding:24px;
+  margin-bottom:20px;
+  display:flex;
+  align-items:center;
+  gap:24px;
+  flex-wrap:wrap;
+}
+.grade-badge{
+  width:80px;
+  height:80px;
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  border-radius:20px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 8px 30px rgba(79,140,255,0.3);
+}
+.grade-badge .grade{
+  font-size:32px;
+  font-weight:900;
+  color:#fff;
+  line-height:1;
+}
+.grade-badge .label{
+  font-size:10px;
+  color:rgba(255,255,255,0.8);
+  text-transform:uppercase;
+}
+.seo-stats{
+  flex:1;
+  min-width:200px;
+}
+.seo-stats .title{
+  font-size:18px;
+  font-weight:700;
+  color:var(--text);
+  margin-bottom:8px;
+}
+.seo-stats .metrics{
+  display:flex;
+  gap:20px;
+  flex-wrap:wrap;
+}
+.seo-stats .metric{
+  display:flex;
+  flex-direction:column;
+}
+.seo-stats .metric .value{
+  font-size:24px;
+  font-weight:800;
+  color:var(--primary);
+}
+.seo-stats .metric .name{
+  font-size:11px;
+  color:var(--text-muted);
+}
+.seo-stats .analysis{
+  margin-top:10px;
+  font-size:13px;
+  color:var(--text-muted);
+  padding:10px 14px;
+  background:rgba(255,255,255,0.05);
+  border-radius:10px;
+}
 
-  .search-input::placeholder {
-    color: rgba(255,255,255,0.35);
-  }
+/* 보장 분석 테이블 (report_data) */
+.report-table{
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:20px;
+  margin-bottom:20px;
+}
+.report-table .table-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:16px;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--border);
+}
+.report-table .table-title{
+  font-size:15px;
+  font-weight:700;
+  color:var(--text);
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.report-table .table-title i{color:var(--primary)}
+.report-table table{
+  width:100%;
+  border-collapse:collapse;
+}
+.report-table th{
+  text-align:left;
+  font-size:11px;
+  font-weight:600;
+  color:var(--text-muted);
+  padding:10px 12px;
+  background:rgba(255,255,255,0.03);
+  border-bottom:1px solid var(--border);
+}
+.report-table td{
+  padding:12px;
+  font-size:13px;
+  border-bottom:1px solid var(--border);
+}
+.report-table tr:last-child td{border-bottom:none}
+.report-table .item-name{font-weight:600;color:var(--text)}
+.report-table .current{color:var(--text-muted)}
+.report-table .target{color:var(--primary);font-weight:600}
+.status-dot{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:12px;
+  font-weight:600;
+}
+.status-dot::before{
+  content:'';
+  width:8px;
+  height:8px;
+  border-radius:50%;
+}
+.status-dot.critical{color:#ef4444}
+.status-dot.critical::before{background:#ef4444;box-shadow:0 0 8px #ef4444}
+.status-dot.essential{color:#f59e0b}
+.status-dot.essential::before{background:#f59e0b;box-shadow:0 0 8px #f59e0b}
+.status-dot.good{color:#10b981}
+.status-dot.good::before{background:#10b981;box-shadow:0 0 8px #10b981}
 
-  .search-input:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-  }
+/* 바이럴 질문 섹션 */
+.viral-questions{
+  background:rgba(245,158,11,0.1);
+  border:1px solid rgba(245,158,11,0.3);
+  border-radius:16px;
+  padding:16px;
+  margin-bottom:20px;
+}
+.viral-questions .section-title{
+  font-size:14px;
+  font-weight:700;
+  color:var(--orange);
+  margin-bottom:12px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.viral-questions .question{
+  background:rgba(255,255,255,0.05);
+  border-radius:10px;
+  padding:12px 16px;
+  margin-bottom:8px;
+  font-size:14px;
+  color:var(--text);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+}
+.viral-questions .question:last-child{margin-bottom:0}
 
-  /* 중요 라벨 */
-  .important-label {
-    color: #EF4444;
-    font-size: 13px;
-    font-weight: 600;
-  }
+/* 탭 네비게이션 */
+.tab-nav{
+  display:flex;
+  gap:4px;
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:6px;
+  margin-bottom:16px;
+}
+.tab-btn{
+  flex:1;
+  padding:12px 16px;
+  border:none;
+  background:transparent;
+  color:var(--text-muted);
+  font-size:13px;
+  font-weight:600;
+  border-radius:10px;
+  cursor:pointer;
+  transition:all 0.2s;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
+.tab-btn:hover{color:var(--text);background:rgba(255,255,255,0.05)}
+.tab-btn.active{
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  color:#fff;
+}
+.tab-btn .badge{
+  background:rgba(255,255,255,0.2);
+  padding:2px 8px;
+  border-radius:10px;
+  font-size:11px;
+}
 
-  /* 메인 버튼 */
-  .main-btn {
-    width: 100%;
-    padding: 20px 32px;
-    border: none;
-    border-radius: 18px;
-    font-size: 17px;
-    font-weight: 700;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    color: #000;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
-  }
+/* 탭 콘텐츠 */
+.tab-content{display:none}
+.tab-content.active{display:block}
 
-  .main-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(16, 185, 129, 0.4);
-  }
+/* 아이템 카드 (제목/본문/댓글 공통) */
+.item-card{
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:16px;
+  margin-bottom:12px;
+  transition:all 0.2s;
+}
+.item-card:hover{border-color:rgba(79,140,255,0.3);background:rgba(79,140,255,0.03)}
+.item-card.selected{
+  border-color:var(--primary);
+  background:var(--primary-soft);
+  box-shadow:0 0 20px rgba(79,140,255,0.1);
+}
+.item-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:10px;
+}
+.item-label{
+  font-size:12px;
+  font-weight:700;
+  color:var(--primary);
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.item-label .num{
+  background:var(--primary);
+  color:#fff;
+  width:20px;
+  height:20px;
+  border-radius:6px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:11px;
+}
+.item-actions{display:flex;gap:6px}
+.copy-btn{
+  padding:6px 12px;
+  border:1px solid var(--border);
+  background:transparent;
+  color:var(--text-muted);
+  font-size:11px;
+  border-radius:8px;
+  cursor:pointer;
+  transition:all 0.2s;
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+.copy-btn:hover{background:var(--primary-soft);color:var(--primary);border-color:var(--primary)}
+.copy-btn.copied{background:var(--green);color:#fff;border-color:var(--green)}
+.item-text{
+  font-size:14px;
+  line-height:1.8;
+  color:var(--text);
+  word-break:keep-all;
+}
+.item-meta{
+  margin-top:10px;
+  font-size:11px;
+  color:var(--text-muted);
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.char-badge{
+  background:rgba(255,255,255,0.1);
+  padding:4px 10px;
+  border-radius:8px;
+}
 
-  .main-btn:active {
-    transform: translateY(0);
-  }
+/* 스타일 태그 */
+.style-tag{
+  padding:4px 10px;
+  border-radius:8px;
+  font-size:11px;
+  font-weight:600;
+}
+.style-tag.empathy{background:rgba(16,185,129,0.2);color:var(--green)}
+.style-tag.info{background:rgba(79,140,255,0.2);color:var(--primary)}
+.style-tag.sales{background:rgba(245,158,11,0.2);color:var(--orange)}
 
-  .main-btn .emoji {
-    font-size: 20px;
-  }
+/* SEO 키워드 */
+.keyword-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:16px;
+}
+.keyword-tag{
+  padding:8px 16px;
+  background:rgba(124,92,255,0.15);
+  border:1px solid rgba(124,92,255,0.3);
+  border-radius:20px;
+  font-size:13px;
+  color:var(--accent);
+  cursor:pointer;
+  transition:all 0.2s;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.keyword-tag:hover{background:var(--accent);color:#fff}
 
-  /* 프로그레스 */
-  .progress-section {
-    margin-top: 32px;
-  }
+/* 전체 복사 버튼 */
+.copy-all-btn{
+  width:100%;
+  padding:14px;
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  border:none;
+  border-radius:12px;
+  color:#fff;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  margin-top:16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  transition:all 0.2s;
+}
+.copy-all-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(79,140,255,0.3)}
 
-  .progress-bar {
-    height: 6px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 3px;
-    overflow: hidden;
-    margin-top: 12px;
-  }
+/* 새로 시작 버튼 */
+.new-btn{
+  width:100%;
+  padding:16px;
+  background:transparent;
+  border:1px solid var(--border);
+  border-radius:14px;
+  color:var(--text-muted);
+  font-size:14px;
+  cursor:pointer;
+  transition:all 0.2s;
+  margin-top:20px;
+  display:none;
+}
+.new-btn.show{display:flex;align-items:center;justify-content:center;gap:8px}
+.new-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
 
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--primary), #34D399);
-    border-radius: 3px;
-    transition: width 0.3s ease;
-  }
+/* 반응형 - 데스크톱 (1200px+) */
+@media(min-width:1200px){
+  .main{max-width:1400px}
+  .trend-list{grid-template-columns:repeat(4, 1fr)}
+  .trend-item{padding:16px 20px;font-size:14px}
+}
 
-  /* 결과 영역 */
-  .result-section {
-    margin-top: 32px;
-  }
+/* 반응형 - 태블릿 (768px ~ 1199px) */
+@media(min-width:768px) and (max-width:1199px){
+  .main{max-width:95vw}
+  .trend-list{grid-template-columns:repeat(4, 1fr)}
+  .trend-item{padding:14px 16px;font-size:13px}
+}
 
-  .result-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 28px;
-    margin-bottom: 20px;
-  }
+/* 반응형 - 모바일 (480px ~ 767px) */
+@media(min-width:480px) and (max-width:767px){
+  .main{max-width:95vw}
+  .trend-list{grid-template-columns:repeat(2, 1fr)}
+  .trend-item{padding:12px 14px;font-size:12px}
+}
 
-  .result-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--border);
-  }
+/* 반응형 - 작은 모바일 (480px 미만) */
+@media(max-width:479px){
+  body{padding:12px}
+  .main{max-width:100%}
+  .nav{top:8px;right:8px;gap:6px}
+  .nav a{padding:6px 10px;font-size:10px}
+  .trend-list{grid-template-columns:repeat(2, 1fr)}
+  .trend-item{padding:10px 12px;font-size:11px;gap:8px}
+  .trend-rank{font-size:10px;min-width:14px}
+  .trend-change{font-size:10px}
+  .trend-volume{font-size:10px}
+  .upload-area{flex-direction:column;align-items:stretch}
+  .search-footer{flex-direction:column;align-items:stretch}
+  .search-btn{width:100%;justify-content:center}
+  .result-header{flex-direction:column;align-items:stretch}
+  .result-actions{justify-content:flex-end}
+}
 
-  .result-title {
-    font-size: 16px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .result-actions {
-    display: flex;
-    gap: 8px;
-  }
-
-  .action-btn {
-    padding: 8px 14px;
-    border-radius: 10px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: rgba(255,255,255,0.7);
-    transition: all 0.2s ease;
-  }
-
-  .action-btn:hover {
-    background: rgba(255,255,255,0.1);
-    color: #fff;
-  }
-
-  #content {
-    line-height: 1.8;
-    color: rgba(255,255,255,0.85);
-  }
-
-  #content br {
-    display: block;
-    margin: 6px 0;
-  }
-
-  /* 엑셀 시트 */
-  .excel-sheet {
-    background: #fff;
-    color: #000;
-    padding: 40px;
-    border-radius: 8px;
-    font-family: 'Malgun Gothic', sans-serif;
-  }
-
-  .excel-table {
-    width: 100%;
-    border-collapse: collapse;
-    border: 2px solid #000;
-    margin-top: 16px;
-  }
-
-  .excel-table th {
-    background: #1a1a1a;
-    color: #fff;
-    border: 1px solid #333;
-    padding: 12px;
-    font-size: 13px;
-    font-weight: 700;
-  }
-
-  .excel-table td {
-    border: 1px solid #ddd;
-    padding: 10px 14px;
-    font-size: 13px;
-  }
-
-  /* 로딩 스피너 */
-  .spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid rgba(16, 185, 129, 0.2);
-    border-top-color: var(--primary);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
-  /* 스크롤바 */
-  ::-webkit-scrollbar { width: 8px; }
-  ::-webkit-scrollbar-track { background: #0a0a0a; }
-  ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: #444; }
-
-  /* 헤더 */
-  .header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 32px;
-  }
-
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .logo-icon {
-    width: 44px;
-    height: 44px;
-    background: var(--primary);
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 900;
-    font-size: 20px;
-    color: #000;
-  }
-
-  .logo-text {
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-  }
-
-  .logo-text span {
-    color: var(--primary);
-  }
-
-  .nav-links {
-    display: flex;
-    gap: 8px;
-  }
-
-  .nav-link {
-    padding: 8px 14px;
-    border-radius: 10px;
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255,255,255,0.6);
-    text-decoration: none;
-    transition: all 0.2s ease;
-  }
-
-  .nav-link:hover {
-    background: rgba(255,255,255,0.05);
-    color: #fff;
-  }
-
-  /* 모바일 */
-  @media (max-width: 768px) {
-    .container { padding: 16px; }
-    .card { padding: 24px; border-radius: 20px; }
-    .main-btn { padding: 18px 24px; font-size: 16px; }
-    .header { flex-direction: column; gap: 16px; align-items: flex-start; }
-  }
+/* 랜드스케이프 모드 */
+@media(max-height:500px) and (orientation:landscape){
+  .wrapper{padding-top:60px}
+  .logo{margin-bottom:12px}
+  .title{margin-bottom:12px}
+}
 </style>
 </head>
 <body>
-  <div class="gradient-bg"></div>
 
-  <div class="container">
-    <!-- 헤더 -->
-    <header class="header">
-      <div class="logo">
-        <div class="logo-icon">X</div>
-        <div class="logo-text">XIVIX <span>2026</span> PRO</div>
-      </div>
-      <nav class="nav-links">
-        <a href="/admin" class="nav-link"><i class="fas fa-cog"></i> Admin</a>
-        <a href="/api/docs" class="nav-link"><i class="fas fa-book"></i> Docs</a>
-      </nav>
-    </header>
-
-    <!-- 타이포그래피 가이드 배너 -->
-    <div class="top-banner">
-      <span class="icon">💡</span>
-      <div class="text">
-        <strong>타이포그래피 가이드 적용:</strong> 모든 콘텐츠에<br>
-        <span class="highlight">❶❷❸</span> (프로세스), <span class="highlight">■</span> (강조), <span class="highlight">✔️</span> (체크) 기호가 자동 적용됩니다.
+<!-- XIVIX 2026 PRO 초정밀 랜덤화 엔진 오버레이 -->
+<div class="seo-overlay" id="seoOverlay">
+  <div class="seo-overlay-content">
+    <div class="seo-overlay-logo"><i class="fas fa-brain"></i> XIVIX INTELLIGENCE</div>
+    <div class="seo-overlay-title">초정밀 랜덤화 엔진 가동 중</div>
+    <div class="seo-overlay-subtitle">수만 가지 확률 조합으로 100% 고유한 미끼 질문을 생성하고 있습니다</div>
+    
+    <div class="seo-step" id="seoStep1">
+      <div class="step-icon"><i class="fas fa-link"></i></div>
+      <div class="step-content">
+        <div class="step-title">API 연결 및 네이버 검색 트렌드 패킷 분석</div>
+        <div class="step-count">연결 상태: <span id="apiCount">대기</span></div>
       </div>
     </div>
-
-    <!-- Step 1: 타겟 고객 선택 -->
-    <div class="card">
-      <div class="step-header">
-        <div class="step-number">1</div>
-        <div class="step-title">타겟 고객 선택</div>
-      </div>
-      <div class="chip-group" id="target-chips">
-        <button class="chip active" onclick="selectChip(this, 'target')">30대 워킹맘</button>
-        <button class="chip" onclick="selectChip(this, 'target')">40대 가장</button>
-        <button class="chip" onclick="selectChip(this, 'target')">50대 은퇴예정자</button>
-        <button class="chip" onclick="selectChip(this, 'target')">법인대표/CEO</button>
-        <button class="chip" onclick="selectChip(this, 'target')">자영업자</button>
+    
+    <div class="seo-step" id="seoStep2">
+      <div class="step-icon"><i class="fas fa-dice"></i></div>
+      <div class="step-content">
+        <div class="step-title">최적의 페르소나 매트릭스 랜덤 조합 중...</div>
+        <div class="step-count">확률 조합: <span id="simCount">0</span>개</div>
       </div>
     </div>
-
-    <!-- Step 2: 보험 종류 선택 -->
-    <div class="card">
-      <div class="step-header">
-        <div class="step-number">2</div>
-        <div class="step-title">보험 종류 선택</div>
-      </div>
-      <div class="chip-group" id="type-chips">
-        <button class="chip gold active" onclick="selectChip(this, 'insuranceType')">상속/증여</button>
-        <button class="chip gold" onclick="selectChip(this, 'insuranceType')">CEO/법인</button>
-        <button class="chip gold" onclick="selectChip(this, 'insuranceType')">치매/간병</button>
-        <button class="chip" onclick="selectChip(this, 'insuranceType')">유병자보험</button>
-        <button class="chip" onclick="selectChip(this, 'insuranceType')">종신보험</button>
+    
+    <div class="seo-step" id="seoStep3">
+      <div class="step-icon"><i class="fas fa-shield-alt"></i></div>
+      <div class="step-content">
+        <div class="step-title">SEO 1위 노출용 바이럴 질문 최적화...</div>
+        <div class="step-count">바이럴 지수: <span id="matchCount">0</span>%</div>
       </div>
     </div>
-
-    <!-- Step 3: 보험사 선택 -->
-    <div class="card">
-      <div class="step-header">
-        <div class="step-number">3</div>
-        <div class="step-title">보험사 선택</div>
-      </div>
-      <select id="company" class="custom-select">
-        <optgroup label="생명보험사">
-          <option>삼성생명</option>
-          <option>한화생명</option>
-          <option>교보생명</option>
-          <option>신한라이프</option>
-          <option>NH농협생명</option>
-          <option>메트라이프</option>
-        </optgroup>
-        <optgroup label="손해보험사">
-          <option>현대해상</option>
-          <option>DB손해보험</option>
-          <option>KB손해보험</option>
-          <option>삼성화재</option>
-          <option>메리츠화재</option>
-          <option>한화손해보험</option>
-        </optgroup>
-      </select>
-    </div>
-
-    <!-- Step 4: 제안서 스타일 -->
-    <div class="card">
-      <div class="step-header">
-        <div class="step-number">4</div>
-        <div class="step-title">제안서 스타일</div>
-      </div>
-      <select id="style" class="custom-select">
-        <option>전문가 팩트체크형</option>
-        <option>감성 공감 위로형</option>
-        <option>세무 절세 분석형</option>
-      </select>
-    </div>
-
-    <!-- Step 5: 핵심 고민 (가장 중요!) -->
-    <div class="card">
-      <div class="step-header">
-        <div class="step-number">5</div>
-        <div class="step-title">핵심 고민 (ANGLE) - <span class="important-label">가장 중요!</span></div>
-      </div>
-      <textarea id="concern" class="search-input" placeholder="예: 워킹맘인데 아이 교육자금으로 증여하려면 세금이 얼마나 나올까요?"></textarea>
-    </div>
-
-    <!-- 생성 버튼 -->
-    <button onclick="generateContent()" id="generateBtn" class="main-btn">
-      <span class="emoji">💎</span>
-      <span class="emoji">🚀</span>
-      데이터 대입 및 전문가 콘텐츠 생성
-    </button>
-
-    <!-- 프로그레스 -->
-    <div id="progress-section" class="progress-section hidden">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <span id="progress-text" style="font-size: 14px; color: var(--primary);">분석 중...</span>
-        <span id="progress-percent" style="font-size: 14px; font-weight: 600; color: var(--primary);">0%</span>
-      </div>
-      <div class="progress-bar">
-        <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+    
+    <div class="seo-step" id="seoStep4">
+      <div class="step-icon"><i class="fas fa-trophy"></i></div>
+      <div class="step-content">
+        <div class="step-title">전문가 데이터 진단 및 보장 리포트 산출!</div>
+        <div class="step-count">최적화 등급: <span id="scoreCount">-</span></div>
       </div>
     </div>
-
-    <!-- 결과 섹션 -->
-    <div id="result-section" class="result-section hidden">
-      <!-- 콘텐츠 결과 -->
-      <div class="result-card">
-        <div class="result-header">
-          <div class="result-title">
-            <i class="fas fa-file-alt" style="color: var(--primary)"></i>
-            Generated Content
-          </div>
-          <div class="result-actions">
-            <button onclick="downloadTxt()" class="action-btn"><i class="fas fa-download"></i> TXT</button>
-            <button onclick="downloadPdf()" class="action-btn"><i class="fas fa-file-pdf"></i> PDF</button>
-            <button onclick="copyAll()" class="action-btn"><i class="fas fa-copy"></i> 복사</button>
-          </div>
-        </div>
-        <div id="content"></div>
-      </div>
-
-      <!-- 엑셀 설계서 -->
-      <div class="result-card">
-        <div class="result-header">
-          <div class="result-title">
-            <i class="fas fa-table" style="color: var(--accent)"></i>
-            Monochrome Excel Policy
-          </div>
-          <button onclick="generateExcel()" class="action-btn" style="background: var(--primary); color: #000; border-color: var(--primary);">
-            <i class="fas fa-sync"></i> 설계서 생성
-          </button>
-        </div>
-        <div id="excel-area" style="display: flex; justify-content: center; align-items: center; min-height: 200px; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
-          <div style="text-align: center; color: rgba(255,255,255,0.4);">
-            <i class="fas fa-file-excel" style="font-size: 32px; margin-bottom: 12px; opacity: 0.3;"></i>
-            <p>설계서 생성 버튼을 클릭하세요</p>
-          </div>
-        </div>
-      </div>
+    
+    <div class="seo-progress-bar">
+      <div class="seo-progress-fill" id="seoProgressFill"></div>
+    </div>
+    
+    <div class="seo-result-keyword" id="seoResultKeyword">
+      <div class="result-label"><i class="fas fa-check-circle"></i> 100% 고유 바이럴 질문 도출 완료</div>
+      <div class="result-title" id="seoResultTitle"></div>
     </div>
   </div>
+</div>
+    
+    <div class="seo-result-keyword" id="seoResultKeyword">
+      <div class="result-label"><i class="fas fa-fire"></i> \ub313\uae00 \ud3ed\ubc1c \ubbf8\ub07c \uc9c8\ubb38 \ub3c4\ucd9c \uc644\ub8cc</div>
+      <div class="result-title" id="seoResultTitle"></div>
+    </div>
+  </div>
+</div>
 
-  <script>
-    // 상태 관리
-    let state = {
-      target: '30대 워킹맘',
-      insuranceType: '상속/증여',
-      company: '삼성생명',
-      style: '전문가 팩트체크형',
-      concern: ''
-    };
+<div class="bg">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+  <div class="grid"></div>
+</div>
 
-    // 칩 선택
-    function selectChip(el, key) {
-      const parent = el.parentElement;
-      parent.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-      el.classList.add('active');
-      state[key] = el.innerText;
+<nav class="nav">
+  <a href="/admin"><i class="fas fa-cog"></i> Admin</a>
+  <a href="/api/docs"><i class="fas fa-book"></i> Docs</a>
+</nav>
+
+<div class="wrapper">
+  
+  <div class="logo">
+    <div class="logo-icon">X</div>
+    <div class="logo-text">XIVIX <span>2026</span> PRO</div>
+  </div>
+  
+  <p class="title">AI 보험 전문가 콘텐츠 생성 엔진</p>
+  
+  <div class="main">
+    
+    <!-- GPT 스타일 검색창 + 파일 업로드 -->
+    <div class="search-box" id="searchBox">
+      <textarea id="search" class="search-input" placeholder="핵심 고민을 입력하세요...&#10;&#10;예: 워킹맘인데 아이 교육자금으로 증여하려면 세금이 얼마나 나올까요?"></textarea>
+      
+      <!-- 파일 업로드 -->
+      <div class="upload-area">
+        <label class="upload-btn">
+          <i class="fas fa-image"></i>
+          <span>이미지 첨부</span>
+          <input type="file" id="fileInput" accept="image/*" multiple>
+        </label>
+        <div id="fileList"></div>
+        <span class="upload-hint">JPG, PNG, GIF, WEBP · 최대 10MB</span>
+      </div>
+      
+      <div class="search-footer">
+        <span class="char-count"><span id="char">0</span>/500</span>
+        <button id="btn" class="search-btn" onclick="goGenerate()">
+          <span class="btn-text"><i class="fas fa-fire"></i> \ubbf8\ub07c \uc9c8\ubb38 + \ub2f5\ubcc0 \uc138\ud2b8 \uc0dd\uc131</span>
+          <div class="spinner"></div>
+        </button>
+      </div>
+    </div>
+    
+    <!-- 프리미엄 실시간 보험 트렌드 (보험설계사 고급형) -->
+    <div class="trend-section" id="trendSection">
+      <div class="trend-header">
+        <div class="trend-title-wrap">
+          <div class="trend-title">
+            <i class="fas fa-fire-alt"></i> 
+            실시간 보험 트렌드
+          </div>
+          <div class="trend-subtitle">
+            <div class="live-dot"></div>
+            네이버 검색 기반 실시간 분석
+          </div>
+        </div>
+        <div class="trend-timer">
+          <span class="trend-time" id="trendTime"><i class="fas fa-clock"></i> 방금 전</span>
+          <button class="refresh-btn" id="refreshBtn" onclick="refreshTrends()">
+            <i class="fas fa-sync-alt"></i> 새로고침
+          </button>
+        </div>
+      </div>
+      
+      <!-- 트렌드 그리드 -->
+      <div id="trends" class="trend-grid">
+        <div style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:40px">
+          <i class="fas fa-spinner fa-spin" style="font-size:24px;margin-bottom:12px;display:block;color:#f59e0b"></i>
+          트렌드 로딩 중...
+        </div>
+      </div>
+      
+      <!-- HOT 키워드 태그 -->
+      <div class="hot-keywords" id="hotKeywords" style="display:none">
+        <div class="hot-keywords-title"><i class="fas fa-hashtag"></i> HOT 트렌드 키워드</div>
+        <div class="hot-keywords-list" id="hotKeywordsList"></div>
+      </div>
+      
+      <!-- 힌트 -->
+      <div class="trend-hint">
+        <i class="fas fa-lightbulb"></i>
+        <span><b>활용 팁:</b> 키워드를 클릭하면 Q&A 생성 칸의 핵심 고민에 자동 입력됩니다. 트렌드 키워드를 활용하면 카페 노출이 높아집니다.</span>
+      </div>
+    </div>
+    
+    <!-- 결과 영역 (탭 분할 UI) -->
+    <div class="result-section" id="resultSection">
+      <div class="progress-box" id="progressBox">
+        <div class="progress-header">
+          <span id="progressText" class="progress-text"><i class="fas fa-spinner fa-spin"></i> 분석 중...</span>
+          <span id="progressPct" class="progress-pct">0%</span>
+        </div>
+        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+      </div>
+      
+      <!-- SEO 감사 리포트 (상단) -->
+      <div class="seo-audit-card" id="seoAuditCard" style="display:none"></div>
+      
+      <!-- 보장 분석 테이블 (report_data 자동 연결) -->
+      <div class="report-table" id="reportTable" style="display:none"></div>
+      
+      <!-- 바이럴 질문 -->
+      <div class="viral-questions" id="viralQuestions" style="display:none"></div>
+      
+      <!-- 탭 네비게이션 -->
+      <div class="tab-nav" id="tabNav">
+        <button class="tab-btn active" data-tab="titles" onclick="switchTab('titles')">
+          <i class="fas fa-heading"></i> 제목 선택 <span class="badge" id="titleCount">5</span>
+        </button>
+        <button class="tab-btn" data-tab="contents" onclick="switchTab('contents')">
+          <i class="fas fa-file-alt"></i> 본문 선택 <span class="badge" id="contentCount">3</span>
+        </button>
+        <button class="tab-btn" data-tab="extras" onclick="switchTab('extras')">
+          <i class="fas fa-comments"></i> 댓글/키워드
+        </button>
+      </div>
+      
+      <!-- 제목 탭 -->
+      <div class="tab-content active" id="tab-titles"></div>
+      
+      <!-- 본문 탭 -->
+      <div class="tab-content" id="tab-contents"></div>
+      
+      <!-- 댓글/키워드 탭 -->
+      <div class="tab-content" id="tab-extras"></div>
+      
+      <!-- 전체 복사/다운로드 -->
+      <button class="copy-all-btn" onclick="copyAllContent()">
+        <i class="fas fa-copy"></i> 선택한 콘텐츠 전체 복사
+      </button>
+      
+      <button class="new-btn show" id="newBtn" onclick="resetAndNew()">
+        <i class="fas fa-plus"></i> 새로운 콘텐츠 생성
+      </button>
+    </div>
+    
+  </div>
+</div>
+
+<script>
+const searchEl = document.getElementById('search');
+const charEl = document.getElementById('char');
+const btn = document.getElementById('btn');
+const trendsEl = document.getElementById('trends');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const refreshBtn = document.getElementById('refreshBtn');
+const trendTimeEl = document.getElementById('trendTime');
+const searchBox = document.getElementById('searchBox');
+const trendSection = document.getElementById('trendSection');
+const hintSection = document.getElementById('hintSection');
+const resultSection = document.getElementById('resultSection');
+const progressBox = document.getElementById('progressBox');
+const progressText = document.getElementById('progressText');
+const progressPct = document.getElementById('progressPct');
+const progressFill = document.getElementById('progressFill');
+const output = document.getElementById('output');
+const newBtn = document.getElementById('newBtn');
+
+let uploadedFiles = [];
+let isGenerating = false;
+let lastTrendUpdate = null;
+
+// 기본 옵션값 (자동 적용)
+const DEFAULT_OPTIONS = {
+  target: '30대 워킹맘',
+  insuranceType: '상속/증여',
+  company: '삼성생명',
+  style: '전문가 팩트체크형'
+};
+
+// 글자수 카운트
+searchEl.addEventListener('input', () => {
+  const len = searchEl.value.length;
+  charEl.textContent = len;
+  if (len > 500) {
+    searchEl.value = searchEl.value.substring(0, 500);
+    charEl.textContent = 500;
+  }
+});
+
+// 파일 업로드 처리
+fileInput.addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  
+  for (const file of files) {
+    if (file.size > 10 * 1024 * 1024) {
+      alert(file.name + ' 파일이 10MB를 초과합니다');
+      continue;
     }
-
-    // 토스트 알림
-    function showToast(message, type = 'info') {
-      const colors = {
-        success: 'linear-gradient(135deg, #10B981, #059669)',
-        error: 'linear-gradient(135deg, #EF4444, #DC2626)',
-        warning: 'linear-gradient(135deg, #F59E0B, #D97706)',
-        info: 'linear-gradient(135deg, #3B82F6, #2563EB)'
+    
+    if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
+      alert(file.name + '는 지원하지 않는 형식입니다');
+      continue;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const base64 = evt.target.result.split(',')[1];
+      const fileObj = {
+        id: Date.now() + Math.random(),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        base64: base64,
+        preview: evt.target.result
       };
-      
-      const toast = document.createElement('div');
-      toast.style.cssText = \`
-        position: fixed;
-        bottom: 24px;
-        right: 24px;
-        padding: 14px 24px;
-        background: \${colors[type]};
-        color: #fff;
-        border-radius: 12px;
-        font-weight: 600;
-        font-size: 14px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        z-index: 9999;
-        transform: translateY(100px);
-        opacity: 0;
-        transition: all 0.3s ease;
-      \`;
-      toast.innerText = message;
-      document.body.appendChild(toast);
-      
-      setTimeout(() => {
-        toast.style.transform = 'translateY(0)';
-        toast.style.opacity = '1';
-      }, 10);
-      
-      setTimeout(() => {
-        toast.style.transform = 'translateY(100px)';
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
-      }, 3000);
-    }
+      uploadedFiles.push(fileObj);
+      renderFileList();
+    };
+    reader.readAsDataURL(file);
+  }
+  
+  fileInput.value = '';
+});
 
-    // 콘텐츠 생성
-    async function generateContent() {
-      const concern = document.getElementById('concern').value;
-      if (!concern.trim()) {
-        showToast('핵심 고민(Angle)을 입력해주세요!', 'warning');
-        document.getElementById('concern').focus();
-        return;
-      }
+function renderFileList() {
+  fileList.innerHTML = uploadedFiles.map(f => 
+    '<div class="file-preview">' +
+      '<img src="' + f.preview + '" alt="' + f.name + '">' +
+      '<span>' + f.name.substring(0, 15) + (f.name.length > 15 ? '...' : '') + '</span>' +
+      '<i class="fas fa-times remove" onclick="removeFile(' + f.id + ')"></i>' +
+    '</div>'
+  ).join('');
+}
 
-      state.concern = concern;
-      state.company = document.getElementById('company').value;
-      state.style = document.getElementById('style').value;
+function removeFile(id) {
+  uploadedFiles = uploadedFiles.filter(f => f.id !== id);
+  renderFileList();
+}
 
-      document.getElementById('progress-section').classList.remove('hidden');
-      document.getElementById('result-section').classList.remove('hidden');
-      document.getElementById('content').innerHTML = '';
-      
-      const progressFill = document.getElementById('progress-fill');
-      const progressText = document.getElementById('progress-text');
-      const progressPercent = document.getElementById('progress-percent');
-      
-      progressFill.style.width = '10%';
-      progressPercent.innerText = '10%';
-      progressText.innerText = '🔍 타겟 페르소나 분석 중...';
-
-      try {
-        const response = await fetch('/api/generate/master', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(state)
-        });
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        const content = document.getElementById('content');
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const lines = decoder.decode(value).split('\\n');
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const json = JSON.parse(line);
-              if (json.type === 'status') {
-                progressText.innerText = json.msg;
-                const percent = json.step * 25;
-                progressFill.style.width = percent + '%';
-                progressPercent.innerText = percent + '%';
-              } else if (json.type === 'content') {
-                content.innerHTML += json.data;
-                progressFill.style.width = '90%';
-                progressPercent.innerText = '90%';
-              } else if (json.type === 'done') {
-                progressFill.style.width = '100%';
-                progressPercent.innerText = '100%';
-                progressText.innerText = '✅ 콘텐츠 생성 완료!';
-                showToast('콘텐츠 생성이 완료되었습니다!', 'success');
-              } else if (json.type === 'error') {
-                content.innerHTML = '<span style="color: #EF4444;">' + json.msg + '</span>';
-                showToast(json.msg, 'error');
-              }
-            } catch (e) {}
-          }
-        }
-      } catch (error) {
-        document.getElementById('content').innerHTML = '<span style="color: #EF4444;">네트워크 오류가 발생했습니다.</span>';
-        showToast('네트워크 오류가 발생했습니다.', 'error');
-      }
-    }
-
-    // 엑셀 설계서 생성
-    async function generateExcel() {
-      const area = document.getElementById('excel-area');
-      area.innerHTML = '<div class="spinner"></div>';
-
-      try {
-        const response = await fetch('/api/generate/excel', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(state)
-        });
-
-        const json = await response.json();
+// 트렌드 로드 (Linear 스타일 미니멀 UI)
+async function loadTrends() {
+  try {
+    const res = await fetch('/api/trend');
+    const data = await res.json();
+    
+    if (data.success && data.trends) {
+      // 트렌드 그리드 렌더링 (컴팩트 1줄 레이아웃)
+      trendsEl.innerHTML = data.trends.map(t => {
+        let changeHtml = '';
+        if (t.change === 'up') changeHtml = '<span class="trend-change up">+' + (t.changePercent || 0) + '%</span>';
+        else if (t.change === 'down') changeHtml = '<span class="trend-change down">-' + (t.changePercent || 0) + '%</span>';
+        else if (t.change === 'new') changeHtml = '<span class="trend-change new">NEW</span>';
+        else changeHtml = '<span class="trend-change same">-</span>';
         
-        if (json.success && json.data) {
-          const d = json.data;
-          let html = '<div class="excel-sheet">';
-          html += '<div style="font-size: 22px; font-weight: 900; border-bottom: 3px solid #000; padding-bottom: 12px; margin-bottom: 16px;">' + (d.product || '보험설계서') + '</div>';
-          html += '<div style="font-size: 13px; margin-bottom: 16px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid #ddd; padding-bottom: 10px;">';
-          html += '<span><b>피보험자:</b> ' + d.target + ' (' + d.gender + '/' + d.age + ')</span>';
-          html += '<span><b>보험사:</b> ' + (d.company || state.company) + '</span>';
-          html += '</div>';
-          html += '<table class="excel-table"><tr><th>보장 항목</th><th style="width: 120px;">가입금액</th><th style="width: 100px;">보험료</th></tr>';
+        const isTop3 = t.rank <= 3;
+        
+        return '<div class="trend-item" onclick="selectTrend(this)" data-keyword="' + t.keyword + '">' +
+          '<span class="trend-rank' + (isTop3 ? ' top3' : '') + '">' + t.rank + '</span>' +
+          '<div class="trend-content">' +
+            '<div class="trend-keyword">' + t.keyword + '</div>' +
+            '<div class="trend-meta">' +
+              '<span class="trend-volume">' + t.volume + '</span>' +
+              changeHtml +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      
+      // 갱신 시간 업데이트
+      lastTrendUpdate = new Date();
+      updateTrendTime();
+    }
+  } catch(e) {
+    console.error('Trend load error:', e);
+    trendsEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--red);padding:36px">' +
+      '<i class="fas fa-exclamation-circle" style="font-size:18px;margin-bottom:10px;display:block"></i>' +
+      '<span style="font-size:13px">트렌드 로딩 실패</span><br>' +
+      '<small style="color:var(--text-muted);font-size:12px">새로고침 버튼을 눌러주세요</small></div>';
+  }
+}
+
+// 새로고침 버튼 클릭
+async function refreshTrends() {
+  refreshBtn.classList.add('loading');
+  refreshBtn.disabled = true;
+  await loadTrends();
+  refreshBtn.classList.remove('loading');
+  refreshBtn.disabled = false;
+}
+
+// 키워드로 트렌드 선택
+function selectTrendByKeyword(keyword) {
+  searchEl.value = keyword + '에 대해 자세히 알려주세요';
+  charEl.textContent = searchEl.value.length;
+  searchEl.focus();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+// 갱신 시간 표시
+function updateTrendTime() {
+  if (!lastTrendUpdate) return;
+  const now = new Date();
+  const diff = Math.floor((now - lastTrendUpdate) / 1000);
+  
+  let timeText = '';
+  if (diff < 60) {
+    timeText = '방금 전';
+  } else if (diff < 3600) {
+    timeText = Math.floor(diff / 60) + '분 전';
+  } else {
+    timeText = Math.floor(diff / 3600) + '시간 전';
+  }
+  trendTimeEl.innerHTML = '<i class="fas fa-clock"></i> ' + timeText;
+}
+
+// 1분마다 갱신 시간 업데이트 (API 호출 없음)
+setInterval(updateTrendTime, 60000);
+
+// ============================================
+// XIVIX 2026 PRO TOTAL ENGINE (Full-Stack \ub9c8\ucf00\ud305 \ub85c\uc9c1)
+// \uc5d4\ud2b8\ub85c\ud53c: 0.98 - \ud0a4\uc6cc\ub4dc\ubd80\ud130 \ub313\uae00\uae4c\uc9c0 \uc720\uae30\uc801 \uc5f0\uacb0
+// ============================================
+
+// 31\uac1c \ubcf4\ud5d8\uc0ac \ub9c8\uc2a4\ud130 \ub9ac\uc2a4\ud2b8 (2026\ub144 \uae30\uc900)
+const INSURANCE_COMPANY_DB = {
+  life: ['\uc0bc\uc131\uc0dd\uba85', '\ud55c\ud654\uc0dd\uba85', '\uad50\ubcf4\uc0dd\uba85', '\uc2e0\ud55c\ub77c\uc774\ud504', '\ubbf8\ub798\uc5d0\uc14b\uc0dd\uba85', '\ud765\uad6d\uc0dd\uba85', '\ub3d9\uc591\uc0dd\uba85', '\ub77c\uc774\ub098\uc0dd\uba85', 'NH\ub18d\ud611\uc0dd\uba85', 'DB\uc0dd\uba85', 'ABL\uc0dd\uba85', 'AIA\uc0dd\uba85', 'KB\ub77c\uc774\ud504', '\uba54\ud2b8\ub77c\uc774\ud504', 'KDB\uc0dd\uba85', '\ud478\ubcf8\ud604\ub300\uc0dd\uba85', '\ud558\ub098\uc0dd\uba85', 'BNP\ud30c\ub9ac\ubc14\uce74\ub514\ud504', '\uad50\ubcf4\ub77c\uc774\ud504\ud50c\ub798\ub2db'],
+  nonLife: ['\uc0bc\uc131\ud654\uc7ac', '\ud604\ub300\ud574\uc0c1', 'DB\uc190\ubcf4', 'KB\uc190\ubcf4', '\uba54\ub9ac\uce20\ud654\uc7ac', '\ud55c\ud654\uc190\ubcf4', '\ub86f\ub370\uc190\ubcf4', '\ud765\uad6d\ud654\uc7ac', 'NH\ub18d\ud611\uc190\ubcf4', 'MG\uc190\ubcf4', 'AXA\uc190\ubcf4', '\ud558\ub098\uc190\ubcf4']
+};
+
+// 4\uc885 \ud398\ub974\uc18c\ub098 \ub9e4\ud2b8\ub9ad\uc2a4 (\uc758\uc2ec\ud615/\ud558\uc18c\uc5f0\ud615/\ub530\uc9c0\ub294\ud615/\ud574\ub9d1\uc740\ud615)
+const PERSONA_POOL = [
+  { role: '\uc9c0\uc778 \uc124\uacc4\uc0ac \ub208\ud0f1\uc774 \uc758\uc2ec\ud615', style: '\uc758\uc2ec \uac00\ub4dd, \ud329\ud2b8 \uccb4\ud06c \uc694\uad6c', keywords: ['\ub208\ud0f1\uc774', '\uc9c4\uc9dc \ud61c\uc790\uc778\uac00\uc694', '\uadf8\ub0e5 \uc218\ub2f9\uc6a9 \uc544\ub2cc\uac00\uc694', '\ubff0\uc774\ub294\uac70 \uc544\ub2c8\uc8e0', '\ud655\uc778 \uc88c \ud574\uc8fc\uc138\uc694'] },
+  { role: '\ub9d8\uce74\ud398 \ucd94\ucc9c \ud329\ud2b8\uccb4\ud06c\ud615', style: '\ub9d8\uce74\ud398\uc5d0\uc11c \ub4e4\uc5c8\ub294\ub370 \uac80\uc99d \uc694\uccad', keywords: ['\ub9d8\uce74\ud398\uc5d0\uc11c', '\uadf8 \ubd84\uc774 \ucd94\ucc9c\ud574\uc11c', '\uad34\ub2f4\uc5d0\uc11c \ubcf4\uace0', '\uc5b4\ub514\uc11c \ub4e4\uc5c8\ub294\ub370', '\uc774\uac70 \ub9de\ub098\uc694'] },
+  { role: '\uc720\ud29c\ube0c \uc0c1\ub2f4 \ud6c4 \ubc30\uc2e0\uac10\ud615', style: '\uc720\ud29c\ubc84 \ub9d0 \ub2e4\ub984, \ud654\ub0a8', keywords: ['\uc720\ud29c\ube0c\uc5d0\uc11c', '\uc0c1\ub2f4\ubc1b\uc558\ub294\ub370 \ub9d0\uc774 \ub2ec\ub77c\uc694', '\uc644\uc804 \ub2e4\ub978 \uc0ac\ub78c\uc774 \ub428', '\ubc29\uc1a1\ud558\ub294 \uc0ac\ub78c \ub9d0\ub9cc \ubbff\uace0', '\ubc30\uc2e0\uac10'] },
+  { role: '\uac31\uc2e0\ud3ed\ud0c4 \uba58\ubd95\ud615', style: '\uac11\uc790\uae30 \ubcf4\ud5d8\ub8cc \ud3ed\ub4f1, \uba58\ubd95', keywords: ['\uac11\uc790\uae30 12\ub9cc\uc6d0', '\uac31\uc2e0\ud3ed\ud0c4', '\ucc98\uc74c\uc5d4 3\ub9cc\uc6d0\uc774\ub77c\ub354\ub2c8', '\uc2dc\uae34\ud3ed\ud0c4', '\uc774\uac8c \ubb34\uc2a8'] }
+];
+
+// \uc81c\uc548\uc11c \uc774\ubbf8\uc9c0 \uad00\ub828 \ud0a4\uc6cc\ub4dc (\ud544\uc218 \ud3ec\ud568)
+const IMAGE_MENTION_TEMPLATES = [
+  '\uc774\ubbf8\uc9c0 \ucca8\ubd80\ud588\uc5b4\uc694. \ubd10\uc8fc\uc138\uc694',
+  '\uc81c\uc548\uc11c \uc0ac\uc9c4 \uc62c\ub9bc\ub2c8\ub2e4',
+  '\uc124\uacc4\uc11c \ucca8\ubd80\ud569\ub2c8\ub2e4',
+  '\uc99d\uad8c \uc0ac\uc9c4 \uc62c\ub824\uc694',
+  '\uc544\ub798 \uc0ac\uc9c4 \ubd10\uc8fc\uc138\uc694'
+];
+
+// \ub79c\ub364 \ubcf4\ud5d8\ub8cc \uae08\uc561 \uc0dd\uc131 (7\ub9cc~15\ub9cc\uc6d0)
+function generateRandomPremium() {
+  const base = Math.floor(Math.random() * 80) + 70; // 70,000 ~ 150,000
+  const hundreds = Math.floor(Math.random() * 10) * 100; // 0 ~ 900
+  return (base * 1000 + hundreds).toLocaleString();
+}
+
+// \uc0c1\ud669 \ud480 (\uc81c\uc548\uc11c/\uc99d\uad8c \ubd84\uc11d \uc911\uc2ec)
+const SITUATION_POOL = [
+  { text: '\uc124\uacc4\uc0ac\uac00 \uc900 \uc81c\uc548\uc11c\uc778\ub370 \uc774\uac8c \uc9c4\uc9dc \uc88b\uc740 \uac74\uc9c0 \ubaa8\ub974\uaca0\uc5b4\uc694', detail: '\uadf8\ub0e5 \uc218\ub2f9\ub9cc \ub9ce\uc774 \ubc1b\uc73c\ub824\uace0 \uc774\ub7f0 \uac70 \uc8fc\ub294 \uac70 \uc544\ub2c8\uc5d0\uc694??' },
+  { text: '\uc5b4\uba38\ub2c8\uac00 20\ub144 \uc804 \ub4e4\uc5b4\uc900 \ubcf4\ud5d8\uc778\ub370 \uc9c4\ub2e8 \uc88c \ud574\uc8fc\uc138\uc694', detail: '\ud574\uc9c0\ud574\uc57c\ud558\ub098\uc694 \uc720\uc9c0\ud574\uc57c\ud558\ub098\uc694' },
+  { text: '\uc0c8\ub85c \ub4e4\ub824\uace0 \ud558\ub294\ub370 \uc774 \uc124\uacc4\uc11c \uad1c\ucc2e\uc740\uac00\uc694', detail: '\ubcf4\uc7a5\ub0b4\uc6a9\uc774 \uc774\uac8c \ub9de\ub294\uc9c0 \ubaa8\ub974\uaca0\uc5b4\uc694' },
+  { text: '\ubcf4\ud5d8\ub9ac\ubaa8\ub378\ub9c1 \ud558\ub77c\ub294\ub370 \uc774 \uc81c\uc548\uc11c\uac00 \ub9de\ub294 \uac74\uc9c0', detail: '\uae30\uc874\uac70 \ud574\uc9c0\ud558\uace0 \uc774\uac78\ub85c \uc804\ud658\ud558\ub77c\ub294\ub370' },
+  { text: '\uc9c0\uc778\uc774 \ucd94\ucc9c\ud574\uc11c \ubc1b\uc740 \uc81c\uc548\uc11c\uc778\ub370 \uac1d\uad00\uc801\uc73c\ub85c \ubd10\uc8fc\uc138\uc694', detail: '\uce5c\uad6c\ub77c\uc11c \uac70\uc808 \ubabb\ud558\uaca0\ub294\ub370 \uc774\uac8c \uc9c4\uc9dc \uc88b\uc740 \uac74\uc9c0' },
+  { text: '\uc544\uc774 \ud0dc\uc5b4\ub098\uc11c \ud0dc\uc544\ubcf4\ud5d8 \ub4e4\ub824\uace0 \ud558\ub294\ub370 \uc774\uac8c \ub9de\ub098\uc694', detail: '\ud2b9\uc57d \uad6c\uc131\uc774 \uc774\uac8c \ub9de\ub294\uc9c0' },
+  { text: '\uc554\ubcf4\ud5d8 \uac00\uc785\ud558\ub824\uace0 \ud558\ub294\ub370 \uc5b4\ub5a4 \uac8c \uc88b\uc744\uae4c\uc694', detail: '\uc5ec\ub7ec \uac1c \ube44\uad50\ud574\ubd24\ub294\ub370 \ubaa8\ub974\uaca0\uc5b4\uc694' },
+  { text: '\uc2e4\ube44 \uc804\ud658\ud558\ub77c\ub294\ub370 \uc774 \uc81c\uc548\uc11c \ubbff\uc5b4\ub3c4 \ub418\ub098\uc694', detail: '\uc804\ud658 \uc548\ud558\uba74 \ubcf4\uc0c1 \ubabb\ubc1b\ub294\ub2e4\uace0 \ud558\ub294\ub370' }
+];
+
+// \uac10\uc815 \ud2b8\ub9ac\uac70 (5\uc885)
+const EMOTION_TRIGGERS = ['\uc5b5\uc6b8\ud568', '\ub0c9\uc18c\uc801', '\uac04\uc808\ud568', '\ub2f9\ub2f9\ud568', '\ubd84\ub178'];
+
+// \ub9d0\ud22c \ubcc0\ud615 \ud328\ud134 (\uc624\ud0c0/\uacf5\ubc31/\uc904\uc784\ub9d0 \uc870\ud569)
+const SPEECH_MUTATIONS = {
+  endings: ['..', '...', 'ㅠㅠ', 'ㅜㅜ', 'ㄷㄷ', ';;', 'ㅎㅎ', '??', '!!!'],
+  typos: { '설계사': '설게사', '보험료': '보헙료', '제안서': '제안서', '청구': '청구', '상담': '상담' },
+  fillers: [' ', '  ', ' \uc544 ', ' \uadf8\ub7f0\ub370 ', ' \uadf8\ub798\uc11c '],
+  emphasis: ['\uc9c4\uc9dc', '\uc9c4\uc9dc\ub85c', '\ub808\uc54c', '\uc2e4\ud654\ub0d0', '\uc640 \uc9c4\uc9dc']
+};
+
+// ============================================
+// 확장된 금지어 필터 v3 (AI 냄새 + 슬랭 + 맥락혼합 원천 차단)
+// 규칙 1: AI 특유 표현 금지
+// 규칙 2: 검증되지 않은 슬랭 금지 (~좌, ~노, ~까, ~긔 등)
+// 규칙 3: 과도한 존칭어 금지
+// 규칙 4: 맥락 혼합 유발 표현 금지
+// ============================================
+const BANNED_WORDS = [
+  // AI 특유 표현 (딥러닝 모델이 자주 생성하는 패턴)
+  '막막하다', '도움요청', '문의드립니다', '경험이 있으신', '부탁드립니다',
+  '자문을 구합니다', '안내해 드리겠습니다', '선배님들 조언', '알려주세요',
+  '의의제기', '해결책을', '어떻게 생각하시나요', '여쭙습니다',
+  '문의하셔서', '감사합니다', '도움이 되실거예요', '참고하시기 바랍니다',
+  // 실제 카페에서 사용하지 않는 과도한 표현
+  '명쾌하다', '철체하다', '유익한', '대단히', '현명한',
+  // 맥락 혼합 유발 표현 (신규 + 기존 섞음 방지) - 이런 표현이 포함되면 혼합 가능성 높음
+  '어머니가 들어준 보험인데 오늘 제안받았는데',
+  '제안받았는데 어머니가',
+  '새로 들려고 하는데 예전에',
+  '기존 보험이 있는데 오늘 새로',
+  '예전 거랑 새 거랑'
+];
+
+// 금지 접미사 패턴 (정규식 기반 필터링) - 슬랭 가드레일
+const BANNED_SUFFIX_PATTERNS = [
+  /좌$/,  // ~좌
+  /노$/,  // ~노  
+  /까$/,  // ~까
+  /긔$/,  // ~긔
+  /림$/,  // ~림
+  /심$/,  // ~심
+  /돋네$/, // ~돋네
+  /요시$/  // ~요시
+];
+
+// \ubc14\uc774\ub7f4 \uc9c8\ubb38 \uc0dd\uc131 \ud37c\ud3ec\uba3c\uc2a4 \uc2dc\ud000\uc2a4 (\uc9c8\ubb38\uc774 \ub300\uc7a5!)
+const VIRAL_ANALYSIS_STEPS = [
+  { id: 'seoStep1', duration: 800, counterId: 'apiCount', counterEnd: '\uc5f0\uacb0\ub428', counterType: 'text' },
+  { id: 'seoStep2', duration: 1200, counterId: 'simCount', counterEnd: 52400, counterType: 'number' },
+  { id: 'seoStep3', duration: 1000, counterId: 'matchCount', counterEnd: 97, counterType: 'number' },
+  { id: 'seoStep4', duration: 500, counterId: 'scoreCount', counterEnd: 'S+', counterType: 'text' }
+];
+
+// \uc22b\uc790 \uce74\uc6b4\ud2b8\uc5c5 \uc560\ub2c8\uba54\uc774\uc158
+function animateCounter(elementId, endValue, duration) {
+  const element = document.getElementById(elementId);
+  if (!element) return;
+  const startTime = performance.now();
+  const animate = (currentTime) => {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const easeOut = 1 - Math.pow(1 - progress, 3);
+    const currentValue = Math.floor(endValue * easeOut);
+    element.textContent = currentValue.toLocaleString();
+    if (progress < 1) requestAnimationFrame(animate);
+  };
+  requestAnimationFrame(animate);
+}
+
+// \ud0c0\uc774\ud551 \ud6a8\uacfc
+function typeWriter(element, text, speed, callback) {
+  element.innerHTML = '';
+  let i = 0;
+  const cursor = document.createElement('span');
+  cursor.className = 'typing-cursor';
+  element.appendChild(cursor);
+  
+  function type() {
+    if (i < text.length) {
+      element.insertBefore(document.createTextNode(text.charAt(i)), cursor);
+      i++;
+      setTimeout(type, speed);
+    } else {
+      cursor.remove();
+      if (callback) callback();
+    }
+  }
+  type();
+}
+
+// ============================================
+// 🚨 상황별 단일 로직 바이럴 질문 생성 엔진 v3 (2026.01.18)
+// 규칙 1: 한 질문 = 하나의 상황만 (신규 OR 기존, 절대 섞지 않음)
+// 규칙 2: 검증된 말투만 사용 (~좌, ~노, ~긔 등 슬랭 완전 금지)
+// 규칙 3: 인과관계 검수 (문장 A → 그래서 → 문장 B 자연스럽게 흐름)
+// 규칙 4: 패러프레이징 금지 (접속사 불필요하게 연결 금지)
+// ============================================
+function generateViralQuestion(keyword) {
+  const allCompanies = [...INSURANCE_COMPANY_DB.life, ...INSURANCE_COMPANY_DB.nonLife];
+  const company = allCompanies[Math.floor(Math.random() * allCompanies.length)];
+  const premium = generateRandomPremium();
+  
+  // 🎯 상황 타입 먼저 결정 (A: 신규 제안서 / B: 기존 보험 / C: 상담 후기)
+  const scenarioType = ['NEW', 'OLD', 'CONSULT'][Math.floor(Math.random() * 3)];
+  
+  // ✅ 허용된 말투 종결 (실제 카페에서 흔히 사용되는 것만)
+  const SAFE_ENDINGS = ['ㅠㅠ', 'ㄷㄷ', ';;', '...', '??', '!!', 'ㅎㄷㄷ', 'ㅇㅇ'];
+  const ending = SAFE_ENDINGS[Math.floor(Math.random() * SAFE_ENDINGS.length)];
+  
+  let question = '';
+  
+  // ============================================
+  // 시나리오 A: 신규 제안서 분석 요청 (오늘/최근 받은 것)
+  // 주의: 기존 보험 언급 절대 금지
+  // ============================================
+  if (scenarioType === 'NEW') {
+    const newTemplates = [
+      // 템플릿 1: 단순 팩트체크 (인과: 제안받음 → 검증 필요)
+      company + ' ' + keyword + ' 제안서 사진 올립니다. 설계사가 월 ' + premium + '원이라는데 이거 30대 직장인한테 적당한 건가요? 팩폭 좀요' + ending,
+      
+      // 템플릿 2: 의심형 (인과: 제안받음 → 수당 의심)
+      '오늘 ' + company + ' 설계사한테 ' + keyword + ' 제안받았어요. 월 ' + premium + '원이래요. 그런데 이거 수당 많이 받으려고 비싼 거 권유하는 거 아닌가요' + ending + ' 제안서 첨부합니다.',
+      
+      // 템플릿 3: 비교 요청 (인과: 제안받음 → 타사 비교 필요)
+      company + ' ' + keyword + ' 월 ' + premium + '원 제안받았는데요. 다른 데랑 비교하면 어떤가요? 첨부한 제안서 좀 봐주세요' + ending,
+      
+      // 템플릿 4: 맘카페 추천 후 (인과: 추천 들음 → 상담 → 검증 필요)
+      '맘카페에서 ' + company + ' ' + keyword + ' 좋다고 해서 상담받았어요. 월 ' + premium + '원인데 이 정도면 괜찮은 건가요? 제안서 올려요' + ending,
+      
+      // 템플릿 5: 급한 결정 (인과: 기한 제시 → 급함 → 검증 필요)
+      company + ' ' + keyword + ' 이번주까지 결정하라는데요. 월 ' + premium + '원이에요. 급하게 가입해도 될까요' + ending + ' 제안서 첨부했어요.'
+    ];
+    question = newTemplates[Math.floor(Math.random() * newTemplates.length)];
+  }
+  
+  // ============================================
+  // 시나리오 B: 기존 보험 진단 요청 (예전에 가입한 것)
+  // 주의: 신규 제안 언급 절대 금지, 갱신/해지/유지 판단 요청만
+  // ============================================
+  else if (scenarioType === 'OLD') {
+    const years = [5, 7, 10, 12, 15][Math.floor(Math.random() * 5)];
+    const oldTemplates = [
+      // 템플릿 1: 서랍 발견 (인과: 발견 → 검토 필요)
+      '서랍 정리하다가 ' + years + '년 전 가입한 ' + company + ' ' + keyword + ' 증권 발견했어요. 월 ' + premium + '원인데 계속 유지해도 되나요' + ending + ' 증권 사진 올립니다.',
+      
+      // 템플릿 2: 갱신 폭탄 (인과: 보험료 폭등 → 당황 → 판단 필요)
+      years + '년 전 들었던 ' + company + ' ' + keyword + '인데요. 갑자기 보험료가 월 ' + premium + '원으로 올랐어요. 해지해야 하나요 유지해야 하나요' + ending + ' 증권 첨부해요.',
+      
+      // 템플릿 3: 부모님이 들어준 (인과: 줬다가 보니까 → 판단 필요)
+      '어머니가 ' + years + '년 전에 들어주신 ' + company + ' ' + keyword + '예요. 월 ' + premium + '원인데 지금 봐도 괜찮은 건지 모르겠어요' + ending + ' 증권 올려볼게요.',
+      
+      // 템플릿 4: 리모델링 권유 (인과: 설계사 권유 → 의심 → 검증 필요)
+      company + ' 설계사가 ' + years + '년 된 ' + keyword + ' 리모델링하자고 하는데요. 지금 월 ' + premium + '원 내고 있어요. 바꿔야 하나요' + ending + ' 현재 증권 첨부합니다.',
+      
+      // 템플릿 5: 보장 내용 확인 (인과: 오래됨 → 궁금함 → 확인 필요)
+      years + '년 전 가입한 ' + company + ' ' + keyword + '인데요. 월 ' + premium + '원이에요. 오래돼서 보장이 지금도 괜찮은지 좀 봐주세요' + ending + ' 증권 사진 올릴게요.'
+    ];
+    question = oldTemplates[Math.floor(Math.random() * oldTemplates.length)];
+  }
+  
+  // ============================================
+  // 시나리오 C: 상담 후기/비교 요청 (오늘 상담받은 것 기준)
+  // 주의: 기존 보험 언급 절대 금지, 상담/제안서 검토만
+  // ============================================
+  else {
+    const consultTemplates = [
+      // 템플릿 1: 유튜브 후 상담 (인과: 유튜브 시청 → 상담 → 제안서가 다름 → 혼란)
+      '유튜브 보고 ' + company + ' ' + keyword + ' 상담받았어요. 그런데 제안서가 생각한 거랑 달라요. 월 ' + premium + '원인데 원래 이런가요' + ending + ' 제안서 첨부합니다.',
+      
+      // 템플릿 2: 지인 추천 (인과: 지인 설계 → 객관적 검토 필요)
+      '지인이 ' + company + ' 설계사인데요. ' + keyword + ' 월 ' + premium + '원으로 설계해줬어요. 객관적으로 봐주실 분' + ending + ' 제안서 올려요.',
+      
+      // 템플릿 3: 여러 곳 비교 (인과: 여러 곳 제안 → 비교 필요)
+      company + ' 말고 다른 데서도 ' + keyword + ' 제안받았는데요. 여기가 월 ' + premium + '원이에요. 어디가 나은지 모르겠어요' + ending + ' 제안서 첨부합니다.',
+      
+      // 템플릿 4: 설계사 말 다름 (인과: 설계사마다 다름 → 혼란 → 팩트 필요)
+      keyword + ' 상담받는데요. ' + company + ' 설계사마다 말이 달라요. 월 ' + premium + '원이면 적당한 건가요' + ending + ' 제안서 올릴게요.',
+      
+      // 템플릿 5: 가입 전 마지막 확인 (인과: 가입 결정 → 마지막 검토 필요)
+      company + ' ' + keyword + ' 가입하려고요. 월 ' + premium + '원인데 마지막으로 확인받고 싶어요' + ending + ' 제안서 첨부했어요.'
+    ];
+    question = consultTemplates[Math.floor(Math.random() * consultTemplates.length)];
+  }
+  
+  // 🚫 금지어 필터링 (AI 냄새 제거)
+  BANNED_WORDS.forEach(word => {
+    question = question.replace(new RegExp(word, 'g'), '');
+  });
+  
+  // 🚫 금지 접미사 패턴 필터링 (슬랭 가드레일)
+  BANNED_SUFFIX_PATTERNS.forEach(pattern => {
+    // 단어 단위로 필터링 (예: "관심좌", "대박좌" 등)
+    const words = question.split(/\\s+/);
+    const filtered = words.filter(word => !pattern.test(word));
+    question = filtered.join(' ');
+  });
+  
+  // 인과관계 검증 (맥락 혼합 여부 확인)
+  question = validateCausalFlow(question, scenarioType);
+  
+  // 800자 제한
+  if (question.length > 800) {
+    question = question.substring(0, 797) + '...';
+  }
+  
+  return question;
+}
+
+// ============================================
+// 인과관계 검증 함수 (맥락 혼합 방지)
+// - 신규 시나리오에서 기존 보험 키워드 발견 시 제거
+// - 기존 시나리오에서 신규 제안 키워드 발견 시 제거
+// ============================================
+function validateCausalFlow(question, scenarioType) {
+  // 신규 시나리오에서 금지할 키워드 (기존 보험 관련)
+  const OLD_KEYWORDS = ['년 전 가입', '년 전에 들어', '예전에 들은', '기존 보험', '증권 발견', '서랍에서', '리모델링'];
+  
+  // 기존 시나리오에서 금지할 키워드 (신규 제안 관련)
+  const NEW_KEYWORDS = ['오늘 제안', '오늘 상담', '새로 가입', '새로 들려고', '이번주까지'];
+  
+  let result = question;
+  
+  if (scenarioType === 'NEW') {
+    // 신규 시나리오에서 기존 보험 키워드가 있으면 문제
+    for (const kw of OLD_KEYWORDS) {
+      if (result.includes(kw)) {
+        console.warn('[Context Mix Detected] NEW 시나리오에 OLD 키워드:', kw);
+        // 해당 문장 제거 대신 키워드만 삭제
+        result = result.replace(new RegExp(kw, 'g'), '');
+      }
+    }
+  } else if (scenarioType === 'OLD') {
+    // 기존 시나리오에서 신규 제안 키워드가 있으면 문제
+    for (const kw of NEW_KEYWORDS) {
+      if (result.includes(kw)) {
+        console.warn('[Context Mix Detected] OLD 시나리오에 NEW 키워드:', kw);
+        result = result.replace(new RegExp(kw, 'g'), '');
+      }
+    }
+  }
+  
+  // 연속 공백 정리
+  result = result.replace(/\\s{2,}/g, ' ').trim();
+  
+  return result;
+}
+
+// 바이럴 질문 생성 퍼포먼스 실행 (질문이 대장!)
+async function runViralQuestionPerformance(keyword) {
+  const overlay = document.getElementById('seoOverlay');
+  const progressFill = document.getElementById('seoProgressFill');
+  const resultBox = document.getElementById('seoResultKeyword');
+  const resultTitle = document.getElementById('seoResultTitle');
+  
+  // 초기화
+  overlay.classList.add('show');
+  progressFill.style.width = '0%';
+  resultBox.classList.remove('show');
+  VIRAL_ANALYSIS_STEPS.forEach(step => {
+    document.getElementById(step.id).classList.remove('active', 'done');
+  });
+  document.getElementById('apiCount').textContent = '대기';
+  document.getElementById('simCount').textContent = '0';
+  document.getElementById('matchCount').textContent = '0';
+  document.getElementById('scoreCount').textContent = '-';
+  
+  let totalDuration = VIRAL_ANALYSIS_STEPS.reduce((sum, s) => sum + s.duration, 0);
+  let elapsed = 0;
+  
+  // 단계별 실행
+  for (let i = 0; i < VIRAL_ANALYSIS_STEPS.length; i++) {
+    const step = VIRAL_ANALYSIS_STEPS[i];
+    const stepEl = document.getElementById(step.id);
+    
+    // 활성화
+    stepEl.classList.add('active');
+    
+    // 카운터 애니메이션
+    if (step.counterType === 'number') {
+      animateCounter(step.counterId, step.counterEnd, step.duration);
+    } else {
+      setTimeout(() => {
+        document.getElementById(step.counterId).textContent = step.counterEnd;
+      }, step.duration * 0.8);
+    }
+    
+    // 프로그레스 바 업데이트
+    elapsed += step.duration;
+    progressFill.style.width = Math.round((elapsed / totalDuration) * 100) + '%';
+    
+    await new Promise(resolve => setTimeout(resolve, step.duration));
+    
+    // 완료 표시
+    stepEl.classList.remove('active');
+    stepEl.classList.add('done');
+  }
+  
+  // 결과 표시 - 바이럴 미끼 질문 생성
+  const viralQuestion = generateViralQuestion(keyword);
+  resultBox.classList.add('show');
+  typeWriter(resultTitle, viralQuestion, 25, () => {
+    // 1.2초 후 오버레이 닫고 입력창에 삽입
+    setTimeout(() => {
+      overlay.classList.remove('show');
+      // 입력창에 타이핑 효과로 삽입
+      searchEl.value = '';
+      typeWriterToInput(viralQuestion);
+    }, 1200);
+  });
+}
+
+// 입력창에 타이핑
+function typeWriterToInput(text) {
+  let i = 0;
+  function type() {
+    if (i < text.length) {
+      searchEl.value += text.charAt(i);
+      charEl.textContent = searchEl.value.length;
+      i++;
+      setTimeout(type, 25);
+    } else {
+      searchEl.focus();
+    }
+  }
+  type();
+}
+
+// 트렌드 선택 (바이럴 질문 퍼포먼스 포함)
+function selectTrend(el) {
+  document.querySelectorAll('.trend-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  const keyword = el.dataset.keyword;
+  
+  // 바이럴 질문 생성 퍼포먼스 실행 (질문이 대장!)
+  runViralQuestionPerformance(keyword);
+}
+
+// 저장된 결과 데이터 (탭 전환용)
+let resultData = null;
+let selectedTitle = 0;
+let selectedContent = 0;
+
+// 탭 전환
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector('[data-tab="' + tabName + '"]').classList.add('active');
+  document.getElementById('tab-' + tabName).classList.add('active');
+}
+
+// SEO 감사 리포트 렌더링
+function renderSeoAudit(seoAudit) {
+  const container = document.getElementById('seoAuditCard');
+  if (!seoAudit) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'flex';
+  const score = seoAudit.score || 95;
+  const grade = seoAudit.grade || 'S+';
+  const rank = seoAudit.rank_prediction || '1-3위';
+  const analysis = seoAudit.analysis || 'SEO 최적화 완료';
+  
+  container.innerHTML = 
+    '<div class="grade-badge">' +
+      '<div class="grade">' + grade + '</div>' +
+      '<div class="label">GRADE</div>' +
+    '</div>' +
+    '<div class="seo-stats">' +
+      '<div class="title"><i class="fas fa-chart-line"></i> SEO 감사 리포트</div>' +
+      '<div class="metrics">' +
+        '<div class="metric"><div class="value">' + score + '<small>/100</small></div><div class="name">SEO 점수</div></div>' +
+        '<div class="metric"><div class="value">' + rank + '</div><div class="name">예상 순위</div></div>' +
+      '</div>' +
+      '<div class="analysis"><i class="fas fa-lightbulb"></i> ' + analysis + '</div>' +
+    '</div>';
+}
+
+// 보장 분석 테이블 렌더링 (report_data)
+function renderReportData(reportData) {
+  const container = document.getElementById('reportTable');
+  if (!reportData || reportData.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'block';
+  
+  const statusLabel = { critical: '위험', essential: '필수', good: '양호' };
+  
+  let tableHtml = 
+    '<div class="table-header">' +
+      '<div class="table-title"><i class="fas fa-shield-alt"></i> 보장 분석 리포트</div>' +
+      '<button class="copy-btn" onclick="copyReportData()"><i class="fas fa-copy"></i> 테이블 복사</button>' +
+    '</div>' +
+    '<table>' +
+      '<thead><tr><th>보장 항목</th><th>현재 가입</th><th>권장 금액</th><th>상태</th></tr></thead>' +
+      '<tbody>';
+  
+  reportData.forEach(item => {
+    const statusClass = item.status || 'essential';
+    tableHtml += '<tr>' +
+      '<td class="item-name">' + (item.item || '-') + '</td>' +
+      '<td class="current">' + (item.current || '-') + '</td>' +
+      '<td class="target">' + (item.target || '-') + '</td>' +
+      '<td><span class="status-dot ' + statusClass + '">' + (statusLabel[statusClass] || statusClass) + '</span></td>' +
+    '</tr>';
+  });
+  
+  tableHtml += '</tbody></table>';
+  container.innerHTML = tableHtml;
+}
+
+// report_data 테이블 복사
+function copyReportData() {
+  if (!resultData || !resultData.report_data) return;
+  let text = '[보장 분석 리포트]' + String.fromCharCode(10);
+  text += '항목\\t현재 가입\\t권장 금액\\t상태' + String.fromCharCode(10);
+  resultData.report_data.forEach(function(item) {
+    text += (item.item || '-') + '\\t' + (item.current || '-') + '\\t' + (item.target || '-') + '\\t' + (item.status || '-') + String.fromCharCode(10);
+  });
+  navigator.clipboard.writeText(text);
+  alert('보장 분석 테이블이 복사되었습니다!');
+}
+
+// 바이럴 질문 렌더링
+function renderViralQuestions(questions) {
+  const container = document.getElementById('viralQuestions');
+  if (!questions || questions.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'block';
+  
+  let html = '<div class="section-title"><i class="fas fa-fire-alt"></i> 바이럴 질문 (댓글 유도)</div>';
+  questions.forEach((q, i) => {
+    const text = q.text || q;
+    html += '<div class="question"><span>' + (i+1) + '. ' + text + '</span>' +
+      '<button class="copy-btn" onclick="copyViralQuestion(' + i + ', this)"><i class="fas fa-copy"></i></button></div>';
+  });
+  container.innerHTML = html;
+}
+
+function copyViralQuestion(idx, btn) {
+  if (!resultData || !resultData.viral_questions) return;
+  const text = resultData.viral_questions[idx]?.text || resultData.viral_questions[idx];
+  navigator.clipboard.writeText(text);
+  btn.innerHTML = '<i class="fas fa-check"></i>';
+  setTimeout(() => { btn.innerHTML = '<i class="fas fa-copy"></i>'; }, 1000);
+}
+
+// 제목 탭 렌더링
+function renderTitles(titles) {
+  const container = document.getElementById('tab-titles');
+  if (!titles || titles.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">제목이 없습니다</div>';
+    return;
+  }
+  container.innerHTML = titles.map((t, i) => 
+    '<div class="item-card' + (i === selectedTitle ? ' selected' : '') + '" onclick="selectTitle(' + i + ')">' +
+      '<div class="item-header">' +
+        '<div class="item-label"><span class="num">' + (i+1) + '</span> 제목 ' + (i+1) + '</div>' +
+        '<div class="item-actions">' +
+          '<button class="copy-btn" onclick="event.stopPropagation();copyItem(\\'title\\', ' + i + ', this)"><i class="fas fa-copy"></i> 복사</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="item-text">' + (t.text || t) + '</div>' +
+    '</div>'
+  ).join('');
+  document.getElementById('titleCount').textContent = titles.length;
+}
+
+// 본문 탭 렌더링
+function renderContents(contents) {
+  const container = document.getElementById('tab-contents');
+  if (!contents || contents.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">본문이 없습니다</div>';
+    return;
+  }
+  const styleMap = {
+    '공감형': 'empathy',
+    '정보형': 'info', 
+    '영업형': 'sales'
+  };
+  container.innerHTML = contents.map((c, i) => {
+    const text = c.text || c;
+    const style = c.style || ['공감형', '정보형', '영업형'][i] || '기본';
+    const charCount = text.length;
+    return '<div class="item-card' + (i === selectedContent ? ' selected' : '') + '" onclick="selectContent(' + i + ')">' +
+      '<div class="item-header">' +
+        '<div class="item-label"><span class="num">' + (i+1) + '</span> 본문 ' + (i+1) + ' <span class="style-tag ' + (styleMap[style] || 'info') + '">' + style + '</span></div>' +
+        '<div class="item-actions">' +
+          '<button class="copy-btn" onclick="event.stopPropagation();copyItem(\\'content\\', ' + i + ', this)"><i class="fas fa-copy"></i> 복사</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="item-text" style="white-space:pre-wrap">' + text + '</div>' +
+      '<div class="item-meta"><span class="char-badge"><i class="fas fa-text-width"></i> ' + charCount + '자</span></div>' +
+    '</div>';
+  }).join('');
+  document.getElementById('contentCount').textContent = contents.length;
+}
+
+// 댓글/키워드 탭 렌더링
+function renderExtras(comments, keywords, imageAnalysis) {
+  const container = document.getElementById('tab-extras');
+  let html = '';
+  
+  // 이미지 분석 결과
+  if (imageAnalysis) {
+    html += '<div style="margin-bottom:20px">';
+    html += '<h4 style="color:var(--primary);margin-bottom:12px;font-size:14px"><i class="fas fa-image"></i> 이미지 분석</h4>';
+    html += '<div class="item-card"><div class="item-text" style="white-space:pre-wrap">' + imageAnalysis + '</div></div>';
+    html += '</div>';
+  }
+  
+  // SEO 키워드
+  if (keywords && keywords.length > 0) {
+    html += '<div style="margin-bottom:20px">';
+    html += '<h4 style="color:var(--accent);margin-bottom:12px;font-size:14px"><i class="fas fa-hashtag"></i> SEO 키워드</h4>';
+    html += '<div class="keyword-list">';
+    keywords.forEach(k => {
+      html += '<span class="keyword-tag" onclick="copyKeyword(this, \\'' + k + '\\')"><i class="fas fa-copy"></i> ' + k + '</span>';
+    });
+    html += '</div></div>';
+  }
+  
+  // 댓글
+  if (comments && comments.length > 0) {
+    html += '<h4 style="color:var(--orange);margin-bottom:12px;font-size:14px"><i class="fas fa-comments"></i> 여론 조작 댓글 (' + comments.length + '개)</h4>';
+    comments.forEach((c, i) => {
+      const text = c.text || c;
+      const nickname = c.nickname || '카페회원' + (i+1);
+      const persona = c.persona || '';
+      html += '<div class="item-card">' +
+        '<div class="item-header">' +
+          '<div class="item-label"><span class="num">' + (i+1) + '</span> @' + nickname + (persona ? ' <small style="color:var(--text-muted)">(' + persona + ')</small>' : '') + '</div>' +
+          '<div class="item-actions">' +
+            '<button class="copy-btn" onclick="copyItem(\\'comment\\', ' + i + ', this)"><i class="fas fa-copy"></i> 복사</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="item-text">' + text + '</div>' +
+      '</div>';
+    });
+  }
+  
+  container.innerHTML = html || '<div style="text-align:center;color:var(--text-muted);padding:40px">데이터가 없습니다</div>';
+}
+
+// 선택 함수
+function selectTitle(idx) {
+  selectedTitle = idx;
+  renderTitles(resultData?.titles || []);
+}
+function selectContent(idx) {
+  selectedContent = idx;
+  renderContents(resultData?.contents || []);
+}
+
+// 개별 복사
+function copyItem(type, idx, btn) {
+  let text = '';
+  if (type === 'title' && resultData?.titles?.[idx]) {
+    text = resultData.titles[idx].text || resultData.titles[idx];
+  } else if (type === 'content' && resultData?.contents?.[idx]) {
+    text = resultData.contents[idx].text || resultData.contents[idx];
+  } else if (type === 'comment' && resultData?.comments?.[idx]) {
+    text = resultData.comments[idx].text || resultData.comments[idx];
+  }
+  if (text) {
+    navigator.clipboard.writeText(text);
+    btn.classList.add('copied');
+    btn.innerHTML = '<i class="fas fa-check"></i> 완료';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = '<i class="fas fa-copy"></i> 복사';
+    }, 1500);
+  }
+}
+
+function copyKeyword(el, keyword) {
+  navigator.clipboard.writeText(keyword);
+  el.style.background = 'var(--accent)';
+  el.style.color = '#fff';
+  setTimeout(() => {
+    el.style.background = '';
+    el.style.color = '';
+  }, 1000);
+}
+
+// 선택한 콘텐츠 전체 복사
+function copyAllContent() {
+  if (!resultData) return;
+  let text = '';
+  
+  // 선택된 제목
+  if (resultData.titles?.[selectedTitle]) {
+    text += '[제목]\\n' + (resultData.titles[selectedTitle].text || resultData.titles[selectedTitle]) + '\\n\\n';
+  }
+  
+  // 선택된 본문
+  if (resultData.contents?.[selectedContent]) {
+    text += '[본문]\\n' + (resultData.contents[selectedContent].text || resultData.contents[selectedContent]) + '\\n\\n';
+  }
+  
+  // SEO 키워드
+  if (resultData.seoKeywords?.length > 0) {
+    text += '[SEO 키워드]\\n' + resultData.seoKeywords.join(', ') + '\\n\\n';
+  }
+  
+  // 댓글 전체
+  if (resultData.comments?.length > 0) {
+    text += '[댓글]\\n';
+    resultData.comments.forEach((c, i) => {
+      const nickname = c.nickname || '회원' + (i+1);
+      text += '@' + nickname + ': ' + (c.text || c) + '\\n';
+    });
+  }
+  
+  navigator.clipboard.writeText(text);
+  alert('선택한 콘텐츠가 복사되었습니다!\\n\\n- 제목: #' + (selectedTitle+1) + '\\n- 본문: #' + (selectedContent+1) + ' (' + (resultData.contents?.[selectedContent]?.style || '기본') + ')\\n- 댓글: ' + (resultData.comments?.length || 0) + '개');
+}
+
+// ============================================
+// 🔥 SSE 스트리밍 버전 콘텐츠 생성 (타임아웃 방지)
+// 실시간으로 진행 상황 표시 + 본문 글자 단위 출력
+// ============================================
+async function goGenerateStream() {
+  const q = searchEl.value.trim();
+  if (!q) {
+    alert('핵심 고민을 입력해주세요');
+    searchEl.focus();
+    return;
+  }
+  
+  if (isGenerating) return;
+  isGenerating = true;
+  
+  // UI 초기화
+  btn.classList.add('loading');
+  btn.disabled = true;
+  trendSection.style.display = 'none';
+  hintSection.style.display = 'none';
+  resultSection.classList.add('show');
+  progressBox.style.display = 'block';
+  document.getElementById('tabNav').style.display = 'none';
+  document.querySelectorAll('.tab-content').forEach(c => c.innerHTML = '');
+  progressFill.style.width = '5%';
+  progressPct.textContent = '5%';
+  progressText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 🔌 SSE 스트리밍 연결 중...';
+  
+  // 실시간 데이터 저장용
+  let streamData = {
+    titles: [],
+    viral_questions: [],
+    contents: [{}, {}, {}],
+    comments: [],
+    seoKeywords: [],
+    report_data: [],
+    context_source: 'input'
+  };
+  
+  const requestData = { concern: q };
+  if (uploadedFiles.length > 0) {
+    requestData.image = uploadedFiles[0].base64;
+    requestData.mimeType = uploadedFiles[0].type;
+  }
+  
+  try {
+    const res = await fetch('/api/generate/full-package-stream', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(requestData)
+    });
+    
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\\n');
+      buffer = lines.pop() || '';
+      
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const event = JSON.parse(line);
           
-          if (d.items && Array.isArray(d.items)) {
-            d.items.forEach(item => {
-              html += '<tr><td>' + item.name + '</td><td style="text-align: right; font-weight: bold;">' + item.amount + '</td><td style="text-align: right;">' + item.premium + '</td></tr>';
-            });
+          switch (event.type) {
+            case 'step':
+              const stepPct = event.step * 15;
+              progressFill.style.width = stepPct + '%';
+              progressPct.textContent = stepPct + '%';
+              progressText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + event.msg;
+              break;
+              
+            case 'context_switch':
+              progressText.innerHTML = '<i class="fas fa-random" style="color:var(--orange)"></i> 🎯 Context Switch: ' + event.from + ' → ' + event.to;
+              break;
+              
+            case 'titles':
+              streamData.titles = event.data || [];
+              renderTitles(streamData.titles);
+              break;
+              
+            case 'viral_questions':
+              streamData.viral_questions = event.data || [];
+              renderViralQuestions(streamData.viral_questions);
+              break;
+              
+            case 'content_start':
+              progressText.innerHTML = '<i class="fas fa-pen-fancy fa-spin"></i> ✍️ 본문 #' + event.id + ' (' + event.style + ') 생성 중...';
+              progressFill.style.width = (50 + event.id * 10) + '%';
+              streamData.contents[event.id - 1] = { id: event.id, style: event.style, text: '' };
+              break;
+              
+            case 'content_chunk':
+              // 실시간 본문 출력
+              streamData.contents[event.id - 1].text += event.chunk;
+              renderContentsRealtime(streamData.contents);
+              break;
+              
+            case 'content_done':
+              progressText.innerHTML = '<i class="fas fa-check" style="color:var(--green)"></i> ✅ 본문 #' + event.id + ' 완료 (' + event.length + '자)';
+              break;
+              
+            case 'comments':
+              streamData.comments = event.data || [];
+              break;
+              
+            case 'complete':
+              // 최종 데이터 저장
+              resultData = event.package;
+              selectedTitle = 0;
+              selectedContent = 0;
+              
+              // 최종 렌더링
+              renderSeoAudit(resultData.seo_audit || { score: 95, grade: 'S+', rank_prediction: '1-3위' });
+              renderReportData(resultData.report_data);
+              renderViralQuestions(resultData.viral_questions);
+              renderTitles(resultData.titles || []);
+              renderContents(resultData.contents || []);
+              renderExtras(resultData.comments || [], resultData.seoKeywords || [], resultData.imageAnalysis);
+              
+              // 완료 처리
+              progressFill.style.width = '100%';
+              progressPct.textContent = '100%';
+              progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ SSE 스트리밍 완료! (v' + event.version + ')';
+              
+              setTimeout(() => {
+                progressBox.style.display = 'none';
+                document.getElementById('tabNav').style.display = 'flex';
+                switchTab('titles');
+              }, 1200);
+              break;
+              
+            case 'error':
+              progressBox.innerHTML = '<div style="text-align:center;color:var(--red);padding:20px"><i class="fas fa-exclamation-triangle"></i> 스트리밍 오류: ' + event.msg + '</div>';
+              break;
           }
-          
-          html += '</table>';
-          html += '<div style="text-align: right; font-size: 18px; font-weight: 900; margin-top: 20px; border-top: 2px solid #000; padding-top: 12px;">월 합계: ' + (d.total || '-') + '</div>';
-          html += '</div>';
-          
-          area.innerHTML = html;
-          showToast('설계서가 생성되었습니다!', 'success');
-        } else {
-          area.innerHTML = '<span style="color: #EF4444;">설계서 생성에 실패했습니다.</span>';
-          showToast('설계서 생성에 실패했습니다.', 'error');
+        } catch (e) {
+          console.error('SSE Parse Error:', e, line);
         }
-      } catch (error) {
-        area.innerHTML = '<span style="color: #EF4444;">네트워크 오류가 발생했습니다.</span>';
-        showToast('네트워크 오류가 발생했습니다.', 'error');
       }
     }
+    
+  } catch(e) {
+    progressBox.innerHTML = '<div style="text-align:center;color:var(--red);padding:20px"><i class="fas fa-exclamation-triangle"></i> 네트워크 오류: ' + e.message + '</div>';
+  }
+  
+  btn.classList.remove('loading');
+  btn.disabled = false;
+  isGenerating = false;
+}
 
-    // 다운로드 기능
-    function downloadTxt() {
-      const content = document.getElementById('content').innerText;
-      if (!content) {
-        showToast('먼저 콘텐츠를 생성해주세요!', 'warning');
-        return;
-      }
-      
-      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'XIVIX_' + state.insuranceType + '_' + new Date().toISOString().slice(0,10) + '.txt';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast('TXT 파일이 다운로드되었습니다!', 'success');
-    }
+// 실시간 본문 렌더링 (스트리밍용)
+function renderContentsRealtime(contents) {
+  const container = document.getElementById('tab-contents');
+  if (!container) return;
+  
+  const styles = { '공감형': 'empathy', '팩트형': 'info', '영업형': 'sales' };
+  
+  container.innerHTML = contents.filter(c => c && c.text).map((c, i) => {
+    const text = c.text || '';
+    const style = c.style || '기본';
+    const styleClass = styles[style] || 'info';
+    const charCount = text.length;
+    
+    return '<div class="item-card' + (i === selectedContent ? ' selected' : '') + '">' +
+      '<div class="item-header">' +
+        '<div class="item-label"><span class="num">' + (i+1) + '</span> <span class="style-tag ' + styleClass + '">' + style + '</span></div>' +
+        '<div class="item-meta"><span class="char-badge">' + charCount + '자 <span class="typing-cursor">|</span></span></div>' +
+      '</div>' +
+      '<div class="item-text" style="white-space:pre-wrap">' + text + '</div>' +
+    '</div>';
+  }).join('');
+}
 
-    function downloadPdf() {
-      const content = document.getElementById('content').innerText;
-      if (!content) {
-        showToast('먼저 콘텐츠를 생성해주세요!', 'warning');
-        return;
-      }
-      
-      const printWindow = window.open('', '_blank');
-      printWindow.document.write(\`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>XIVIX 2026 PRO - \${state.insuranceType}</title>
-          <style>
-            body { font-family: 'Malgun Gothic', sans-serif; padding: 40px; line-height: 1.8; word-break: keep-all; }
-            h1 { color: #10B981; border-bottom: 3px solid #10B981; padding-bottom: 10px; }
-          </style>
-        </head>
-        <body>
-          <h1>XIVIX 2026 PRO - \${state.insuranceType}</h1>
-          <p><strong>타겟:</strong> \${state.target} | <strong>보험사:</strong> \${state.company} | <strong>스타일:</strong> \${state.style}</p>
-          <hr>
-          <pre style="white-space: pre-wrap; font-family: inherit;">\${content}</pre>
-        </body>
-        </html>
-      \`);
-      printWindow.document.close();
-      printWindow.print();
-    }
+// 바로 콘텐츠 생성 (기본 - 스트리밍 버전 사용)
+async function goGenerate() {
+  // 스트리밍 버전 호출
+  return goGenerateStream();
+}
 
-    function copyAll() {
-      const content = document.getElementById('content').innerText;
-      if (!content) {
-        showToast('먼저 콘텐츠를 생성해주세요!', 'warning');
-        return;
-      }
-      
-      navigator.clipboard.writeText(content).then(() => {
-        showToast('전체 내용이 복사되었습니다!', 'success');
-      });
-    }
-  </script>
+// 새로 시작
+function resetAndNew() {
+  searchEl.value = '';
+  charEl.textContent = '0';
+  resultData = null;
+  selectedTitle = 0;
+  selectedContent = 0;
+  resultSection.classList.remove('show');
+  trendSection.style.display = 'block';
+  hintSection.style.display = 'flex';
+  progressBox.style.display = 'block';
+  progressFill.style.width = '0';
+  progressPct.textContent = '0%';
+  document.getElementById('tabNav').style.display = 'flex';
+  document.querySelectorAll('.tab-content').forEach(c => c.innerHTML = '');
+  document.getElementById('seoAuditCard').style.display = 'none';
+  document.getElementById('reportTable').style.display = 'none';
+  document.getElementById('viralQuestions').style.display = 'none';
+  searchEl.focus();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+searchEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    goGenerate();
+  }
+});
+
+// 초기화 (처음 1회만 로드, 이후 수동 새로고침)
+loadTrends();
+</script>
 </body>
-</html>
-`
+</html>`
 
-// ============================================
-// 🔧 어드민 대시보드 페이지
-// ============================================
-const adminPageHtml = `
-<!DOCTYPE html>
+const adminPageHtml = `<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>XIVIX 2026 PRO | Admin Dashboard</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<title>XIVIX Admin</title>
 <style>
-  body { background: #0a0a0a; color: #fff; font-family: -apple-system, sans-serif; }
-  .card { background: rgba(18,18,18,0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; }
-  .stat-card { transition: all 0.3s ease; }
-  .stat-card:hover { transform: translateY(-4px); border-color: #10B981; }
+body{background:#0a0a0a;color:#fff;font-family:sans-serif;padding:24px}
+.wrap{max-width:600px;margin:0 auto}
+.header{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.icon{width:40px;height:40px;background:linear-gradient(135deg,#00D4FF,#A855F7);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+.card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px}
+.card-value{font-size:24px;font-weight:900;color:#00D4FF}
+.card-label{font-size:12px;color:rgba(255,255,255,0.5)}
+.links{display:flex;gap:8px}
+.links a{flex:1;padding:12px;text-align:center;border-radius:10px;text-decoration:none;font-size:13px}
+.links a:nth-child(1){background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00D4FF}
+.links a:nth-child(2){background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10B981}
+.links a:nth-child(3){background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:#F59E0B}
 </style>
 </head>
-<body class="p-6">
-  <div class="max-w-5xl mx-auto space-y-6">
-    <header class="flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center font-black">X</div>
-        <div>
-          <h1 class="text-xl font-black">Admin Dashboard</h1>
-          <p class="text-xs text-gray-500">XIVIX 2026 PRO</p>
-        </div>
-      </div>
-      <a href="/" class="px-3 py-2 bg-gray-800 rounded-lg text-sm hover:bg-gray-700 transition">
-        <i class="fas fa-arrow-left mr-2"></i>메인
-      </a>
-    </header>
-
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="card stat-card p-5">
-        <div class="text-2xl font-black text-green-500" id="totalKeys">-</div>
-        <div class="text-xs text-gray-400 mt-1">API 키</div>
-      </div>
-      <div class="card stat-card p-5">
-        <div class="text-2xl font-black text-blue-500" id="expertEngine">-</div>
-        <div class="text-xs text-gray-400 mt-1">전문가 엔진</div>
-      </div>
-      <div class="card stat-card p-5">
-        <div class="text-2xl font-black text-purple-500" id="dataEngine">-</div>
-        <div class="text-xs text-gray-400 mt-1">데이터 엔진</div>
-      </div>
-      <div class="card stat-card p-5">
-        <div class="text-2xl font-black text-orange-500">v2026.3</div>
-        <div class="text-xs text-gray-400 mt-1">버전</div>
-      </div>
-    </div>
-
-    <div class="card p-6">
-      <h2 class="font-bold mb-4"><i class="fas fa-link mr-2 text-green-500"></i>빠른 링크</h2>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <a href="/" class="p-3 bg-green-600/10 border border-green-600/20 rounded-xl text-center hover:bg-green-600/20 transition">
-          <i class="fas fa-home text-green-500 mb-1"></i>
-          <div class="text-xs">메인</div>
-        </a>
-        <a href="/api/docs" class="p-3 bg-blue-600/10 border border-blue-600/20 rounded-xl text-center hover:bg-blue-600/20 transition">
-          <i class="fas fa-book text-blue-500 mb-1"></i>
-          <div class="text-xs">API 문서</div>
-        </a>
-        <a href="/api/health" class="p-3 bg-purple-600/10 border border-purple-600/20 rounded-xl text-center hover:bg-purple-600/20 transition">
-          <i class="fas fa-heartbeat text-purple-500 mb-1"></i>
-          <div class="text-xs">Health</div>
-        </a>
-        <a href="/api/admin/stats" class="p-3 bg-orange-600/10 border border-orange-600/20 rounded-xl text-center hover:bg-orange-600/20 transition">
-          <i class="fas fa-chart-bar text-orange-500 mb-1"></i>
-          <div class="text-xs">Stats</div>
-        </a>
-      </div>
-    </div>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="icon">X</div>
+    <div><div style="font-size:18px;font-weight:800">Admin Dashboard</div><div style="font-size:12px;color:rgba(255,255,255,0.5)">XIVIX 2026 PRO v2026.6</div></div>
   </div>
-
-  <script>
-    fetch('/api/admin/stats')
-      .then(r => r.json())
-      .then(data => {
-        document.getElementById('totalKeys').innerText = data.totalKeys;
-        document.getElementById('expertEngine').innerText = data.engines.expert.split('-').pop();
-        document.getElementById('dataEngine').innerText = data.engines.data.split('-').pop();
-      });
-  </script>
+  <div class="cards">
+    <div class="card"><div id="keys" class="card-value">-</div><div class="card-label">API Keys</div></div>
+    <div class="card"><div class="card-value" style="color:#F59E0B">v2026.6</div><div class="card-label">Version</div></div>
+  </div>
+  <div class="links">
+    <a href="/">메인</a>
+    <a href="/api/health">Health</a>
+    <a href="/api/docs">Docs</a>
+  </div>
+</div>
+<script>fetch('/api/admin/stats').then(r=>r.json()).then(d=>{document.getElementById('keys').textContent=d.totalKeys})</script>
 </body>
-</html>
-`
+</html>`
 
 app.get('/', (c) => c.html(mainPageHtml))
 app.get('/admin', (c) => c.html(adminPageHtml))
