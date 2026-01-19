@@ -17,16 +17,15 @@ app.use('/*', cors())
 // 모델 설정 (용도별 분리)
 // ============================================
 // ============================================
-// ✅ XIVIX V39 FINAL_LOGIC_SYNC - 모델 설정 (최종 확정)
-// ⚠️ gemini-2.5-pro는 존재하지 않는 모델명! → gemini-1.5-pro-002가 정답
-// gemini-1.5-pro-002: 전문가 브레인 (답변 깊이 확보)
-// gemini-2.0-flash: 데이터 엔진 (빠른 처리, 제목/질문 생성)
+// ✅ XIVIX V39 ENGINE_SYNC_FINAL - 모델 최종 확정
+// ⚠️ gemini-1.5-pro-002는 404 에러 발생 (API에 없음)
+// ✅ gemini-2.5-pro는 API curl 조회 결과 정상 접근 확인됨
 // API 검증 완료: 2026.01.19
 // ============================================
 const ENGINE = {
   FLASH: 'gemini-2.0-flash',       // 데이터 엔진 (빠른 처리용)
-  PRO: 'gemini-1.5-pro-002',       // 전문가 브레인 (답변 깊이 확보) ← 정확한 모델명
-  VISION: 'gemini-1.5-pro-002'     // 이미지 OCR 분석용 (PRO와 통일)
+  PRO: 'gemini-2.5-pro',           // 전문가 브레인 (API 확인됨) ← 최종 확정
+  VISION: 'gemini-2.5-pro'         // 이미지 OCR 분석용 (PRO와 동일)
 }
 
 // ============================================
@@ -83,13 +82,13 @@ const EXPERT_KNOWLEDGE_BASE = {
 }
 
 // ============================================
-// XIVIX V39 마스터 프롬프트 엔진 v5.0 (최종 확정)
+// XIVIX V39 마스터 프롬프트 엔진 v5.0 (ENGINE_SYNC_FINAL)
 // 프로젝트: XIVIX_Insurance_King_2026
-// 모델: gemini-1.5-pro-002 (답변 깊이 확보) ← 정확한 모델명
+// 모델: gemini-2.5-pro (API 확인됨) ← 최종 확정
 // 핵심: 가변 본문 + 전문 지식 베이스
 // ============================================
 const MASTER_INSTRUCTION_V3 = {
-  model: 'gemini-1.5-pro-002',  // 정확한 모델명 (2026.01.19)
+  model: 'gemini-2.5-pro',  // API 확인됨 (2026.01.19)
   persona: '30년 경력 MDRT 보험왕 & 심리 영업 마스터',
   constraints: {
     text_limit: '본문은 공백 포함 1,200자 이상 (압도적 정보량)',
@@ -1049,8 +1048,8 @@ app.post('/api/generate/full-package-stream', async (c) => {
   const body = await c.req.json()
   const inputTopic = body.concern || body.topic || ''
   const trendKeyword = body.trend_keyword || ''
-  const image = body.image || null
-  const mimeType = body.mimeType || 'image/jpeg'
+  let image = body.image || null
+  let mimeType = body.mimeType || 'image/jpeg'
   
   return streamText(c, async (stream) => {
     try {
@@ -1063,6 +1062,24 @@ app.post('/api/generate/full-package-stream', async (c) => {
       
       const proKey = getApiKey(c.env, 'PRO')
       const flashKey = getApiKey(c.env, 'FLASH')
+      
+      // 🔥 이미지 URL → Base64 변환 (Gemini API는 base64 필요)
+      if (image && image.startsWith('http')) {
+        try {
+          await stream.write(JSON.stringify({ type: 'step', step: 0, msg: '🖼️ 이미지 다운로드 중...' }) + '\n')
+          const imgResponse = await fetch(image)
+          if (imgResponse.ok) {
+            const imgBuffer = await imgResponse.arrayBuffer()
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(imgBuffer)))
+            image = base64
+            // Content-Type에서 mime type 추출
+            const contentType = imgResponse.headers.get('content-type')
+            if (contentType) mimeType = contentType.split(';')[0]
+          }
+        } catch (e) {
+          await stream.write(JSON.stringify({ type: 'warning', msg: '이미지 다운로드 실패, URL 직접 분석 시도' }) + '\n')
+        }
+      }
       
       // Step 1: 이미지 분석 (우선순위 1)
       await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '🔍 API 연결 및 트렌드 분석 중...' }) + '\n')
@@ -1333,6 +1350,17 @@ ${style === '공감형' ? `
         if (contentResponse.ok) {
           const json = await contentResponse.json() as any
           const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          
+          // 🔥 디버그: API 응답 확인
+          console.log(`[XIVIX] Content #${i+1} API 응답 길이: ${rawText.length}`)
+          
+          if (!rawText) {
+            // API가 빈 응답을 반환한 경우 - finishReason 확인
+            const finishReason = json.candidates?.[0]?.finishReason || 'UNKNOWN'
+            console.log(`[XIVIX] Content #${i+1} finishReason: ${finishReason}`)
+            await stream.write(JSON.stringify({ type: 'content_error', id: i + 1, reason: finishReason }) + '\n')
+          }
+          
           try {
             // JSON 파싱 시도
             const parsed = JSON.parse(rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim())
@@ -1342,7 +1370,14 @@ ${style === '공감형' ? `
             fullText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').replace(/^\s*{\s*"text"\s*:\s*"|"\s*}\s*$/g, '').trim()
           }
           // 진행 상황 업데이트
-          await stream.write(JSON.stringify({ type: 'content_chunk', id: i + 1, chunk: fullText.substring(0, 50) + '...' }) + '\n')
+          if (fullText.length > 0) {
+            await stream.write(JSON.stringify({ type: 'content_chunk', id: i + 1, chunk: fullText.substring(0, 50) + '...' }) + '\n')
+          }
+        } else {
+          // API 호출 실패
+          const errorText = await contentResponse.text()
+          console.log(`[XIVIX] Content #${i+1} API 오류: ${contentResponse.status} - ${errorText.substring(0, 200)}`)
+          await stream.write(JSON.stringify({ type: 'content_error', id: i + 1, status: contentResponse.status, error: errorText.substring(0, 100) }) + '\n')
         }
         
         contents.push({ id: i + 1, style, text: fullText })
