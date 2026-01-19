@@ -1051,14 +1051,37 @@ app.post('/api/generate/full-package-stream', async (c) => {
   let image = body.image || null
   let mimeType = body.mimeType || 'image/jpeg'
   
+  // V39: API 요청에서 직접 전달된 OCR 데이터 (브라우저에서 미리 분석한 경우)
+  const requestImageAnalysis = body.imageAnalysis || ''
+  const requestOcrData = body.ocrData || null
+  
   return streamText(c, async (stream) => {
     try {
       // 🎯 Context Priority 시스템
       let contextSource = 'trend'
       let topic = trendKeyword || inputTopic
-      let imageAnalysis = ''
+      let imageAnalysis = requestImageAnalysis // API 요청에서 전달된 분석 데이터 우선 사용
       let reportData: any[] = []
       let imageDetectedKeyword = ''
+      
+      // V39: API 요청에서 OCR 데이터가 전달된 경우 바로 바인딩
+      if (requestOcrData) {
+        contextSource = 'image'
+        imageDetectedKeyword = requestOcrData.productName || ''
+        // OCR 데이터를 reportData 형태로 변환
+        if (requestOcrData.coverages && Array.isArray(requestOcrData.coverages)) {
+          reportData = requestOcrData.coverages.map((c: string, i: number) => ({
+            item: c.split(' ')[0] || `담보${i+1}`,
+            current: c,
+            target: '확인 필요',
+            status: 'info'
+          }))
+        }
+        // imageAnalysis가 비어있으면 OCR 데이터로 생성
+        if (!imageAnalysis && requestOcrData) {
+          imageAnalysis = `📋 보험증권 OCR 분석 결과\n🏢 ${requestOcrData.company || '보험사'} - ${requestOcrData.productName || '상품명'}\n💰 월 보험료: ${requestOcrData.premium || '확인 필요'}\n\n담보 내역:\n${(requestOcrData.coverages || []).map((c: string) => `- ${c}`).join('\n')}`
+        }
+      }
       
       const proKey = getApiKey(c.env, 'PRO')
       const flashKey = getApiKey(c.env, 'FLASH')
@@ -1262,9 +1285,15 @@ JSON 형식으로만 응답:
       const contents: any[] = []
       
       // 이미지 OCR 데이터가 있으면 본문에 강제 바인딩
-      const ocrDataBinding = reportData.length > 0 
-        ? `\n\n■ [이미지에서 추출한 담보 정보 - 반드시 답변에 언급할 것!]\n${reportData.map((r: any) => `- ${r.item}: 현재 ${r.current || '미가입'} → 권장 ${r.target || '확인 필요'} (${r.status === 'critical' ? '⚠️위험' : r.status === 'essential' ? '📌필수' : '✅양호'})`).join('\n')}`
-        : ''
+      // V39 마스터 지시: "이미지 업로드해서 데이터 안 박히면 OCR 연결 고장 난 거니까 배포 중단"
+      let ocrDataBinding = ''
+      if (reportData.length > 0) {
+        ocrDataBinding = `\n\n■ [이미지에서 추출한 담보 정보 - 반드시 답변에 언급할 것!]\n${reportData.map((r: any) => `- ${r.item}: 현재 ${r.current || '미가입'} → 권장 ${r.target || '확인 필요'} (${r.status === 'critical' ? '⚠️위험' : r.status === 'essential' ? '📌필수' : '✅양호'})`).join('\n')}`
+      }
+      // imageAnalysis가 있으면 추가 바인딩 (보험사명, 상품명, 보험료 등)
+      if (imageAnalysis) {
+        ocrDataBinding += `\n\n🔴🔴🔴 [OCR 데이터 강제 바인딩 - 반드시 본문에 인용!] 🔴🔴🔴\n${imageAnalysis}\n→ 위 정보(보험사명, 상품명, 월 보험료 금액)를 본문에 구체적으로 언급해야 합니다!`
+      }
       
       // 사용자 입력 원본 강제 바인딩
       const userInputBinding = userContextAngle 
@@ -1326,12 +1355,17 @@ ${expertKnowledge}
 
 📌 [${style} 작성 필수 구조 - ❶❷❸ 순차 사용 강제!]
 ${style === '공감형' ? `
-■ 반드시 아래 3단계 구조로 작성:
-❶ [공감 시작] "저도 같은 고민 했어요" - 독자의 감정에 먼저 공감
-❷ [핵심 정보] 2~3가지 핵심 포인트를 ■ 기호와 ✔️로 정리
-❸ [따뜻한 마무리] "함께 고민해드릴게요" - 도움 의지 표현
+■ 반드시 아래 3단계 구조로 작성 (❶❷❸ 기호 3개 전부 필수!):
 
-⚠️ ❶→❷→❸ 순서로 3개 모두 반드시 포함! 하나라도 누락 시 불합격!
+❶ [첫 번째 단락] 공감으로 시작 - "저도 같은 고민 했어요"
+
+❷ [두 번째 단락] 핵심 정보 2~3가지를 ■ 기호와 ✔️로 정리
+   ↳ 반드시 "❷"로 시작하는 문단이 있어야 함!
+
+❸ [세 번째 단락] 따뜻한 마무리 - "함께 고민해드릴게요"
+
+🚨 공감형도 ❶❷❸ 3개 기호 전부 텍스트에 포함되어야 합격!
+🚨 ■ 기호만 쓰고 ❷를 빼먹으면 불합격! ❷ 반드시 포함!
 ` : style === '팩트형' ? `
 ■ 반드시 아래 3단계 구조로 작성:
 ❶ [팩트 시작] 숫자와 통계로 시작 (예: 40대 남성 암 발병률 3.1배)
