@@ -4791,22 +4791,32 @@ async function downloadGeneratedImage() {
     return;
   }
   
+  // ============================================
+  // ✅ CEO 지시 (2026.01.19) - 다운로드 로직 수정
+  // Cloudinary 이미지는 CORS 문제로 fetch 불가
+  // fl_attachment 파라미터로 직접 다운로드 URL 생성
+  // ============================================
   try {
-    const response = await fetch(generatedImageUrl);
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
+    // Cloudinary URL에 fl_attachment 추가하여 강제 다운로드
+    let downloadUrl = generatedImageUrl;
+    if (generatedImageUrl.includes('cloudinary.com')) {
+      // /upload/ 뒤에 fl_attachment 삽입
+      downloadUrl = generatedImageUrl.replace('/upload/', '/upload/fl_attachment/');
+    }
     
+    // 새 탭에서 다운로드 (브라우저가 자동으로 파일 저장)
     const a = document.createElement('a');
-    a.href = url;
-    a.download = 'XIVIX_마케팅이미지_' + Date.now() + '.png';
+    a.href = downloadUrl;
+    a.download = 'XIVIX_마케팅이미지_' + Date.now() + '.jpg';
+    a.target = '_blank';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    
+    console.log('[XIVIX] 다운로드 URL:', downloadUrl);
     
   } catch (error) {
     console.error('[XIVIX] 이미지 다운로드 오류:', error);
-    // 직접 링크 열기 (fallback)
     window.open(generatedImageUrl, '_blank');
   }
 }
