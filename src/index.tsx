@@ -561,6 +561,166 @@ function generateRealtimeTrends() {
   })
 }
 
+// ============================================
+// [4번] 약관 페이지 - CEO v2026.30 지시
+// ============================================
+
+// 서비스 이용약관 페이지
+app.get('/terms', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>서비스 이용약관 - XIVIX 2026 PRO</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0f;color:#e5e5e5;line-height:1.8;padding:40px 20px}
+    .container{max-width:800px;margin:0 auto}
+    .logo{display:flex;align-items:center;gap:12px;margin-bottom:40px}
+    .logo-icon{width:40px;height:40px;background:linear-gradient(135deg,#4F8CFF,#00FF85);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff}
+    .logo-text{font-size:20px;font-weight:700;color:#fff}
+    .logo-text span{background:linear-gradient(135deg,#4F8CFF,#00FF85);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    h1{font-size:28px;margin-bottom:24px;color:#fff}
+    h2{font-size:20px;margin:32px 0 16px;color:#4F8CFF;border-bottom:1px solid #333;padding-bottom:8px}
+    h3{font-size:16px;margin:24px 0 12px;color:#00FF85}
+    p,li{font-size:15px;color:#b5b5b5;margin-bottom:12px}
+    ul{padding-left:24px}
+    .highlight{background:rgba(79,140,255,0.1);border-left:3px solid #4F8CFF;padding:16px;margin:16px 0;border-radius:0 8px 8px 0}
+    .back-btn{display:inline-flex;align-items:center;gap:8px;color:#4F8CFF;text-decoration:none;margin-top:40px;font-size:14px}
+    .back-btn:hover{text-decoration:underline}
+    .updated{font-size:12px;color:#666;margin-top:40px;padding-top:20px;border-top:1px solid #222}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="logo">
+      <div class="logo-icon">X</div>
+      <div class="logo-text">XIVIX <span>2026</span> PRO</div>
+    </a>
+    
+    <h1>서비스 이용약관</h1>
+    
+    <h2>제1조 (목적)</h2>
+    <p>본 약관은 XIVIX / Combine Technology & Business(이하 '회사')가 제공하는 AI 보험 콘텐츠 생성 서비스 'XIVIX 2026 PRO'의 이용 조건 및 절차에 관한 사항을 규정함을 목적으로 합니다.</p>
+    
+    <h2>제2조 (서비스의 제공 및 제한)</h2>
+    <h3>1. 서비스 내용</h3>
+    <p>회사는 이용자에게 AI를 활용한 보험 마케팅 콘텐츠 생성 서비스를 제공합니다.</p>
+    
+    <h3>2. 이용 제한</h3>
+    <div class="highlight">
+      <p>서비스의 품질 유지 및 운영 비용 관리를 위해, 이용자는 <strong>1일 최대 4회</strong>의 콘텐츠 생성 기회를 가집니다.</p>
+      <p>잔여 횟수는 <strong>매일 00:00(KST)</strong>에 초기화됩니다.</p>
+    </div>
+    
+    <h3>3. 계정 관리</h3>
+    <p>본 서비스는 <strong>1인 1계정 상시 접속</strong>을 원칙으로 하며, 중복 로그인이 감지될 경우 기존 세션은 즉시 종료됩니다.</p>
+    
+    <h2>제3조 (회원가입 및 인증)</h2>
+    <p>본 서비스는 이용자의 편의를 위해 <strong>카카오 간편로그인(Kakao Sync)</strong> 인증 체계를 채택하며, 이용자는 카카오 계정을 통해 본 약관에 동의함으로써 가입이 완료됩니다.</p>
+    
+    <h2>제4조 (지식재산권 및 책임 제한)</h2>
+    <ul>
+      <li>생성된 콘텐츠의 저작권은 이용자에게 귀속되나, AI 모델의 로직 및 시스템에 대한 권리는 회사에 있습니다.</li>
+      <li>본 서비스가 제공하는 분석 결과는 AI에 의한 참고 자료이며, 보험 법리적 최종 판단 및 영업 결과에 대한 책임은 이용자 본인에게 있습니다.</li>
+    </ul>
+    
+    <a href="/" class="back-btn">← 메인으로 돌아가기</a>
+    
+    <p class="updated">최종 업데이트: 2026년 1월 19일</p>
+  </div>
+</body>
+</html>`)
+})
+
+// 개인정보 처리방침 페이지
+app.get('/privacy', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>개인정보 처리방침 - XIVIX 2026 PRO</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0f;color:#e5e5e5;line-height:1.8;padding:40px 20px}
+    .container{max-width:800px;margin:0 auto}
+    .logo{display:flex;align-items:center;gap:12px;margin-bottom:40px}
+    .logo-icon{width:40px;height:40px;background:linear-gradient(135deg,#4F8CFF,#00FF85);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff}
+    .logo-text{font-size:20px;font-weight:700;color:#fff}
+    .logo-text span{background:linear-gradient(135deg,#4F8CFF,#00FF85);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    h1{font-size:28px;margin-bottom:24px;color:#fff}
+    h2{font-size:20px;margin:32px 0 16px;color:#4F8CFF;border-bottom:1px solid #333;padding-bottom:8px}
+    h3{font-size:16px;margin:24px 0 12px;color:#00FF85}
+    p,li{font-size:15px;color:#b5b5b5;margin-bottom:12px}
+    ul{padding-left:24px}
+    table{width:100%;border-collapse:collapse;margin:16px 0}
+    th,td{padding:12px;text-align:left;border:1px solid #333}
+    th{background:rgba(79,140,255,0.1);color:#4F8CFF;font-weight:600}
+    td{color:#b5b5b5}
+    .highlight{background:rgba(79,140,255,0.1);border-left:3px solid #4F8CFF;padding:16px;margin:16px 0;border-radius:0 8px 8px 0}
+    .back-btn{display:inline-flex;align-items:center;gap:8px;color:#4F8CFF;text-decoration:none;margin-top:40px;font-size:14px}
+    .back-btn:hover{text-decoration:underline}
+    .updated{font-size:12px;color:#666;margin-top:40px;padding-top:20px;border-top:1px solid #222}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="logo">
+      <div class="logo-icon">X</div>
+      <div class="logo-text">XIVIX <span>2026</span> PRO</div>
+    </a>
+    
+    <h1>개인정보 처리방침</h1>
+    
+    <h2>1. 수집하는 개인정보 항목</h2>
+    <p>회사는 카카오 간편로그인 연동을 통해 아래의 정보를 수집합니다.</p>
+    
+    <table>
+      <tr>
+        <th>구분</th>
+        <th>수집 항목</th>
+      </tr>
+      <tr>
+        <td>필수 항목</td>
+        <td>닉네임(이름), 카카오 계정(이메일), 전화번호</td>
+      </tr>
+    </table>
+    
+    <h2>2. 수집 및 이용 목적</h2>
+    <ul>
+      <li>서비스 이용에 따른 본인 식별 및 회원 관리</li>
+      <li>일일 사용량(4회) 제한 로직 적용 및 중복 로그인 방지</li>
+      <li>보험 트렌드 및 XIVIX 서비스 관련 마케팅 정보 전달</li>
+    </ul>
+    
+    <h2>3. 보유 및 이용 기간</h2>
+    <div class="highlight">
+      <p>회원 탈퇴 시 또는 서비스 종료 시까지 보유하며, 법령에서 정한 기간 동안 안전하게 보관 후 파기합니다.</p>
+    </div>
+    
+    <h2>4. 개인정보의 제3자 제공</h2>
+    <p>회사는 이용자의 개인정보를 원칙적으로 외부에 제공하지 않습니다. 다만, 아래의 경우에는 예외로 합니다.</p>
+    <ul>
+      <li>이용자가 사전에 동의한 경우</li>
+      <li>법령의 규정에 의거하거나, 수사 목적으로 법령에 정해진 절차와 방법에 따라 수사기관의 요구가 있는 경우</li>
+    </ul>
+    
+    <h2>5. 개인정보의 파기</h2>
+    <p>회사는 개인정보 보유기간의 경과, 처리목적 달성 등 개인정보가 불필요하게 되었을 때에는 지체없이 해당 개인정보를 파기합니다.</p>
+    
+    <h2>6. 이용자 권리</h2>
+    <p>이용자는 언제든지 본인의 개인정보를 조회하거나 수정할 수 있으며, 회원탈퇴를 요청할 수 있습니다.</p>
+    
+    <a href="/" class="back-btn">← 메인으로 돌아가기</a>
+    
+    <p class="updated">최종 업데이트: 2026년 1월 19일</p>
+  </div>
+</body>
+</html>`)
+})
+
 // 네이버 실시간 검색 트렌드 API
 app.get('/api/trend', async (c) => {
   const clientId = c.env?.NAVER_CLIENT_ID || ''
@@ -1819,53 +1979,88 @@ body{
    - Mobile: 1컬럼 Stack + 입력창 하단 Sticky
    ============================================ */
 
-/* 레이아웃 - 화면 전체 활용 (상단 압축) */
+/* ============================================
+   [1번] CEO 마스터 업데이트 v2026.30
+   상단 여백 70% 축소 + 로고 좌측 상단 이동
+   ============================================ */
 .wrapper{
   display:flex;
   flex-direction:column;
-  align-items:center;
+  align-items:stretch;  /* 전체 너비 활용 */
   width:100%;
   max-width:100%;
-  gap:clamp(12px, 2vh, 20px);  /* 60% 압축: 32px → 20px */
-  padding-top:clamp(8px, 1.5vh, 16px);  /* 60% 압축: 40px → 16px */
+  gap:8px;  /* 70% 압축: 24px → 8px */
+  padding:8px 16px;  /* 최소 패딩 */
 }
 
-/* 네비게이션 */
-.nav{
-  position:fixed;
-  top:clamp(12px, 2vw, 24px);
-  right:clamp(12px, 2vw, 24px);
+/* 상단 헤더 바 - 로고 좌측, 사용량 중앙, 메뉴 우측 */
+.top-header{
   display:flex;
-  gap:clamp(8px, 1.5vw, 16px);
-  z-index:100;
+  align-items:center;
+  justify-content:space-between;
+  width:100%;
+  padding:8px 0;
+  border-bottom:1px solid var(--border);
+  margin-bottom:8px;
 }
-.nav a{
+.top-header .logo{
+  margin:0;
+  justify-content:flex-start;
+}
+.top-header .usage-badge{
+  background:linear-gradient(135deg, var(--primary-soft), rgba(0,255,133,0.1));
+  border:1px solid var(--primary);
+  border-radius:20px;
+  padding:6px 16px;
+  font-size:13px;
+  font-weight:600;
+  color:var(--primary);
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.top-header .usage-badge .count{
+  background:var(--primary);
+  color:#000;
+  border-radius:12px;
+  padding:2px 8px;
+  font-weight:700;
+}
+.top-header .header-nav{
+  display:flex;
+  gap:8px;
+}
+.top-header .header-nav a{
   color:var(--text-muted);
   text-decoration:none;
-  font-size:clamp(11px, 1.2vw, 13px);
-  padding:8px 12px;
-  border-radius:8px;
+  font-size:12px;
+  padding:6px 12px;
+  border-radius:6px;
   background:var(--card-bg);
   border:1px solid var(--border);
   transition:all 0.2s;
-  display:flex;
-  align-items:center;
-  gap:6px;
 }
-.nav a:hover{color:var(--primary);border-color:var(--primary-soft);background:var(--primary-soft)}
+.top-header .header-nav a:hover{
+  color:var(--primary);
+  border-color:var(--primary);
+}
 
-/* 로고 - 슬림화 (CEO 지시) */
+/* 네비게이션 - 상단 헤더에 통합됨 (기존 고정 nav 제거) */
+.nav{
+  display:none;  /* 상단 헤더로 대체 */
+}
+
+/* 로고 - 슬림화 + 좌측 정렬 (CEO v2026.30 지시) */
 .logo{
   display:flex;
   align-items:center;
-  justify-content:center;
-  gap:clamp(8px, 1vw, 12px);  /* 슬림화 */
+  gap:8px;
 }
 .logo-icon{
-  width:clamp(32px, 4vw, 40px);  /* 슬림화: 56px → 40px */
-  height:clamp(32px, 4vw, 40px);
+  width:32px;
+  height:32px;
   background:linear-gradient(135deg, var(--primary), var(--accent));
-  border-radius:clamp(8px, 1vw, 12px);
+  border-radius:8px;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -1875,8 +2070,8 @@ body{
   box-shadow:0 0 20px rgba(79,140,255,0.2);
 }
 .logo-text{
-  font-size:clamp(18px, 2.5vw, 26px);  /* 슬림화: 32px → 26px */
-  font-weight:800;
+  font-size:18px;  /* 슬림화 */
+  font-weight:700;
   letter-spacing:-0.5px;
 }
 .logo-text span{
@@ -1886,12 +2081,9 @@ body{
   background-clip:text;
 }
 
-/* 타이틀 */
+/* 타이틀 - 숨김 (상단 압축으로 제거) */
 .title{
-  font-size:clamp(14px, 1.8vw, 18px);
-  color:var(--text-muted);
-  font-weight:400;
-  text-align:center;
+  display:none;
 }
 
 /* 메인 컨테이너 - 2컬럼 Grid (PC/Tablet), 1컬럼 (Mobile) */
@@ -1925,19 +2117,80 @@ body{
 .main-right::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
 /* 모바일: 1컬럼 Stack */
+/* ============================================
+   [1번] 모바일 반응형 - CEO v2026.30 지시
+   상단: 결과물 / 하단: 고정 입력바 (Sticky Input)
+   ============================================ */
 @media(max-width:900px){
+  .wrapper{
+    padding:8px;
+  }
+  .top-header{
+    flex-wrap:wrap;
+    gap:8px;
+    padding:8px 4px;
+  }
+  .top-header .logo{
+    order:1;
+  }
+  .top-header .usage-badge{
+    order:3;
+    width:100%;
+    justify-content:center;
+    font-size:12px;
+    padding:4px 12px;
+  }
+  .top-header .header-nav{
+    order:2;
+    margin-left:auto;
+  }
   .main{
     grid-template-columns:1fr;
     max-width:100%;
+    gap:12px;
   }
   .main-left{
-    position:relative;
-    top:0;
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+    top:auto;
+    background:var(--bg);
+    z-index:100;
+    padding:12px;
+    border-top:1px solid var(--border);
+    box-shadow:0 -4px 20px rgba(0,0,0,0.3);
+    max-height:45vh;
+    overflow-y:auto;
+  }
+  .main-left .trend-section{
+    display:none;  /* 모바일에서 트렌드 숨김 */
   }
   .main-right{
     max-height:none;
     overflow-y:visible;
-    order:-1;  /* 결과물 상단 배치 (CEO 지시) */
+    order:-1;
+    padding-bottom:200px;  /* 하단 입력바 공간 확보 */
+  }
+  /* 모바일 트렌드 토글 버튼 */
+  .mobile-trend-toggle{
+    display:flex !important;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:10px;
+    background:var(--card-bg);
+    border:1px solid var(--border);
+    border-radius:8px;
+    color:var(--text-muted);
+    font-size:13px;
+    cursor:pointer;
+    margin-top:8px;
+  }
+}
+@media(min-width:901px){
+  .mobile-trend-toggle{
+    display:none;
   }
 }
 
@@ -2583,6 +2836,35 @@ body{
   background:linear-gradient(135deg, rgba(16,185,129,0.15), rgba(79,140,255,0.1));
   border:1px solid rgba(16,185,129,0.3);
   border-radius:12px;
+}
+
+/* [1번] 완료 가이드 팝업 - CEO 지시 */
+.completion-guide{
+  margin-top:12px;
+  padding:16px;
+  background:linear-gradient(135deg, rgba(0,255,133,0.15), rgba(79,140,255,0.1));
+  border:2px solid var(--primary);
+  border-radius:12px;
+  text-align:center;
+  animation:guideGlow 2s infinite;
+}
+.completion-guide .guide-arrow{
+  font-size:24px;
+  animation:bounce 1s infinite;
+  color:var(--primary);
+}
+.completion-guide .guide-text{
+  font-size:14px;
+  color:var(--text);
+  margin-top:8px;
+}
+@keyframes guideGlow{
+  0%,100%{box-shadow:0 0 10px rgba(0,255,133,0.3)}
+  50%{box-shadow:0 0 25px rgba(0,255,133,0.5)}
+}
+@keyframes bounce{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(5px)}
   display:flex;
   align-items:center;
   gap:10px;
@@ -3254,9 +3536,271 @@ body{
     box-shadow:0 0 30px rgba(0,255,133,0.1) !important;
   }
 }
+
+/* ============================================
+   [2번] 카카오 로그인 환영 모달 - CEO v2026.30
+   ============================================ */
+.welcome-modal-overlay{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.85);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10000;
+  opacity:0;
+  visibility:hidden;
+  transition:all 0.3s ease;
+}
+.welcome-modal-overlay.show{
+  opacity:1;
+  visibility:visible;
+}
+.welcome-modal{
+  background:linear-gradient(135deg, #1a1a2e, #16213e);
+  border:1px solid rgba(0,255,133,0.3);
+  border-radius:24px;
+  padding:40px;
+  max-width:480px;
+  width:90%;
+  text-align:center;
+  box-shadow:0 0 60px rgba(0,255,133,0.2);
+  transform:scale(0.9);
+  transition:transform 0.3s ease;
+}
+.welcome-modal-overlay.show .welcome-modal{
+  transform:scale(1);
+}
+.welcome-modal .modal-icon{
+  width:80px;
+  height:80px;
+  background:linear-gradient(135deg, var(--primary), #00FF85);
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:0 auto 24px;
+  font-size:36px;
+}
+.welcome-modal .modal-title{
+  font-size:22px;
+  font-weight:700;
+  color:#fff;
+  margin-bottom:8px;
+}
+.welcome-modal .modal-subtitle{
+  font-size:14px;
+  color:var(--text-muted);
+  line-height:1.6;
+  margin-bottom:24px;
+}
+.welcome-modal .modal-badge{
+  background:linear-gradient(135deg, rgba(0,255,133,0.15), rgba(79,140,255,0.1));
+  border:1px solid var(--primary);
+  border-radius:12px;
+  padding:16px;
+  margin-bottom:24px;
+}
+.welcome-modal .modal-badge-title{
+  font-size:12px;
+  color:var(--text-muted);
+  margin-bottom:8px;
+}
+.welcome-modal .modal-badge-value{
+  font-size:28px;
+  font-weight:900;
+  color:var(--primary);
+}
+.welcome-modal .modal-features{
+  text-align:left;
+  margin-bottom:24px;
+}
+.welcome-modal .modal-feature{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding:10px 0;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.welcome-modal .modal-feature:last-child{
+  border-bottom:none;
+}
+.welcome-modal .modal-feature i{
+  color:var(--primary);
+  font-size:14px;
+  margin-top:2px;
+}
+.welcome-modal .modal-feature span{
+  font-size:13px;
+  color:var(--text);
+  line-height:1.5;
+}
+.welcome-modal .modal-cta{
+  background:linear-gradient(135deg, var(--primary), #00FF85);
+  color:#000;
+  border:none;
+  border-radius:12px;
+  padding:14px 32px;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  width:100%;
+  transition:all 0.2s;
+}
+.welcome-modal .modal-cta:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 25px rgba(0,255,133,0.3);
+}
+
+/* [3번] 미로그인 잠금 UI */
+.locked-overlay{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.9);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:9000;
+  opacity:0;
+  visibility:hidden;
+  transition:all 0.3s ease;
+}
+.locked-overlay.show{
+  opacity:1;
+  visibility:visible;
+}
+.locked-content{
+  text-align:center;
+  max-width:400px;
+  padding:40px;
+}
+.locked-content .lock-icon{
+  font-size:64px;
+  color:var(--primary);
+  margin-bottom:24px;
+}
+.locked-content .lock-title{
+  font-size:20px;
+  font-weight:700;
+  color:#fff;
+  margin-bottom:12px;
+}
+.locked-content .lock-desc{
+  font-size:14px;
+  color:var(--text-muted);
+  line-height:1.6;
+  margin-bottom:24px;
+}
+.kakao-login-btn{
+  background:#FEE500;
+  color:#000;
+  border:none;
+  border-radius:12px;
+  padding:14px 24px;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  width:100%;
+  transition:all 0.2s;
+}
+.kakao-login-btn:hover{
+  background:#F5DC00;
+  transform:translateY(-2px);
+}
+.kakao-login-btn img{
+  width:20px;
+  height:20px;
+}
+.terms-link{
+  font-size:12px;
+  color:var(--text-muted);
+  margin-top:16px;
+}
+.terms-link a{
+  color:var(--primary);
+  text-decoration:underline;
+}
+
+/* 결과물 영역 블러 효과 (미로그인 시) */
+.result-section.blurred{
+  filter:blur(8px);
+  pointer-events:none;
+  user-select:none;
+}
 </style>
 </head>
 <body>
+
+<!-- ============================================
+     [2번] 카카오 로그인 환영 모달 - CEO v2026.30
+     ============================================ -->
+<div class="welcome-modal-overlay" id="welcomeModal">
+  <div class="welcome-modal">
+    <div class="modal-icon">
+      <i class="fas fa-crown"></i>
+    </div>
+    <div class="modal-title">반갑습니다, XIVIX 파트너님.</div>
+    <div class="modal-subtitle">
+      대한민국 1%의 전문성을 AI로 완성하는<br>
+      <strong>XIVIX 2026 PRO</strong>에 오신 것을 환영합니다.
+    </div>
+    
+    <div class="modal-badge">
+      <div class="modal-badge-title">오늘의 생성 기회</div>
+      <div class="modal-badge-value" id="welcomeUsageCount">4회 남음</div>
+    </div>
+    
+    <div class="modal-features">
+      <div class="modal-feature">
+        <i class="fas fa-check-circle"></i>
+        <span><strong>❶ 카카오 연동 완료:</strong> 안전한 1인 1계정 환경에서 작업이 보호됩니다.</span>
+      </div>
+      <div class="modal-feature">
+        <i class="fas fa-check-circle"></i>
+        <span><strong>❷ 생성 제한 안내:</strong> 최상의 퀄리티 유지를 위해 1일 4회 생성이 가능합니다.</span>
+      </div>
+      <div class="modal-feature">
+        <i class="fas fa-check-circle"></i>
+        <span><strong>❸ 최적화 완료:</strong> PC 환경에 최적화된 '2분할 작업 공간'이 적용되었습니다.</span>
+      </div>
+    </div>
+    
+    <button class="modal-cta" onclick="closeWelcomeModal()">
+      <i class="fas fa-rocket"></i> 지금 바로 시작하기
+    </button>
+  </div>
+</div>
+
+<!-- ============================================
+     [3번] 미로그인 사용자용 잠금 UI - CEO v2026.30
+     ============================================ -->
+<div class="locked-overlay" id="lockedOverlay">
+  <div class="locked-content">
+    <div class="lock-icon">
+      <i class="fas fa-lock"></i>
+    </div>
+    <div class="lock-title">이 분석 결과는 XIVIX 파트너에게만 공개됩니다</div>
+    <div class="lock-desc">
+      카카오 1초 로그인으로 MDRT급 통찰을 확인하세요.<br>
+      매일 4회의 무료 생성 기회가 제공됩니다.
+    </div>
+    
+    <button class="kakao-login-btn" onclick="loginWithKakao()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="#000">
+        <path d="M12 3c5.799 0 10.5 3.664 10.5 8.185 0 4.52-4.701 8.184-10.5 8.184a13.5 13.5 0 0 1-1.727-.11l-4.408 2.883c-.501.265-.678.236-.472-.413l.892-3.678c-2.88-1.46-4.785-3.99-4.785-6.866C1.5 6.665 6.201 3 12 3z"/>
+      </svg>
+      카카오로 1초 만에 시작하기
+    </button>
+    
+    <div class="terms-link">
+      로그인 시 <a href="/terms">서비스 이용약관</a> 및 <a href="/privacy">개인정보 처리방침</a>에 동의합니다
+    </div>
+  </div>
+</div>
 
 <!-- XIVIX 2026 PRO 초정밀 랜덤화 엔진 오버레이 -->
 <div class="seo-overlay" id="seoOverlay">
@@ -3322,24 +3866,29 @@ body{
   <div class="grid"></div>
 </div>
 
-<nav class="nav">
-  <a href="/admin"><i class="fas fa-cog"></i> Admin</a>
-  <a href="/api/docs"><i class="fas fa-book"></i> Docs</a>
-</nav>
-
+<!-- ============================================
+     [1번] CEO v2026.30 마스터 업데이트
+     상단 여백 70% 축소 + 2컬럼 Split View
+     ============================================ -->
 <div class="wrapper">
   
-  <div class="logo">
-    <div class="logo-icon">X</div>
-    <div class="logo-text">XIVIX <span>2026</span> PRO</div>
-  </div>
-  
-  <p class="title">AI 보험 전문가 콘텐츠 생성 엔진</p>
-  
-  <!-- ✅ CEO 지시 - 일일 사용량 표시 -->
-  <div class="usage-display" style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:8px;">
-    <span id="usageDisplay">오늘 남은 횟수: 4/4</span>
-  </div>
+  <!-- 상단 헤더 바: 로고(좌측) + 사용량(중앙) + 메뉴(우측) -->
+  <header class="top-header">
+    <div class="logo">
+      <div class="logo-icon">X</div>
+      <div class="logo-text">XIVIX <span>2026</span> PRO</div>
+    </div>
+    
+    <div class="usage-badge" id="usageBadge">
+      <i class="fas fa-bolt"></i>
+      오늘 남은 횟수: <span class="count" id="usageCount">4/4</span>
+    </div>
+    
+    <nav class="header-nav">
+      <a href="/terms"><i class="fas fa-file-contract"></i> 약관</a>
+      <a href="/admin"><i class="fas fa-cog"></i> Admin</a>
+    </nav>
+  </header>
   
   <div class="main">
     
@@ -3447,10 +3996,16 @@ body{
           </div>
         </div>
         
-        <!-- 완료 CTA -->
+        <!-- 완료 CTA - 가이드 팝업 -->
         <div class="tracker-complete" id="trackerComplete" style="display:none">
           <i class="fas fa-check-circle"></i>
-          <span>분석 완료! 하단 <b>[마케팅 이미지 생성]</b> 버튼을 클릭하세요.</span>
+          <span>🎉 모든 텍스트 생성 완료!</span>
+        </div>
+        <div class="completion-guide" id="completionGuide" style="display:none">
+          <div class="guide-arrow">↓</div>
+          <div class="guide-text">
+            <strong>다음 단계:</strong> 아래 <span style="color:var(--primary);font-weight:700">[마케팅 이미지 생성]</span> 버튼을 클릭하세요
+          </div>
         </div>
       </div>
       
@@ -3566,6 +4121,93 @@ body{
 </div><!-- // wrapper 닫기 -->
 
 <script>
+// ============================================
+// [2번][3번] 카카오 로그인 & 잠금 UI 로직 - CEO v2026.30
+// ============================================
+const AUTH_KEY = 'xivix_auth';
+const WELCOME_SHOWN_KEY = 'xivix_welcome_shown';
+
+// 로그인 상태 확인 (임시: localStorage 기반, 실제로는 카카오 SDK 연동)
+function isLoggedIn() {
+  const auth = localStorage.getItem(AUTH_KEY);
+  return auth && JSON.parse(auth).loggedIn === true;
+}
+
+// 로그인 처리 (카카오 SDK 연동 시 대체)
+function loginWithKakao() {
+  // 실제 카카오 로그인 구현 시:
+  // Kakao.Auth.login({ success: handleKakaoLogin, fail: handleKakaoError });
+  
+  // 임시 데모: 로그인 성공 시뮬레이션
+  const authData = {
+    loggedIn: true,
+    nickname: 'XIVIX 파트너',
+    loginTime: new Date().toISOString()
+  };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(authData));
+  
+  // 잠금 UI 닫기
+  document.getElementById('lockedOverlay').classList.remove('show');
+  document.getElementById('resultSection').classList.remove('blurred');
+  
+  // 환영 모달 표시 (첫 로그인 시에만)
+  if (!localStorage.getItem(WELCOME_SHOWN_KEY)) {
+    showWelcomeModal();
+  }
+}
+
+// 환영 모달 표시
+function showWelcomeModal() {
+  const remaining = getRemainingCount();
+  document.getElementById('welcomeUsageCount').textContent = remaining + '회 남음';
+  document.getElementById('welcomeModal').classList.add('show');
+  localStorage.setItem(WELCOME_SHOWN_KEY, new Date().toDateString());
+}
+
+// 환영 모달 닫기
+function closeWelcomeModal() {
+  document.getElementById('welcomeModal').classList.remove('show');
+}
+
+// 잠금 UI 표시 (미로그인 시)
+function showLockedUI() {
+  document.getElementById('lockedOverlay').classList.add('show');
+  document.getElementById('resultSection').classList.add('blurred');
+}
+
+// 로그아웃
+function logout() {
+  localStorage.removeItem(AUTH_KEY);
+  localStorage.removeItem(WELCOME_SHOWN_KEY);
+  location.reload();
+}
+
+// 생성 버튼 클릭 시 로그인 체크
+function checkAuthBeforeGenerate() {
+  if (!isLoggedIn()) {
+    showLockedUI();
+    return false;
+  }
+  return true;
+}
+
+// 페이지 로드 시 로그인 상태 확인
+function initAuth() {
+  // 날짜가 바뀌면 환영 모달 다시 표시 가능하도록
+  const welcomeDate = localStorage.getItem(WELCOME_SHOWN_KEY);
+  if (welcomeDate && welcomeDate !== new Date().toDateString()) {
+    localStorage.removeItem(WELCOME_SHOWN_KEY);
+  }
+  
+  // 로그인 되어있고 오늘 환영 모달을 안 봤으면 표시
+  if (isLoggedIn() && !localStorage.getItem(WELCOME_SHOWN_KEY)) {
+    setTimeout(showWelcomeModal, 500);
+  }
+}
+
+// ============================================
+// DOM 요소 참조
+// ============================================
 const searchEl = document.getElementById('search');
 const charEl = document.getElementById('char');
 const btn = document.getElementById('btn');
@@ -3576,7 +4218,7 @@ const refreshBtn = document.getElementById('refreshBtn');
 const trendTimeEl = document.getElementById('trendTime');
 const searchBox = document.getElementById('searchBox');
 const trendSection = document.getElementById('trendSection');
-const hintSection = document.getElementById('hintSection'); // 제거됨 - 안전한 null 체크 적용
+const hintSection = document.getElementById('hintSection');
 const resultSection = document.getElementById('resultSection');
 const progressBox = document.getElementById('progressBox');
 const progressText = document.getElementById('progressText');
@@ -3627,10 +4269,20 @@ function getRemainingCount() {
 
 function updateUsageDisplay() {
   const remaining = getRemainingCount();
-  const usageEl = document.getElementById('usageDisplay');
-  if (usageEl) {
-    usageEl.textContent = '오늘 남은 횟수: ' + remaining + '/' + DAILY_LIMIT;
-    usageEl.style.color = remaining <= 1 ? '#ef4444' : 'rgba(255,255,255,0.6)';
+  // 새로운 상단 헤더 배지 업데이트
+  const usageCountEl = document.getElementById('usageCount');
+  const usageBadgeEl = document.getElementById('usageBadge');
+  if (usageCountEl) {
+    usageCountEl.textContent = remaining + '/' + DAILY_LIMIT;
+  }
+  if (usageBadgeEl) {
+    if (remaining <= 1) {
+      usageBadgeEl.style.borderColor = '#ef4444';
+      usageBadgeEl.style.color = '#ef4444';
+    } else {
+      usageBadgeEl.style.borderColor = '';
+      usageBadgeEl.style.color = '';
+    }
   }
 }
 
@@ -3676,8 +4328,11 @@ const DEFAULT_OPTIONS = {
   style: '전문가 팩트체크형'
 };
 
-// 페이지 로드 시 사용량 표시 업데이트
-document.addEventListener('DOMContentLoaded', updateUsageDisplay);
+// 페이지 로드 시 초기화
+document.addEventListener('DOMContentLoaded', () => {
+  updateUsageDisplay();
+  initAuth();  // [2번][3번] 로그인 상태 확인 및 모달 처리
+});
 
 // 글자수 카운트
 searchEl.addEventListener('input', () => {
@@ -4847,6 +5502,10 @@ function renderContentsRealtime(contents) {
 
 // 바로 콘텐츠 생성 (기본 - 스트리밍 버전 사용)
 async function goGenerate() {
+  // [3번] 미로그인 시 잠금 UI 표시
+  if (!checkAuthBeforeGenerate()) {
+    return;
+  }
   // 스트리밍 버전 호출
   return goGenerateStream();
 }
