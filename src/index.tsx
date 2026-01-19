@@ -1986,11 +1986,11 @@ body{
 .wrapper{
   display:flex;
   flex-direction:column;
-  align-items:center;  /* 중앙 정렬 */
+  align-items:stretch;  /* 전체 너비 활용 */
   width:100%;
   max-width:100%;
-  gap:12px;
-  padding:12px 24px;
+  gap:8px;  /* 70% 압축: 24px → 8px */
+  padding:8px 16px;  /* 최소 패딩 */
 }
 
 /* 상단 헤더 바 - 로고 좌측, 사용량 중앙, 메뉴 우측 */
@@ -2089,12 +2089,13 @@ body{
 /* 메인 컨테이너 - 2컬럼 Grid (PC/Tablet), 1컬럼 (Mobile) */
 .main{
   width:100%;
-  max-width:1400px;  /* 확장: 1200px → 1400px */
-  margin:0 auto;  /* 중앙 정렬 */
+  max-width:1600px;
+  margin:0 auto;
   display:grid;
-  grid-template-columns:1fr 1fr !important;  /* 2컬럼 Grid (PC/Tablet) - 강제 적용 */
+  grid-template-columns:minmax(400px, 1fr) minmax(400px, 1fr);  /* 2컬럼 강제 */
   gap:24px;
   align-items:start;
+  padding:0 16px;
 }
 /* 왼쪽 컬럼: 입력/트렌드 */
 .main-left{
@@ -2122,7 +2123,18 @@ body{
    [1번] 모바일 반응형 - CEO v2026.30 지시
    상단: 결과물 / 하단: 고정 입력바 (Sticky Input)
    ============================================ */
-@media(max-width:900px){
+/* 태블릿: 1024px 이하 */
+@media(max-width:1024px){
+  .main{
+    grid-template-columns:1fr;  /* 1컬럼 */
+    max-width:100%;
+    gap:16px;
+    padding:0 12px;
+  }
+}
+
+/* 모바일: 768px 이하 */
+@media(max-width:768px){
   .wrapper{
     padding:8px;
   }
@@ -2144,11 +2156,6 @@ body{
   .top-header .header-nav{
     order:2;
     margin-left:auto;
-  }
-  .main{
-    grid-template-columns:1fr !important;  /* 모바일: 1컬럼 */
-    max-width:100%;
-    gap:12px;
   }
   .main-left{
     position:fixed;
