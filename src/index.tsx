@@ -1348,7 +1348,7 @@ ${ocrDataBinding}
 ■ 모든 본문은 반드시 ❶ ❷ ❸ 기호를 "순차적으로 3개 모두" 사용할 것
 ■ ❶ 으로 시작 → ❷ 로 이어짐 → ❸ 으로 마무리 (이 순서 필수!)
 ■ 첫째/둘째/셋째 텍스트 사용 절대 금지! 오직 ❶ ❷ ❸ 기호만!
-■ ■ 기호로 단락 구분, ✔️ 기호로 체크리스트 사용
+■ 기호로 단락 구분, ✔️ 기호로 체크리스트 사용
 ■ 기호 하나라도 빠지면 XIVIX 급이 아님 - 반드시 3개 전부 포함!
 
 ${expertKnowledge}
@@ -1434,10 +1434,26 @@ ${style === '공감형' ? `
         await stream.write(JSON.stringify({ type: 'content_done', id: i + 1, length: fullText.length }) + '\n')
       }
       
-      // Step 4: 댓글 생성
+      // Step 4: 댓글 생성 (V39 강화)
       await stream.write(JSON.stringify({ type: 'step', step: 5, msg: '💬 댓글 군단 생성 중...' }) + '\n')
       
-      const commentPrompt = `주제: ${topic} 전문가 글에 달릴 댓글 5개 (5명 페르소나). JSON: {"comments":[{"nickname":"","persona":"","text":""}]}`
+      const commentPrompt = `주제: ${topic}
+타겟: ${targetAudience}
+보험: ${insuranceProduct}
+
+위 주제의 전문가 게시글에 달릴 '진짜 카페 회원' 댓글 5개를 작성해줘.
+
+[댓글 작성 원칙]
+■ 실제 카페 회원처럼 반말/존댓말 섞어서
+■ 1번: 까칠한 선배 (의심하다가 인정)
+■ 2번: 다정한 주부 (공감하며 질문)
+■ 3번: 전문가에게 감탄하는 내용 필수
+■ 4번: 베테랑 회원 (추가 정보 제공)
+■ 5번: 초보 (단순 감사)
+■ 각 댓글 50~150자 (한 줄~세 줄)
+
+JSON 형식으로만 응답:
+{"comments":[{"id":1,"nickname":"닉네임","persona":"역할","text":"댓글 내용"}]}`
       const commentResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.FLASH}:generateContent?key=${flashKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1451,12 +1467,38 @@ ${style === '공감형' ? `
       if (commentResponse.ok) {
         const json = await commentResponse.json() as any
         const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        console.log('[XIVIX] 댓글 API 응답 길이:', rawText.length)
         try {
-          comments = JSON.parse(rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()).comments || []
-        } catch (e) {}
+          const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+          const parsed = JSON.parse(cleanJson)
+          // 응답이 배열이면 직접 사용, 객체이면 .comments 사용
+          comments = Array.isArray(parsed) ? parsed : (parsed.comments || [])
+          console.log('[XIVIX] 댓글 파싱 성공:', comments.length, '개')
+        } catch (e) {
+          console.error('[XIVIX] 댓글 JSON 파싱 실패:', e)
+          // 파싱 실패 시 기본 댓글 생성
+          comments = [
+            { id: 1, nickname: '보험맘37', persona: '까칠한 선배', text: '와 이렇게 자세히 설명해주시다니... 저도 비슷한 고민했는데 도움됐어요.' },
+            { id: 2, nickname: '행복한주부', persona: '다정한 주부', text: '저도 30대 워킹맘인데 정말 공감돼요. 감사합니다!' },
+            { id: 3, nickname: '재테크초보', persona: '감탄형', text: '전문가님 글 너무 좋아요. 어려운 내용을 쉽게 설명해주셔서 이해가 쏙쏙!' },
+            { id: 4, nickname: '10년차직장인', persona: '베테랑', text: '참고로 저는 작년에 비슷하게 했는데 세무사 상담도 같이 받으니 더 좋더라고요.' },
+            { id: 5, nickname: '궁금이', persona: '초보', text: '감사합니다 ㅎㅎ' }
+          ]
+        }
+      } else {
+        console.error('[XIVIX] 댓글 API 호출 실패:', commentResponse.status)
+        // API 실패 시 기본 댓글
+        comments = [
+          { id: 1, nickname: '보험맘37', persona: '까칠한 선배', text: '좋은 정보 감사합니다. 저도 참고할게요.' },
+          { id: 2, nickname: '행복한주부', persona: '다정한 주부', text: '공감돼요! 저도 비슷한 상황이에요.' },
+          { id: 3, nickname: '재테크초보', persona: '감탄형', text: '전문가님 설명 최고예요!' },
+          { id: 4, nickname: '10년차직장인', persona: '베테랑', text: '추가로 전문가 상담도 추천드려요.' },
+          { id: 5, nickname: '궁금이', persona: '초보', text: '감사합니다!' }
+        ]
       }
       
       await stream.write(JSON.stringify({ type: 'comments', data: comments }) + '\n')
+      console.log('[XIVIX] 댓글 전송 완료:', comments.length, '개')
       
       // Final
       await stream.write(JSON.stringify({
@@ -4541,8 +4583,12 @@ loadTrends();
 // ============================================
 // 🖼️ AI 마케팅 이미지 생성 기능
 // 미들웨어 서버: https://xivix-xiim.pages.dev/api/process
+// API 규격: api_key(최상위), request_info(keyword, user_id 필수)
 // ============================================
 let generatedImageUrl = '';
+
+// 미들웨어 API 키 (프로덕션에서는 환경변수로 관리)
+const XIIM_API_KEY = 'xivix_2026_pro_key';
 
 async function generateMarketingImage() {
   const btn = document.getElementById('imageGenBtn');
@@ -4555,10 +4601,30 @@ async function generateMarketingImage() {
     return;
   }
   
-  // 키워드 구성: 보험사명 + 담보내용
+  // 키워드 구성: 보험사명 + 담보내용 + 설계안
   const company = resultData.company || '삼성생명';
   const insurance = resultData.insurance || '종합보험';
-  const keyword = company + ' ' + insurance;
+  const keyword = company + ' ' + insurance + ' 설계안';
+  
+  // 보험사 코드 매핑
+  const companyCodeMap = {
+    '삼성생명': 'SAMSUNG_LIFE',
+    '한화생명': 'HANWHA_LIFE',
+    '교보생명': 'KYOBO_LIFE',
+    '신한라이프': 'SHINHAN_LIFE',
+    'NH농협생명': 'NH_LIFE',
+    'KB라이프': 'KB_LIFE',
+    '미래에셋생명': 'MIRAE_LIFE',
+    '메트라이프': 'METLIFE',
+    '푸르덴셜': 'PRUDENTIAL',
+    'AIA': 'AIA',
+    '삼성화재': 'SAMSUNG_FIRE',
+    '현대해상': 'HYUNDAI_MARINE',
+    'DB손해보험': 'DB_INSURANCE',
+    'KB손해보험': 'KB_INSURANCE',
+    '메리츠화재': 'MERITZ_FIRE'
+  };
+  const targetCompany = companyCodeMap[company] || 'SAMSUNG_LIFE';
   
   // UI 상태 변경
   btn.disabled = true;
@@ -4567,36 +4633,69 @@ async function generateMarketingImage() {
   result.classList.remove('show');
   
   try {
-    // 미들웨어 서버로 POST 요청
+    console.log('[XIVIX] 이미지 생성 요청:', { keyword, targetCompany });
+    
+    // ✅ 미들웨어 API 규격에 맞춘 요청 구조
+    // api_key: 최상위에 위치 (필수)
+    // request_info: keyword, user_id 필수
     const response = await fetch('https://xivix-xiim.pages.dev/api/process', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
-        keyword: keyword,
-        user_id: 'xivix_user_' + Date.now()
+        api_key: XIIM_API_KEY,  // ❗ 최상위에 위치 필수
+        request_info: {
+          keyword: keyword,                    // ❗ 필수
+          user_id: 'xivix_2026_pro_' + Date.now(),  // ❗ 필수
+          target_company: targetCompany,       // 선택
+          source_url: window.location.href     // 선택
+        }
       })
     });
     
+    const data = await response.json();
+    console.log('[XIVIX] 미들웨어 응답:', data);
+    
     if (!response.ok) {
-      throw new Error('서버 응답 오류: ' + response.status);
+      // 에러 응답 상세 처리
+      const errorMsg = data.error?.message || data.message || '서버 오류: ' + response.status;
+      const errorCode = data.error?.code || 'UNKNOWN';
+      console.error('[XIVIX] API 에러:', errorCode, errorMsg);
+      throw new Error(errorCode + ': ' + errorMsg);
     }
     
-    const data = await response.json();
+    // 성공 응답 처리 (다양한 응답 구조 대응)
+    const imageUrl = data.processed_image_url || data.image_url || data.result?.image_url || data.data?.processed_image_url;
     
-    if (data.processed_image_url) {
+    if (imageUrl) {
       // 성공: 이미지 표시
-      generatedImageUrl = data.processed_image_url;
+      generatedImageUrl = imageUrl;
       document.getElementById('imageGenPreview').src = generatedImageUrl;
       result.classList.add('show');
-    } else if (data.error) {
-      throw new Error(data.error);
+      console.log('[XIVIX] 이미지 생성 성공:', imageUrl);
+    } else if (data.status === 'error' || data.error) {
+      const errDetail = data.error?.message || data.message || JSON.stringify(data.error);
+      throw new Error(errDetail);
     } else {
-      throw new Error('이미지 URL을 받지 못했습니다.');
+      console.warn('[XIVIX] 예상치 못한 응답 구조:', data);
+      throw new Error('이미지 URL을 받지 못했습니다. 응답: ' + JSON.stringify(data).substring(0, 100));
     }
     
   } catch (error) {
     console.error('[XIVIX] 이미지 생성 오류:', error);
-    alert('이미지 생성 중 오류가 발생했습니다.\\n' + error.message);
+    // 사용자 친화적 에러 메시지
+    let userMsg = '이미지 생성 중 오류가 발생했습니다.';
+    if (error.message.includes('INVALID_REQUEST')) {
+      userMsg += '\\n\\n원인: API 키 또는 필수 파라미터 누락\\n해결: 관리자에게 문의해 주세요.';
+    } else if (error.message.includes('FORBIDDEN')) {
+      userMsg += '\\n\\n원인: 접근 권한 없음\\n해결: 허용된 도메인에서 접속해 주세요.';
+    } else if (error.message.includes('RATE_LIMIT')) {
+      userMsg += '\\n\\n원인: 일일 사용량 초과\\n해결: 내일 다시 시도해 주세요.';
+    } else {
+      userMsg += '\\n\\n' + error.message;
+    }
+    alert(userMsg);
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-image"></i> 마케팅 이미지 생성';
