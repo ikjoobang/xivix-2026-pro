@@ -4797,6 +4797,14 @@ async function generateMarketingImage() {
       userMsg += '1. 다른 보험사/상품으로 다시 시도해 보세요.\\n';
       userMsg += '2. 직접 설계안 이미지 URL을 입력할 수 있습니다.';
       showSourceUrlInput = true;
+    } else if (error.message.includes('DOWNLOAD_FAILED') || error.message.includes('매직 바이트') || error.message.includes('Invalid image file')) {
+      // 🔴 CEO 지시 (2026.01.19) - HTML 에러 페이지를 이미지로 착각한 경우
+      // 매직 바이트 3c 21 44 4f = <!DO = HTML 문서
+      userMsg = '⚠️ 이미지 다운로드에 실패했습니다.\\n\\n';
+      userMsg += '원인: 수집된 파일이 이미지가 아닌 웹페이지(HTML)입니다.\\n';
+      userMsg += '(미들웨어가 에러 페이지를 이미지로 착각함)\\n\\n';
+      userMsg += '💡 해결: 다른 보험사/상품으로 다시 시도해 주세요.';
+      showSourceUrlInput = true;
     } else if (error.message.includes('INVALID_IMAGE') || error.message.includes('UPLOAD_FAILED')) {
       userMsg = '⚠️ 이미지 파일이 손상되었습니다.\\n\\n';
       userMsg += '수집된 이미지가 유효하지 않습니다.\\n\\n';
