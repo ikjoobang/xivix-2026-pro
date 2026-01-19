@@ -158,18 +158,20 @@ const RANDOMIZATION_MATRIX = {
 }
 
 // ============================================
-// 🔥 제목 생성 패턴 (CTR 30% 이상 목표)
-// 현장 밀착형 질문 / 내부자 기밀형 제목
-// 금지어 자동 필터링 적용됨
+// ✅ V39 제목 패턴 - CEO 지시 (2026.01.19)
+// "제목은 설계사가 아니라 고객이 짓는 거다"
+// 설계사용 홍보 제목 절대 금지 → 막막한 고객의 질문 스타일
+// 금지: "~한 이유", "~가이드", "~추천", "현직 설계사입니다"
+// 필수: "너무 막막한", "도와주세요", "이거 어떻게 해요?" 느낌
 // ============================================
 const TITLE_PATTERNS = [
-  "{age}살 직장인 {keyword}, 약관 보고 밤잠 설친 이유",
-  "{keyword} 보상 청구했다가 거절당한 사연",
-  "{target}이 {keyword} 가입 전 꼭 물어봐야 할 질문",
-  "{keyword} 설계사도 잘 모르는 약관 함정",
-  "우리 엄마가 {keyword} 들어준 이유를 이제야 알았다",
-  "{keyword} 리모델링하라는 연락 받고 멘붕온 썰",
-  "{age}살에 {keyword} 안 들면 진짜 후회하는 이유"
+  "{target}인데 {keyword} 이거 유지하는 게 맞나요?",
+  "{keyword} 리모델링하라는데 진짜 해야 하나요ㅠㅠ",
+  "너무 막막한 {target}입니다... {keyword} 질문이요",
+  "{keyword} 갱신 폭탄 맞았는데 어떻게 해야 하나요",
+  "{target} {keyword} 들어야 할지 고민됩니다",
+  "설계사가 {keyword} 바꾸라는데 믿어도 되나요?",
+  "{keyword} 보험료가 너무 올랐어요 도와주세요"
 ]
 
 // 제목 금지어 필터링 함수
@@ -242,8 +244,12 @@ async function callGeminiWithPersona(
   return response
 }
 
-// 타겟 분석 함수
-function analyzeTarget(topic: string) {
+// ============================================
+// ✅ V39 동적 컨텍스트 바인딩 - CEO 지시 (2026.01.19)
+// "30대/40대 타령 그만해라" - 하드코딩 나이 완전 제거
+// 사용자 입력에서 나이/직업/상황을 100% 동적 추출
+// ============================================
+function analyzeTarget(topic: string, ocrData?: any) {
   // 보험 종류 자동 감지
   let insuranceProduct = '실손보험'
   if (topic.includes('암')) insuranceProduct = '암보험'
@@ -256,16 +262,63 @@ function analyzeTarget(topic: string) {
   else if (topic.includes('운전자')) insuranceProduct = '운전자보험'
   else if (topic.includes('실비') || topic.includes('실손')) insuranceProduct = '실손보험'
   
-  // 타겟 독자 자동 감지
-  let targetAudience = '30대 직장인'
-  if (topic.includes('신혼') || topic.includes('결혼')) targetAudience = '이제 막 결혼한 신혼부부'
-  else if (topic.includes('50대') || topic.includes('은퇴')) targetAudience = '은퇴를 앞둔 50대'
-  else if (topic.includes('40대') || topic.includes('가장')) targetAudience = '40대 남성 가장'
-  else if (topic.includes('20대') || topic.includes('사회초년생')) targetAudience = '20대 사회초년생'
-  else if (topic.includes('주부') || topic.includes('엄마') || topic.includes('워킹맘')) targetAudience = '30~40대 주부/워킹맘'
-  else if (topic.includes('CEO') || topic.includes('법인') || topic.includes('사업')) targetAudience = '법인대표/CEO'
+  // ✅ 동적 나이 추출 - 하드코딩 완전 제거
+  // 1순위: 사용자 입력에서 정확한 숫자 추출
+  // 2순위: OCR 데이터에서 생년월일 계산
+  // 3순위: "XX대" 표현에서 추출
+  // 기본값 없음 - 추출 실패 시 "보험 관심자"로 표기
+  let extractedAge = ''
+  let extractedRole = ''
   
-  return { insuranceProduct, targetAudience }
+  // 정확한 나이 추출 (52세, 38살 등)
+  const exactAgeMatch = topic.match(/(\d{2,3})\s*(세|살)/)
+  if (exactAgeMatch) {
+    extractedAge = exactAgeMatch[1]
+  }
+  // "XX대" 추출 (50대, 30대 등)
+  else {
+    const decadeMatch = topic.match(/(\d{2})대/)
+    if (decadeMatch) {
+      extractedAge = decadeMatch[1] + '대'
+    }
+  }
+  
+  // OCR 데이터에서 나이 추출 (생년월일 → 나이 계산)
+  if (!extractedAge && ocrData?.birthDate) {
+    const birthYear = parseInt(ocrData.birthDate.substring(0, 4))
+    if (birthYear > 1900 && birthYear < 2020) {
+      extractedAge = String(new Date().getFullYear() - birthYear)
+    }
+  }
+  
+  // 직업/역할 동적 추출
+  if (topic.includes('자영업') || topic.includes('사장')) extractedRole = '자영업자'
+  else if (topic.includes('직장인') || topic.includes('회사원')) extractedRole = '직장인'
+  else if (topic.includes('주부') || topic.includes('전업')) extractedRole = '전업주부'
+  else if (topic.includes('워킹맘')) extractedRole = '워킹맘'
+  else if (topic.includes('프리랜서')) extractedRole = '프리랜서'
+  else if (topic.includes('아줌마') || topic.includes('아주머니')) extractedRole = '아줌마'
+  else if (topic.includes('아빠') || topic.includes('아버지') || topic.includes('가장')) extractedRole = '가장'
+  else if (topic.includes('엄마') || topic.includes('어머니')) extractedRole = '엄마'
+  else if (topic.includes('신혼') || topic.includes('결혼')) extractedRole = '신혼부부'
+  else if (topic.includes('CEO') || topic.includes('법인') || topic.includes('대표')) extractedRole = '법인대표'
+  else if (topic.includes('은퇴') || topic.includes('노후')) extractedRole = '은퇴 준비자'
+  else if (topic.includes('사회초년생') || topic.includes('취준')) extractedRole = '사회초년생'
+  
+  // ✅ 동적 타겟 조합 - 절대 하드코딩 금지
+  let targetAudience = ''
+  if (extractedAge && extractedRole) {
+    targetAudience = `${extractedAge}${extractedAge.includes('대') ? '' : '세'} ${extractedRole}`
+  } else if (extractedAge) {
+    targetAudience = `${extractedAge}${extractedAge.includes('대') ? '' : '세'} 보험 관심자`
+  } else if (extractedRole) {
+    targetAudience = extractedRole
+  } else {
+    // 기본값도 입력 기반으로 유추
+    targetAudience = '보험 상담이 필요한 분'
+  }
+  
+  return { insuranceProduct, targetAudience, extractedAge, extractedRole }
 }
 
 // 전문가 답변용 프롬프트 생성 (XIVIX 2026 초정밀 버전 - 스트리밍용)
@@ -1198,47 +1251,59 @@ app.post('/api/generate/full-package-stream', async (c) => {
       // Step 2: 제목 + 바이럴 질문 생성 (스트리밍)
       await stream.write(JSON.stringify({ type: 'step', step: 3, msg: '✍️ 제목 및 바이럴 질문 생성 중...' }) + '\n')
       
-      // 타겟 나이 추출 (30대 → 30)
+      // ✅ V39 동적 나이 추출 - 하드코딩 30 제거
+      // 나이를 못 찾으면 빈 문자열 유지 (기본값 30 삭제)
       const ageMatch = targetAudience.match(/(\d+)/)
-      const targetAge = ageMatch ? ageMatch[1] : '30'
+      const targetAge = ageMatch ? ageMatch[1] : ''
       
-      const titlePrompt = `## XIVIX V38 제목 + 바이럴 질문 생성 ##
-
-주제: ${topic}
+      // ✅ OCR 데이터가 있으면 프롬프트 최상단에 강제 배치
+      const ocrPriorityBlock = imageAnalysis ? `
+🔴🔴🔴 [OCR 데이터 - 최우선 반영 필수!] 🔴🔴🔴
+${imageAnalysis}
+→ 위 정보(보험사명, 상품명, 월 보험료)를 제목과 질문에 반드시 포함하세요!
+` : ''
+      
+      const titlePrompt = `## XIVIX V39 제목 + 바이럴 질문 생성 ##
+${ocrPriorityBlock}
+사용자 원본 입력: ${topic}
 보험: ${insuranceProduct}
 타겟: ${targetAudience}
 
-🚨🚨🚨 [최우선 제약 - 반드시 준수] 🚨🚨🚨
+🚨🚨🚨 [CEO 최우선 지시 - 반드시 준수] 🚨🚨🚨
+"제목은 설계사가 아니라 고객이 짓는 거다"
+"현직 설계사입니다"가 아니라 "너무 막막한 ${targetAudience}입니다"라는 느낌!
 
 📌 [제목 5개 생성 규칙]
 ■ 공백 포함 25자 이내 필수!
-■ 현장 밀착형 질문 / 내부자 기밀형 스타일
-■ 금지어 절대 사용 금지: "가이드", "전략", "포인트", "대비", "선택", "추천", "충격", "손해", "필독", "경악", "대박", "100%", "절대", "이거 모르면", "반드시", "꼭 알아야", "핵심 정리", "총정리", "완벽 정리", "한눈에", "꿀팁", "필수"
+■ ✅ 고객 관점 질문형 스타일 (막막함, 도움 요청)
+■ ❌ 설계사용 홍보 제목 절대 금지
+■ 금지어: "가이드", "전략", "포인트", "대비", "선택", "추천", "충격", "손해", "필독", "경악", "대박", "~한 이유", "~하는 이유"
 
-✔️ 좋은 제목 예시:
-- "${targetAge}살 직장인 ${insuranceProduct}, 약관 보고 밤잠 설친 이유"
-- "${insuranceProduct} 보상 청구했다가 거절당한 사연"
-- "우리 엄마가 ${insuranceProduct} 들어준 이유를 이제야 알았다"
-- "${insuranceProduct} 리모델링하라는 연락 받고 멘붕온 썰"
+✔️ 좋은 제목 예시 (고객 관점):
+- "${targetAudience}인데 ${insuranceProduct} 이거 유지해야 하나요?"
+- "${insuranceProduct} 리모델링하라는데 진짜 해야 하나요ㅠㅠ"
+- "너무 막막한 ${targetAudience}입니다... ${insuranceProduct} 질문"
+- "${insuranceProduct} 갱신 폭탄 맞았는데 어떻게 해요"
 
-❌ 나쁜 제목 예시 (절대 금지):
-- "30대를 위한 암보험 선택 가이드" (가이드 금지)
-- "암보험 비교 분석 핵심 포인트" (포인트 금지)
-- "이거 모르면 손해! 암보험 총정리" (손해, 총정리 금지)
+❌ 나쁜 제목 예시 (설계사 관점 - 절대 금지):
+- "30대를 위한 암보험 선택 가이드"
+- "암보험 비교 분석 핵심 포인트"
+- "${targetAge}살에 ${insuranceProduct} 안 들면 후회하는 이유"
+- "현직 설계사가 알려주는 보험 꿀팁"
 
 📌 [바이럴 질문 3개 생성 규칙]
 ■ 각 질문 500~800자
-■ 보험을 전혀 모르는 초보자가 간절하게 질문하는 형태 필수!
-■ "너무 막막해요", "도와주세요", "용어가 너무 어려워요" 같은 간절한 어투
-■ 구체적인 개인 상황 + 숫자(나이, 금액, 날짜) 필수 포함
-■ 전문가 어투 절대 금지: "손해", "필수", "꼭", "반드시" 등
+■ 보험을 전혀 모르는 초보자가 간절하게 질문하는 형태!
+■ "너무 막막해요", "도와주세요", "용어가 너무 어려워요" 어투 필수
+■ 사용자 입력에서 추출한 나이/상황/금액을 그대로 사용 (하드코딩 금지)
+■ 전문가 어투 절대 금지: "손해", "필수", "꼭", "반드시"
 
 ✔️ 좋은 바이럴 질문 예시:
-"안녕하세요. 올해 ${targetAge}살 직장인인데요. 보험을 처음 알아보는데 너무 막막해서 글 올려요ㅠㅠ 어머니가 예전에 들어주신 ${insuranceProduct}이 있는데, 최근에 설계사분이 리모델링하라고 연락이 왔어요. 근데 뭐가 뭔지 하나도 모르겠고 용어도 너무 어려워요. 혹시 이런 상황에서 어떻게 해야 하는지 아시는 분 계실까요? 진짜 도와주세요..."
+"안녕하세요. ${targetAudience}${targetAge ? `(${targetAge}세)` : ''}인데요. 보험을 처음 알아보는데 너무 막막해서 글 올려요ㅠㅠ ${insuranceProduct} 관련해서 설계사분이 리모델링하라고 연락이 왔어요. 근데 뭐가 뭔지 하나도 모르겠고 용어도 너무 어려워요. 혹시 이런 상황에서 어떻게 해야 하는지 아시는 분 계실까요? 진짜 도와주세요..."
 
 JSON 형식으로만 응답:
 {
-  "titles": [{"id":1,"text":"25자 이내 제목"},{"id":2,"text":"25자 이내 제목"},{"id":3,"text":"25자 이내 제목"},{"id":4,"text":"25자 이내 제목"},{"id":5,"text":"25자 이내 제목"}],
+  "titles": [{"id":1,"text":"25자 이내 고객관점 제목"},{"id":2,"text":"25자 이내 고객관점 제목"},{"id":3,"text":"25자 이내 고객관점 제목"},{"id":4,"text":"25자 이내 고객관점 제목"},{"id":5,"text":"25자 이내 고객관점 제목"}],
   "viral_questions": [{"id":1,"text":"초보자 관점의 간절한 질문 500~800자"},{"id":2,"text":"초보자 관점의 간절한 질문 500~800자"},{"id":3,"text":"초보자 관점의 간절한 질문 500~800자"}]
 }`
       
@@ -3377,11 +3442,12 @@ let uploadedFiles = [];
 let isGenerating = false;
 let lastTrendUpdate = null;
 
-// 기본 옵션값 (자동 적용)
+// ✅ V39 기본 옵션값 - 하드코딩 나이 제거 (CEO 지시)
+// target은 사용자 입력에서 동적 추출하므로 빈 값으로 설정
 const DEFAULT_OPTIONS = {
-  target: '30대 워킹맘',
-  insuranceType: '상속/증여',
-  company: '삼성생명',
+  target: '',  // 동적 추출 (하드코딩 금지)
+  insuranceType: '실손보험',
+  company: '',  // 동적 추출
   style: '전문가 팩트체크형'
 };
 
@@ -3701,8 +3767,8 @@ function generateViralQuestion(keyword) {
   // ============================================
   if (scenarioType === 'NEW') {
     const newTemplates = [
-      // 템플릿 1: 단순 팩트체크 (인과: 제안받음 → 검증 필요)
-      company + ' ' + keyword + ' 제안서 사진 올립니다. 설계사가 월 ' + premium + '원이라는데 이거 30대 직장인한테 적당한 건가요? 팩폭 좀요' + ending,
+      // 템플릿 1: 단순 팩트체크 (인과: 제안받음 → 검증 필요) - V39 하드코딩 제거
+      company + ' ' + keyword + ' 제안서 사진 올립니다. 설계사가 월 ' + premium + '원이라는데 이거 적당한 건가요? 팩폭 좀요' + ending,
       
       // 템플릿 2: 의심형 (인과: 제안받음 → 수당 의심)
       '오늘 ' + company + ' 설계사한테 ' + keyword + ' 제안받았어요. 월 ' + premium + '원이래요. 그런데 이거 수당 많이 받으려고 비싼 거 권유하는 거 아닌가요' + ending + ' 제안서 첨부합니다.',
@@ -4271,12 +4337,10 @@ async function goGenerateStream() {
       }
     }
     
-    // 그래도 비어있으면 기본값 사용
+    // ✅ V39 - 빈 입력 시 알림 (하드코딩 기본값 제거)
     if (!q) {
-      q = '30대 직장인 암보험 추천';
-      searchEl.value = q;
-      charEl.textContent = q.length;
-      console.log('[XIVIX] 기본 키워드 사용');
+      alert('검색어를 입력해 주세요. (예: 52세 자영업자 실손보험 갱신)');
+      return;
     }
   }
   
@@ -4676,8 +4740,8 @@ async function generateMarketingImage() {
       throw new Error(errorCode + ': ' + errorMsg);
     }
     
-    // 성공 응답 처리 (다양한 응답 구조 대응)
-    const imageUrl = data.processed_image_url || data.image_url || data.result?.image_url || data.data?.processed_image_url;
+    // ✅ 성공 응답 처리 - XIIM 서버는 'data.final_url'로 응답함 (CEO 지시 2026.01.19)
+    const imageUrl = data.data?.final_url || data.final_url || data.data?.image_url || data.image_url;
     
     if (imageUrl) {
       // 성공: 이미지 표시
