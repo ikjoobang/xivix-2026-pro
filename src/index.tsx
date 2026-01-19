@@ -4729,32 +4729,39 @@ async function generateMarketingImage() {
       })
     });
     
-    const data = await response.json();
-    console.log('[XIVIX] 미들웨어 응답:', data);
+    // ============================================
+    // ✅ CEO 최종 지시 (2026.01.19) - 응답 처리 로직 확정
+    // 서버 응답 구조: { "status": "success", "data": { "final_url": "..." } }
+    // 반드시 result.data.final_url 경로로 읽어야 함
+    // ============================================
+    const result = await response.json();
+    console.log('[XIVIX] 미들웨어 응답:', result);
     
-    if (!response.ok) {
-      // 에러 응답 상세 처리
-      const errorMsg = data.error?.message || data.message || '서버 오류: ' + response.status;
-      const errorCode = data.error?.code || 'UNKNOWN';
-      console.error('[XIVIX] API 에러:', errorCode, errorMsg);
-      throw new Error(errorCode + ': ' + errorMsg);
-    }
-    
-    // ✅ 성공 응답 처리 - XIIM 서버는 'data.final_url'로 응답함 (CEO 지시 2026.01.19)
-    const imageUrl = data.data?.final_url || data.final_url || data.data?.image_url || data.image_url;
-    
-    if (imageUrl) {
+    if (result.status === 'success') {
+      // ❗ 핵심: result.data.final_url 경로로 읽기 (CEO 지시)
+      const imageUrl = result.data.final_url;
+      
+      if (!imageUrl) {
+        throw new Error('이미지 URL이 응답에 포함되지 않았습니다.');
+      }
+      
       // 성공: 이미지 표시
       generatedImageUrl = imageUrl;
       document.getElementById('imageGenPreview').src = generatedImageUrl;
-      result.classList.add('show');
+      document.getElementById('imageGenResult').classList.add('show');
       console.log('[XIVIX] 이미지 생성 성공:', imageUrl);
-    } else if (data.status === 'error' || data.error) {
-      const errDetail = data.error?.message || data.message || JSON.stringify(data.error);
-      throw new Error(errDetail);
+      
+    } else if (result.status === 'error') {
+      // 에러 응답 처리
+      const errorCode = result.error?.code || 'UNKNOWN';
+      const errorMsg = result.error?.message || '알 수 없는 오류';
+      console.error('[XIVIX] API 에러:', errorCode, errorMsg);
+      throw new Error(errorCode + ': ' + errorMsg);
+      
     } else {
-      console.warn('[XIVIX] 예상치 못한 응답 구조:', data);
-      throw new Error('이미지 URL을 받지 못했습니다. 응답: ' + JSON.stringify(data).substring(0, 100));
+      // 예상치 못한 응답
+      console.warn('[XIVIX] 예상치 못한 응답 구조:', result);
+      throw new Error('서버 응답을 처리할 수 없습니다.');
     }
     
   } catch (error) {
