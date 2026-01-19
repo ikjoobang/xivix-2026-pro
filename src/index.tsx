@@ -17,15 +17,16 @@ app.use('/*', cors())
 // 모델 설정 (용도별 분리)
 // ============================================
 // ============================================
-// ✅ XIVIX V39 FINAL_LOGIC_SYNC - 모델 설정
-// gemini-2.5-pro: 전문가 브레인 (품질 글쓰기)
+// ✅ XIVIX V39 FINAL_LOGIC_SYNC - 모델 설정 (최종 확정)
+// ⚠️ gemini-2.5-pro는 존재하지 않는 모델명! → gemini-1.5-pro-002가 정답
+// gemini-1.5-pro-002: 전문가 브레인 (답변 깊이 확보)
 // gemini-2.0-flash: 데이터 엔진 (빠른 처리, 제목/질문 생성)
 // API 검증 완료: 2026.01.19
 // ============================================
 const ENGINE = {
   FLASH: 'gemini-2.0-flash',       // 데이터 엔진 (빠른 처리용)
-  PRO: 'gemini-2.5-pro',           // 전문가 브레인 (품질 글쓰기용)
-  VISION: 'gemini-2.5-pro'         // 이미지 OCR 분석용 (PRO로 변경 - 담보/보험료 추출)
+  PRO: 'gemini-1.5-pro-002',       // 전문가 브레인 (답변 깊이 확보) ← 정확한 모델명
+  VISION: 'gemini-1.5-pro-002'     // 이미지 OCR 분석용 (PRO와 통일)
 }
 
 // ============================================
@@ -82,13 +83,13 @@ const EXPERT_KNOWLEDGE_BASE = {
 }
 
 // ============================================
-// XIVIX V38 마스터 프롬프트 엔진 v4.0 (최종 설계도)
+// XIVIX V39 마스터 프롬프트 엔진 v5.0 (최종 확정)
 // 프로젝트: XIVIX_Insurance_King_2026
-// 모델: gemini-2.5-pro (전문가 브레인)
-// 핵심: 1,200자 압도적 정보량 + 전문 지식 베이스
+// 모델: gemini-1.5-pro-002 (답변 깊이 확보) ← 정확한 모델명
+// 핵심: 가변 본문 + 전문 지식 베이스
 // ============================================
 const MASTER_INSTRUCTION_V3 = {
-  model: 'gemini-2.5-pro',  // API 검증 완료 (2026.01.18)
+  model: 'gemini-1.5-pro-002',  // 정확한 모델명 (2026.01.19)
   persona: '30년 경력 MDRT 보험왕 & 심리 영업 마스터',
   constraints: {
     text_limit: '본문은 공백 포함 1,200자 이상 (압도적 정보량)',
@@ -4090,6 +4091,8 @@ async function goGenerateStream() {
                 progressBox.style.display = 'none';
                 document.getElementById('tabNav').style.display = 'flex';
                 switchTab('titles');
+                // ✅ 생성 완료 후 결과 섹션으로 자동 스크롤
+                resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }, 1200);
               break;
               
@@ -4127,6 +4130,8 @@ async function goGenerateStream() {
             progressBox.style.display = 'none';
             document.getElementById('tabNav').style.display = 'flex';
             switchTab('titles');
+            // ✅ 생성 완료 후 결과 섹션으로 자동 스크롤
+            resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }, 1200);
         }
       } catch (e) {
