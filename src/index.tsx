@@ -1314,22 +1314,24 @@ ${ocrDataBinding}
 ■ 핵심만 팩트로! 지루한 서론 금지!
 ■ ${style} 스타일로 작성
 ■ 줄바꿈으로 가독성 확보
+■ [필수 기호] ❶ ❷ ❸ 기호로 핵심 포인트 정리 (첫째/둘째 사용 금지!)
+■ [필수 기호] ■ 기호로 단락 구분, ✔️ 기호로 체크리스트
 
 ${expertKnowledge}
 
-📌 [${style} 작성 가이드]
+📌 [${style} 작성 가이드 - ❶❷❸ 기호 필수!]
 ${style === '공감형' ? `
-- 공감 한 줄 → 핵심 정보 바로 전달
-- "저도 같은 고민 했어요" + 바로 해결책
-- 마무리: "도움 필요하시면 말씀해주세요"
+❶ 공감 한 줄로 시작 → "저도 같은 고민 했어요"
+❷ 핵심 정보 2~3가지 ■ 기호로 정리
+❸ 마무리: "도움 필요하시면 말씀해주세요"
 ` : style === '팩트형' ? `
-- 숫자와 통계로 시작
-- 약관 함정과 주의사항 폭로
-- 체크리스트 형태로 핵심만 정리
+❶ 숫자와 통계로 시작 (예: 40대 남성 암 발병률 3.1배)
+❷ 약관 함정과 주의사항을 ✔️ 체크리스트로 폭로
+❸ 핵심 결론 한 줄로 마무리
 ` : `
-- 심리적 트리거 (손실 회피, 긴급성)
-- "지금 확인 안 하면..." 긴박감
-- CTA: "무료 진단 신청" 마무리
+❶ 심리적 트리거로 시작 (손실 회피, 긴급성)
+❷ "지금 확인 안 하면..." 긴박감 조성
+❸ CTA: "무료 진단 신청" 마무리
 `}
 
 반드시 아래 JSON 형식으로만 응답:
@@ -2538,47 +2540,70 @@ body{
 }
 .viral-questions .question:last-child{margin-bottom:0}
 
-/* 탭 네비게이션 */
-.tab-nav{
-  display:flex;
-  gap:4px;
+/* V39 단일 페이지 순차 흐름 (탭 메뉴 제거) */
+.tab-nav{display:none !important} /* 탭 네비게이션 완전 숨김 */
+
+/* 순차 섹션 스타일 */
+.sequential-section{
   background:var(--card-bg);
   border:1px solid var(--border);
-  border-radius:14px;
-  padding:6px;
-  margin-bottom:16px;
+  border-radius:16px;
+  margin-bottom:20px;
+  overflow:hidden;
 }
-.tab-btn{
-  flex:1;
-  padding:12px 16px;
-  border:none;
-  background:transparent;
-  color:var(--text-muted);
-  font-size:13px;
-  font-weight:600;
-  border-radius:10px;
-  cursor:pointer;
-  transition:all 0.2s;
+.sequential-section .section-header{
   display:flex;
   align-items:center;
-  justify-content:center;
-  gap:6px;
+  gap:10px;
+  padding:16px 20px;
+  background:linear-gradient(135deg, rgba(79,140,255,0.1), rgba(182,255,59,0.05));
+  border-bottom:1px solid var(--border);
+  font-weight:700;
+  font-size:15px;
+  color:var(--text);
 }
-.tab-btn:hover{color:var(--text);background:rgba(255,255,255,0.05)}
-.tab-btn.active{
-  background:linear-gradient(135deg, var(--primary), var(--accent));
+.sequential-section .section-header i{
+  color:var(--primary);
+  font-size:16px;
+}
+.sequential-section .section-header .badge{
+  background:var(--primary);
   color:#fff;
+  padding:3px 10px;
+  border-radius:12px;
+  font-size:12px;
+  font-weight:600;
+  margin-left:auto;
 }
-.tab-btn .badge{
-  background:rgba(255,255,255,0.2);
-  padding:2px 8px;
-  border-radius:10px;
-  font-size:11px;
+.sequential-section .section-content{
+  padding:16px;
 }
 
-/* 탭 콘텐츠 */
-.tab-content{display:none}
-.tab-content.active{display:block}
+/* 탭 콘텐츠 - 항상 표시 (탭 제거됨) */
+.tab-content{display:block !important}
+
+/* SEO 키워드 섹션 스타일 */
+#seoKeywords{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+#seoKeywords .keyword-tag{
+  background:linear-gradient(135deg, var(--primary-soft), rgba(182,255,59,0.1));
+  border:1px solid var(--primary);
+  color:var(--primary);
+  padding:8px 16px;
+  border-radius:20px;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all 0.2s;
+}
+#seoKeywords .keyword-tag:hover{
+  background:var(--primary);
+  color:#fff;
+  transform:translateY(-2px);
+}
 
 /* 아이템 카드 (제목/본문/댓글 공통) */
 .item-card{
@@ -3151,27 +3176,51 @@ body{
       <!-- 바이럴 질문 -->
       <div class="viral-questions" id="viralQuestions" style="display:none"></div>
       
-      <!-- 탭 네비게이션 -->
-      <div class="tab-nav" id="tabNav">
-        <button class="tab-btn active" data-tab="titles" onclick="switchTab('titles')">
-          <i class="fas fa-heading"></i> 제목 선택 <span class="badge" id="titleCount">5</span>
-        </button>
-        <button class="tab-btn" data-tab="contents" onclick="switchTab('contents')">
-          <i class="fas fa-file-alt"></i> 본문 선택 <span class="badge" id="contentCount">3</span>
-        </button>
-        <button class="tab-btn" data-tab="extras" onclick="switchTab('extras')">
-          <i class="fas fa-comments"></i> 댓글/키워드
-        </button>
+      <!-- ============================================
+           V39 단일 페이지 순차 흐름 (Single Page Sequential Flow)
+           탭 메뉴 100% 제거 - 사장님 지시사항 반영
+           출력 순서: 제목 → 질문 → 키워드 → 답변 → 댓글
+           ============================================ -->
+      
+      <!-- ❶ 제목 섹션 -->
+      <div class="sequential-section" id="section-titles">
+        <div class="section-header">
+          <i class="fas fa-heading"></i>
+          <span>❶ 제목 선택</span>
+          <span class="badge" id="titleCount">5</span>
+        </div>
+        <div class="section-content" id="tab-titles"></div>
       </div>
       
-      <!-- 제목 탭 -->
-      <div class="tab-content active" id="tab-titles"></div>
+      <!-- ❷ SEO 키워드 섹션 -->
+      <div class="sequential-section" id="section-keywords">
+        <div class="section-header">
+          <i class="fas fa-tags"></i>
+          <span>❷ SEO 키워드</span>
+          <span class="badge">5</span>
+        </div>
+        <div class="section-content" id="seoKeywords"></div>
+      </div>
       
-      <!-- 본문 탭 -->
-      <div class="tab-content" id="tab-contents"></div>
+      <!-- ❸ 전문가 답변 섹션 -->
+      <div class="sequential-section" id="section-contents">
+        <div class="section-header">
+          <i class="fas fa-file-alt"></i>
+          <span>❸ 전문가 답변</span>
+          <span class="badge" id="contentCount">3</span>
+        </div>
+        <div class="section-content" id="tab-contents"></div>
+      </div>
       
-      <!-- 댓글/키워드 탭 -->
-      <div class="tab-content" id="tab-extras"></div>
+      <!-- ❹ 댓글 군단 섹션 -->
+      <div class="sequential-section" id="section-comments">
+        <div class="section-header">
+          <i class="fas fa-comments"></i>
+          <span>❹ 댓글 군단</span>
+          <span class="badge" id="commentCount">5</span>
+        </div>
+        <div class="section-content" id="tab-extras"></div>
+      </div>
       
       <!-- 전체 복사/다운로드 -->
       <button class="copy-all-btn" onclick="copyAllContent()">
@@ -3772,14 +3821,20 @@ function typeWriterToInput(text) {
   type();
 }
 
-// 트렌드 선택 (바이럴 질문 퍼포먼스 포함)
+// 트렌드 선택 - V39 컨텍스트 스위칭 (전체 콘텐츠 일괄 업데이트)
+// 사장님 지시: "트렌드 클릭하면 제목만 바뀌는 게 아니라, 답변이랑 댓글까지 그 키워드에 맞춰서 싹 다 새로 고쳐지게 로직을 묶으라"
 function selectTrend(el) {
   document.querySelectorAll('.trend-item').forEach(i => i.classList.remove('active'));
   el.classList.add('active');
   const keyword = el.dataset.keyword;
   
-  // 바이럴 질문 생성 퍼포먼스 실행 (질문이 대장!)
-  runViralQuestionPerformance(keyword);
+  // V39: 기존 데이터 전체 초기화 후 새로운 주제로 일괄 생성
+  // 기존 runViralQuestionPerformance 대신 전체 콘텐츠 생성 API 호출
+  searchEl.value = keyword;
+  charEl.textContent = keyword.length;
+  
+  // 전체 콘텐츠 일괄 생성 (제목-질문-키워드-답변-댓글 동기화)
+  generateFullContent();
 }
 
 // 저장된 결과 데이터 (탭 전환용)
@@ -3946,10 +4001,26 @@ function renderContents(contents) {
   document.getElementById('contentCount').textContent = contents.length;
 }
 
-// 댓글/키워드 탭 렌더링
+// V39 SEO 키워드 별도 섹션 렌더링
+function renderSeoKeywords(keywords) {
+  const container = document.getElementById('seoKeywords');
+  if (!keywords || keywords.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-muted);font-size:13px">키워드 생성 중...</div>';
+    return;
+  }
+  
+  container.innerHTML = keywords.map(k => 
+    '<span class="keyword-tag" onclick="copyKeyword(this, \\'' + k + '\\')"><i class="fas fa-copy"></i> ' + k + '</span>'
+  ).join('');
+}
+
+// 댓글 렌더링 (V39 단일 페이지 흐름)
 function renderExtras(comments, keywords, imageAnalysis) {
   const container = document.getElementById('tab-extras');
   let html = '';
+  
+  // V39: SEO 키워드는 별도 섹션에서 렌더링
+  renderSeoKeywords(keywords);
   
   // 이미지 분석 결과
   if (imageAnalysis) {
@@ -3959,20 +4030,8 @@ function renderExtras(comments, keywords, imageAnalysis) {
     html += '</div>';
   }
   
-  // SEO 키워드
-  if (keywords && keywords.length > 0) {
-    html += '<div style="margin-bottom:20px">';
-    html += '<h4 style="color:var(--accent);margin-bottom:12px;font-size:14px"><i class="fas fa-hashtag"></i> SEO 키워드</h4>';
-    html += '<div class="keyword-list">';
-    keywords.forEach(k => {
-      html += '<span class="keyword-tag" onclick="copyKeyword(this, \\'' + k + '\\')"><i class="fas fa-copy"></i> ' + k + '</span>';
-    });
-    html += '</div></div>';
-  }
-  
   // 댓글
   if (comments && comments.length > 0) {
-    html += '<h4 style="color:var(--orange);margin-bottom:12px;font-size:14px"><i class="fas fa-comments"></i> 여론 조작 댓글 (' + comments.length + '개)</h4>';
     comments.forEach((c, i) => {
       const text = c.text || c;
       const nickname = c.nickname || '카페회원' + (i+1);
@@ -3987,9 +4046,10 @@ function renderExtras(comments, keywords, imageAnalysis) {
         '<div class="item-text">' + text + '</div>' +
       '</div>';
     });
+    document.getElementById('commentCount').textContent = comments.length;
   }
   
-  container.innerHTML = html || '<div style="text-align:center;color:var(--text-muted);padding:40px">데이터가 없습니다</div>';
+  container.innerHTML = html || '<div style="text-align:center;color:var(--text-muted);padding:40px">댓글 데이터가 없습니다</div>';
 }
 
 // 선택 함수
@@ -4109,8 +4169,10 @@ async function goGenerateStream() {
   if (hintSection) hintSection.style.display = 'none';
   resultSection.classList.add('show');
   progressBox.style.display = 'block';
-  document.getElementById('tabNav').style.display = 'none';
+  // V39: 탭 네비게이션 제거됨 - 순차 섹션 초기화
+  document.querySelectorAll('.section-content').forEach(function(c) { c.innerHTML = ''; });
   document.querySelectorAll('.tab-content').forEach(function(c) { c.innerHTML = ''; });
+  document.getElementById('seoKeywords').innerHTML = '';
   
   // 🎯 사용자에게 진행 상황 즉시 안내 (대기 화면)
   progressFill.style.width = '5%';
@@ -4262,10 +4324,9 @@ async function goGenerateStream() {
               progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ SSE 스트리밍 완료! (v' + event.version + ')';
               
               setTimeout(() => {
-                console.log('[XIVIX] 탭 전환 시작');
+                console.log('[XIVIX] V39 순차 흐름 렌더링 완료');
                 progressBox.style.display = 'none';
-                document.getElementById('tabNav').style.display = 'flex';
-                switchTab('titles');
+                // V39: 탭 제거됨 - 모든 섹션이 이미 순차적으로 표시됨
                 // ✅ 생성 완료 후 결과 섹션으로 자동 스크롤
                 resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 // ✅ 이미지 생성 섹션 표시
@@ -4305,10 +4366,11 @@ async function goGenerateStream() {
           progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ SSE 스트리밍 완료! (v' + event.version + ')';
           setTimeout(() => {
             progressBox.style.display = 'none';
-            document.getElementById('tabNav').style.display = 'flex';
-            switchTab('titles');
+            // V39: 탭 제거됨 - 모든 섹션이 이미 순차적으로 표시됨
             // ✅ 생성 완료 후 결과 섹션으로 자동 스크롤
             resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // ✅ 이미지 생성 섹션 표시
+            document.getElementById('imageGenSection').classList.add('show');
           }, 1200);
         }
       } catch (e) {
@@ -4363,6 +4425,13 @@ async function goGenerate() {
   return goGenerateStream();
 }
 
+// V39 전체 콘텐츠 일괄 생성 (트렌드 클릭 시 호출)
+// 사장님 지시: "사용자가 뭘 누르든 모든 결과물은 하나의 주제로 완벽히 동기화"
+function generateFullContent() {
+  // 기존 goGenerate() 호출로 전체 콘텐츠 동기화 생성
+  goGenerate();
+}
+
 // 새로 시작
 function resetAndNew() {
   searchEl.value = '';
@@ -4376,11 +4445,13 @@ function resetAndNew() {
   progressBox.style.display = 'block';
   progressFill.style.width = '0';
   progressPct.textContent = '0%';
-  document.getElementById('tabNav').style.display = 'flex';
+  // V39: 탭 네비게이션 제거됨 - 순차 섹션 초기화
+  document.querySelectorAll('.section-content').forEach(c => c.innerHTML = '');
   document.querySelectorAll('.tab-content').forEach(c => c.innerHTML = '');
   document.getElementById('seoAuditCard').style.display = 'none';
   document.getElementById('reportTable').style.display = 'none';
   document.getElementById('viralQuestions').style.display = 'none';
+  document.getElementById('seoKeywords').innerHTML = '';
   searchEl.focus();
   window.scrollTo({top: 0, behavior: 'smooth'});
 }
