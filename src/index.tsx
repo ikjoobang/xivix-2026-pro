@@ -3396,14 +3396,27 @@ body{
           </div>
         </div>
         
+        <!-- ✅ CEO 지시 (2026.01.19) - source_url 직접 입력 필드 -->
+        <div class="source-url-input-wrapper" style="margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <i class="fas fa-link" style="color:#00D4FF;font-size:12px;"></i>
+            <span style="font-size:12px;color:rgba(255,255,255,0.7);">직접 이미지 URL 입력 (선택사항)</span>
+          </div>
+          <input type="text" id="sourceUrlInput" placeholder="유튜브 캡처본, 설계안 이미지 URL 직접 입력 시 AI 검증 없이 8초 내 가공" 
+            style="width:100%;padding:10px 12px;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.2);border-radius:8px;color:#fff;font-size:13px;outline:none;">
+          <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;">
+            💡 네이버 검색 결과가 부실할 때, 직접 URL을 입력하면 빠르게 처리됩니다
+          </div>
+        </div>
+        
         <button class="image-gen-btn" id="imageGenBtn" onclick="generateMarketingImage()">
           <i class="fas fa-image"></i> 마케팅 이미지 생성
         </button>
         
         <div class="image-gen-loading" id="imageGenLoading">
           <i class="fas fa-spinner fa-spin"></i>
-          <div class="image-gen-loading-text">AI가 이미지를 분석하고 마스킹 중입니다...</div>
-          <div class="image-gen-loading-sub">약 5~10초 소요됩니다</div>
+          <div class="image-gen-loading-text" id="imageGenLoadingText">AI가 이미지를 분석하고 마스킹 중입니다...</div>
+          <div class="image-gen-loading-sub" id="imageGenLoadingSub">약 5~10초 소요됩니다</div>
         </div>
         
         <div class="image-gen-result" id="imageGenResult">
@@ -4681,6 +4694,11 @@ async function generateMarketingImage() {
   const insurance = resultData.insurance || '종합보험';
   const keyword = company + ' ' + insurance + ' 설계안';
   
+  // ✅ CEO 지시 (2026.01.19) - source_url 직접 입력 지원
+  const sourceUrlInput = document.getElementById('sourceUrlInput');
+  const directSourceUrl = sourceUrlInput?.value?.trim() || '';
+  const hasDirectUrl = directSourceUrl.length > 0 && (directSourceUrl.startsWith('http://') || directSourceUrl.startsWith('https://'));
+  
   // 보험사 코드 매핑
   const companyCodeMap = {
     '삼성생명': 'SAMSUNG_LIFE',
@@ -4707,12 +4725,25 @@ async function generateMarketingImage() {
   loading.classList.add('show');
   result.classList.remove('show');
   
+  // ✅ CEO 지시 - 진행 상황 메시지 구체화
+  const loadingText = document.getElementById('imageGenLoadingText');
+  const loadingSub = document.getElementById('imageGenLoadingSub');
+  
+  if (hasDirectUrl) {
+    loadingText.textContent = '직접 입력한 이미지를 가공 중입니다...';
+    loadingSub.textContent = 'AI 검증 없이 빠르게 처리 (약 8초)';
+  } else {
+    loadingText.textContent = '설계안 검색 및 검증 중...';
+    loadingSub.textContent = '검색 결과가 부실하면 표준 샘플로 가공합니다';
+  }
+  
   try {
-    console.log('[XIVIX] 이미지 생성 요청:', { keyword, targetCompany });
+    console.log('[XIVIX] 이미지 생성 요청:', { keyword, targetCompany, hasDirectUrl, directSourceUrl });
     
     // ✅ 미들웨어 API 규격에 맞춘 요청 구조
     // api_key: 최상위에 위치 (필수)
     // request_info: keyword, user_id 필수
+    // source_url: 직접 입력 시 해당 URL 사용, 없으면 현재 페이지 URL
     const response = await fetch('https://xivix-xiim.pages.dev/api/process', {
       method: 'POST',
       headers: { 
@@ -4724,7 +4755,8 @@ async function generateMarketingImage() {
           keyword: keyword,                    // ❗ 필수
           user_id: XIIM_USER_ID,  // ❗ 필수 (운영용 ID)
           target_company: targetCompany,       // 선택
-          source_url: window.location.href     // 선택
+          source_url: hasDirectUrl ? directSourceUrl : window.location.href,  // ✅ 직접 입력 URL 우선
+          skip_verification: hasDirectUrl      // ✅ 직접 URL 입력 시 검증 스킵 요청
         }
       })
     });
