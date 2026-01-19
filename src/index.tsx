@@ -1812,15 +1812,22 @@ body{
 }
 @keyframes gridDrift{to{transform:translate(60px,60px)}}
 
-/* 레이아웃 - 화면 전체 활용 */
+/* ============================================
+   ✅ CEO 지시 (2026.01.19) - v2026.35 UI/UX 최적화
+   - 상단 빈 공간 60% 압축
+   - PC/Tablet: 2컬럼 Grid 레이아웃
+   - Mobile: 1컬럼 Stack + 입력창 하단 Sticky
+   ============================================ */
+
+/* 레이아웃 - 화면 전체 활용 (상단 압축) */
 .wrapper{
   display:flex;
   flex-direction:column;
   align-items:center;
   width:100%;
   max-width:100%;
-  gap:clamp(20px, 3vh, 32px);
-  padding-top:clamp(20px, 4vh, 40px);
+  gap:clamp(12px, 2vh, 20px);  /* 60% 압축: 32px → 20px */
+  padding-top:clamp(8px, 1.5vh, 16px);  /* 60% 압축: 40px → 16px */
 }
 
 /* 네비게이션 */
@@ -1847,33 +1854,28 @@ body{
 }
 .nav a:hover{color:var(--primary);border-color:var(--primary-soft);background:var(--primary-soft)}
 
-/* 로고 */
+/* 로고 - 슬림화 (CEO 지시) */
 .logo{
   display:flex;
   align-items:center;
   justify-content:center;
-  gap:clamp(10px, 1.5vw, 16px);
+  gap:clamp(8px, 1vw, 12px);  /* 슬림화 */
 }
 .logo-icon{
-  width:clamp(44px, 5vw, 56px);
-  height:clamp(44px, 5vw, 56px);
+  width:clamp(32px, 4vw, 40px);  /* 슬림화: 56px → 40px */
+  height:clamp(32px, 4vw, 40px);
   background:linear-gradient(135deg, var(--primary), var(--accent));
-  border-radius:clamp(12px, 1.5vw, 16px);
+  border-radius:clamp(8px, 1vw, 12px);
   display:flex;
   align-items:center;
   justify-content:center;
   font-weight:900;
-  font-size:clamp(18px, 2.2vw, 26px);
+  font-size:clamp(14px, 1.8vw, 20px);  /* 슬림화 */
   color:#fff;
-  box-shadow:0 0 30px rgba(79,140,255,0.25);
-  animation:logoPulse 4s ease-in-out infinite;
-}
-@keyframes logoPulse{
-  0%,100%{box-shadow:0 0 30px rgba(79,140,255,0.25)}
-  50%{box-shadow:0 0 50px rgba(79,140,255,0.35), 0 0 80px rgba(124,92,255,0.15)}
+  box-shadow:0 0 20px rgba(79,140,255,0.2);
 }
 .logo-text{
-  font-size:clamp(22px, 3vw, 32px);
+  font-size:clamp(18px, 2.5vw, 26px);  /* 슬림화: 32px → 26px */
   font-weight:800;
   letter-spacing:-0.5px;
 }
@@ -1892,13 +1894,51 @@ body{
   text-align:center;
 }
 
-/* 메인 컨테이너 - 화면 전체 활용 */
+/* 메인 컨테이너 - 2컬럼 Grid (PC/Tablet), 1컬럼 (Mobile) */
 .main{
   width:100%;
-  max-width:1200px;
+  max-width:1400px;  /* 확장: 1200px → 1400px */
+  display:grid;
+  grid-template-columns:1fr 1fr;  /* 2컬럼 Grid (PC/Tablet) */
+  gap:clamp(16px, 2vh, 24px);
+  align-items:start;
+}
+/* 왼쪽 컬럼: 입력/트렌드 */
+.main-left{
   display:flex;
   flex-direction:column;
-  gap:clamp(20px, 3vh, 32px);
+  gap:16px;
+  position:sticky;
+  top:20px;
+}
+/* 오른쪽 컬럼: 결과물 스트리밍 */
+.main-right{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+  max-height:calc(100vh - 120px);
+  overflow-y:auto;
+  padding-right:8px;
+}
+.main-right::-webkit-scrollbar{width:6px}
+.main-right::-webkit-scrollbar-track{background:transparent}
+.main-right::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* 모바일: 1컬럼 Stack */
+@media(max-width:900px){
+  .main{
+    grid-template-columns:1fr;
+    max-width:100%;
+  }
+  .main-left{
+    position:relative;
+    top:0;
+  }
+  .main-right{
+    max-height:none;
+    overflow-y:visible;
+    order:-1;  /* 결과물 상단 배치 (CEO 지시) */
+  }
 }
 
 /* GPT 스타일 검색창 */
@@ -2499,6 +2539,58 @@ body{
   padding:20px;
   margin-bottom:20px;
 }
+
+/* ✅ CEO 지시 - Real-time Process Tracker CSS */
+.process-tracker{
+  margin-top:16px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.tracker-step{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 14px;
+  background:rgba(255,255,255,0.02);
+  border-radius:10px;
+  border-left:3px solid var(--border);
+  opacity:0.5;
+  transition:all 0.3s ease;
+}
+.tracker-step[data-status="active"]{
+  opacity:1;
+  border-left-color:var(--primary);
+  background:rgba(79,140,255,0.08);
+}
+.tracker-step[data-status="active"] .tracker-icon{
+  animation:pulse 1s infinite;
+}
+.tracker-step[data-status="done"]{
+  opacity:1;
+  border-left-color:var(--green);
+  background:rgba(16,185,129,0.08);
+}
+.tracker-icon{font-size:18px}
+.tracker-text{font-size:13px;color:var(--text-muted)}
+.tracker-step[data-status="active"] .tracker-text,
+.tracker-step[data-status="done"] .tracker-text{color:var(--text)}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+
+.tracker-complete{
+  margin-top:16px;
+  padding:14px 18px;
+  background:linear-gradient(135deg, rgba(16,185,129,0.15), rgba(79,140,255,0.1));
+  border:1px solid rgba(16,185,129,0.3);
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:14px;
+  color:var(--green);
+}
+.tracker-complete i{font-size:20px}
+.tracker-complete b{color:var(--primary)}
 .progress-header{
   display:flex;
   justify-content:space-between;
@@ -3244,7 +3336,15 @@ body{
   
   <p class="title">AI 보험 전문가 콘텐츠 생성 엔진</p>
   
+  <!-- ✅ CEO 지시 - 일일 사용량 표시 -->
+  <div class="usage-display" style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:8px;">
+    <span id="usageDisplay">오늘 남은 횟수: 4/4</span>
+  </div>
+  
   <div class="main">
+    
+    <!-- ✅ CEO 지시 - 왼쪽 컬럼: 입력/트렌드 -->
+    <div class="main-left">
     
     <!-- GPT 스타일 검색창 + 파일 업로드 -->
     <div class="search-box" id="searchBox">
@@ -3312,14 +3412,46 @@ body{
       </div>
     </div>
     
+    </div><!-- // main-left 닫기 -->
+    
+    <!-- ✅ CEO 지시 - 오른쪽 컬럼: 결과물 스트리밍 -->
+    <div class="main-right">
+    
     <!-- 결과 영역 (탭 분할 UI) -->
     <div class="result-section" id="resultSection">
+      <!-- ✅ CEO 지시 - Real-time Process Tracker -->
       <div class="progress-box" id="progressBox">
         <div class="progress-header">
           <span id="progressText" class="progress-text"><i class="fas fa-spinner fa-spin"></i> 분석 중...</span>
           <span id="progressPct" class="progress-pct">0%</span>
         </div>
         <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+        
+        <!-- Real-time Process Tracker Steps -->
+        <div class="process-tracker" id="processTracker">
+          <div class="tracker-step" id="trackerStep1" data-status="pending">
+            <span class="tracker-icon">🔍</span>
+            <span class="tracker-text">데이터 분석 및 컨텍스트 로딩 중</span>
+          </div>
+          <div class="tracker-step" id="trackerStep2" data-status="pending">
+            <span class="tracker-icon">✅</span>
+            <span class="tracker-text">날카로운 제목 및 미끼 질문 생성 완료</span>
+          </div>
+          <div class="tracker-step" id="trackerStep3" data-status="pending">
+            <span class="tracker-icon">✍️</span>
+            <span class="tracker-text">❶❷❸ 전문가 답변 정밀 분석 중</span>
+          </div>
+          <div class="tracker-step" id="trackerStep4" data-status="pending">
+            <span class="tracker-icon">💬</span>
+            <span class="tracker-text">사회적 증거(댓글) 동기화 완료</span>
+          </div>
+        </div>
+        
+        <!-- 완료 CTA -->
+        <div class="tracker-complete" id="trackerComplete" style="display:none">
+          <i class="fas fa-check-circle"></i>
+          <span>분석 완료! 하단 <b>[마케팅 이미지 생성]</b> 버튼을 클릭하세요.</span>
+        </div>
       </div>
       
       <!-- SEO 감사 리포트 (상단) -->
@@ -3428,8 +3560,10 @@ body{
       </div>
     </div>
     
-  </div>
-</div>
+    </div><!-- // main-right 닫기 -->
+    
+  </div><!-- // main 닫기 -->
+</div><!-- // wrapper 닫기 -->
 
 <script>
 const searchEl = document.getElementById('search');
@@ -3455,6 +3589,84 @@ let uploadedFiles = [];
 let isGenerating = false;
 let lastTrendUpdate = null;
 
+// ============================================
+// ✅ CEO 지시 (2026.01.19) - 일일 4회 생성 제한 로직
+// ============================================
+const DAILY_LIMIT = 4;
+const USAGE_KEY = 'xivix_daily_usage';
+
+function getDailyUsage() {
+  const stored = localStorage.getItem(USAGE_KEY);
+  if (!stored) return { count: 0, date: new Date().toDateString() };
+  const data = JSON.parse(stored);
+  // 날짜가 바뀌면 리셋 (00:00 KST)
+  if (data.date !== new Date().toDateString()) {
+    return { count: 0, date: new Date().toDateString() };
+  }
+  return data;
+}
+
+function incrementUsage() {
+  const usage = getDailyUsage();
+  usage.count++;
+  usage.date = new Date().toDateString();
+  localStorage.setItem(USAGE_KEY, JSON.stringify(usage));
+  updateUsageDisplay();
+  return usage.count;
+}
+
+function canGenerate() {
+  const usage = getDailyUsage();
+  return usage.count < DAILY_LIMIT;
+}
+
+function getRemainingCount() {
+  const usage = getDailyUsage();
+  return Math.max(0, DAILY_LIMIT - usage.count);
+}
+
+function updateUsageDisplay() {
+  const remaining = getRemainingCount();
+  const usageEl = document.getElementById('usageDisplay');
+  if (usageEl) {
+    usageEl.textContent = '오늘 남은 횟수: ' + remaining + '/' + DAILY_LIMIT;
+    usageEl.style.color = remaining <= 1 ? '#ef4444' : 'rgba(255,255,255,0.6)';
+  }
+}
+
+// ============================================
+// ✅ CEO 지시 - ❶❷❸ 기호 검증 로직
+// 전문가 답변에 기호 누락 시 자동 재호출
+// ============================================
+function validateTypography(content) {
+  if (!content) return false;
+  const requiredSymbols = ['❶', '❷', '❸'];
+  return requiredSymbols.every(symbol => content.includes(symbol));
+}
+
+// ============================================
+// ✅ CEO 지시 - Process Tracker 업데이트 함수
+// ============================================
+function updateTrackerStep(stepNum, status) {
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById('trackerStep' + i);
+    if (el) {
+      if (i < stepNum) {
+        el.setAttribute('data-status', 'done');
+      } else if (i === stepNum) {
+        el.setAttribute('data-status', status);
+      } else {
+        el.setAttribute('data-status', 'pending');
+      }
+    }
+  }
+  // 완료 시 CTA 표시
+  if (stepNum > 4 || (stepNum === 4 && status === 'done')) {
+    const completeEl = document.getElementById('trackerComplete');
+    if (completeEl) completeEl.style.display = 'flex';
+  }
+}
+
 // ✅ V39 기본 옵션값 - 하드코딩 나이 제거 (CEO 지시)
 // target은 사용자 입력에서 동적 추출하므로 빈 값으로 설정
 const DEFAULT_OPTIONS = {
@@ -3463,6 +3675,9 @@ const DEFAULT_OPTIONS = {
   company: '',  // 동적 추출
   style: '전문가 팩트체크형'
 };
+
+// 페이지 로드 시 사용량 표시 업데이트
+document.addEventListener('DOMContentLoaded', updateUsageDisplay);
 
 // 글자수 카운트
 searchEl.addEventListener('input', () => {
@@ -4334,6 +4549,12 @@ function copyAllContent() {
 // 실시간으로 진행 상황 표시 + 본문 글자 단위 출력
 // ============================================
 async function goGenerateStream() {
+  // ✅ CEO 지시 - 일일 4회 생성 제한 체크
+  if (!canGenerate()) {
+    alert('⚠️ 오늘의 생성 횟수(' + DAILY_LIMIT + '회)를 모두 사용했습니다.\\n\\n내일 00:00에 초기화됩니다.\\n프리미엄 요금제로 업그레이드하면 무제한 이용 가능합니다.');
+    return;
+  }
+  
   let q = searchEl.value.trim();
   
   // 입력이 비어있으면 랜덤 트렌드 키워드로 자동 채우기
@@ -4359,6 +4580,10 @@ async function goGenerateStream() {
   
   if (isGenerating) return;
   isGenerating = true;
+  
+  // ✅ CEO 지시 - 사용량 증가 및 Process Tracker 초기화
+  incrementUsage();
+  updateTrackerStep(1, 'active');
   
   // ⚡ 즉시 UI 반응 - 버튼 로딩 상태
   btn.classList.add('loading');
