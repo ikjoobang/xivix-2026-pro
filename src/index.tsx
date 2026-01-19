@@ -1986,11 +1986,11 @@ body{
 .wrapper{
   display:flex;
   flex-direction:column;
-  align-items:stretch;  /* 전체 너비 활용 */
+  align-items:center;  /* 중앙 정렬 */
   width:100%;
   max-width:100%;
-  gap:8px;  /* 70% 압축: 24px → 8px */
-  padding:8px 16px;  /* 최소 패딩 */
+  gap:12px;
+  padding:12px 24px;
 }
 
 /* 상단 헤더 바 - 로고 좌측, 사용량 중앙, 메뉴 우측 */
@@ -2090,9 +2090,10 @@ body{
 .main{
   width:100%;
   max-width:1400px;  /* 확장: 1200px → 1400px */
+  margin:0 auto;  /* 중앙 정렬 */
   display:grid;
-  grid-template-columns:1fr 1fr;  /* 2컬럼 Grid (PC/Tablet) */
-  gap:clamp(16px, 2vh, 24px);
+  grid-template-columns:1fr 1fr !important;  /* 2컬럼 Grid (PC/Tablet) - 강제 적용 */
+  gap:24px;
   align-items:start;
 }
 /* 왼쪽 컬럼: 입력/트렌드 */
@@ -2145,7 +2146,7 @@ body{
     margin-left:auto;
   }
   .main{
-    grid-template-columns:1fr;
+    grid-template-columns:1fr !important;  /* 모바일: 1컬럼 */
     max-width:100%;
     gap:12px;
   }
