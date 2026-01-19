@@ -4739,10 +4739,25 @@ async function generateMarketingImage() {
     
     if (result.status === 'success') {
       // ❗ 핵심: result.data.final_url 경로로 읽기 (CEO 지시)
-      const imageUrl = result.data.final_url;
+      let imageUrl = result.data.final_url;
       
       if (!imageUrl) {
         throw new Error('이미지 URL이 응답에 포함되지 않았습니다.');
+      }
+      
+      // ============================================
+      // ✅ CEO 지시 (2026.01.19) - /demo/ 경로 검증 및 차단
+      // XIIM 미들웨어가 /demo/ 경로를 반환하면 404 에러 발생
+      // 정상 경로: /xivix/raw/
+      // ============================================
+      if (imageUrl.includes('/demo/')) {
+        console.error('[XIVIX] 잘못된 경로 감지: /demo/ 경로는 유효하지 않음');
+        throw new Error('INVALID_PATH: 이미지 경로가 유효하지 않습니다. 다시 시도해 주세요.');
+      }
+      
+      // Cloudinary URL 유효성 검증
+      if (!imageUrl.includes('cloudinary.com') || !imageUrl.includes('/xivix/')) {
+        console.warn('[XIVIX] 비표준 URL 감지:', imageUrl);
       }
       
       // 성공: 이미지 표시
@@ -4792,32 +4807,32 @@ async function downloadGeneratedImage() {
   }
   
   // ============================================
-  // ✅ CEO 지시 (2026.01.19) - 다운로드 로직 수정
-  // Cloudinary 이미지는 CORS 문제로 fetch 불가
-  // fl_attachment 파라미터로 직접 다운로드 URL 생성
+  // ✅ CEO 지시 (2026.01.19) - 다운로드 로직 최종 수정
+  // 1. /demo/ 경로 차단
+  // 2. fl_attachment로 강제 다운로드
+  // 3. 새 창에서 직접 열기 (가장 안정적)
   // ============================================
   try {
+    // /demo/ 경로 차단
+    if (generatedImageUrl.includes('/demo/')) {
+      alert('이미지 경로가 유효하지 않습니다. 이미지를 다시 생성해 주세요.');
+      return;
+    }
+    
     // Cloudinary URL에 fl_attachment 추가하여 강제 다운로드
     let downloadUrl = generatedImageUrl;
-    if (generatedImageUrl.includes('cloudinary.com')) {
-      // /upload/ 뒤에 fl_attachment 삽입
+    if (generatedImageUrl.includes('cloudinary.com') && generatedImageUrl.includes('/upload/')) {
       downloadUrl = generatedImageUrl.replace('/upload/', '/upload/fl_attachment/');
     }
     
-    // 새 탭에서 다운로드 (브라우저가 자동으로 파일 저장)
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = 'XIVIX_마케팅이미지_' + Date.now() + '.jpg';
-    a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    console.log('[XIVIX] 다운로드 시작:', downloadUrl);
     
-    console.log('[XIVIX] 다운로드 URL:', downloadUrl);
+    // 새 창에서 직접 열기 (브라우저가 Content-Disposition: attachment 헤더 보고 자동 다운로드)
+    window.open(downloadUrl, '_blank');
     
   } catch (error) {
     console.error('[XIVIX] 이미지 다운로드 오류:', error);
-    window.open(generatedImageUrl, '_blank');
+    alert('다운로드 중 오류가 발생했습니다: ' + error.message);
   }
 }
 </script>
