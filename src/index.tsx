@@ -2726,6 +2726,97 @@ body{
 .new-btn.show{display:flex;align-items:center;justify-content:center;gap:8px}
 .new-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
 
+/* ============================================
+   🖼️ AI 이미지 생성 섹션
+   ============================================ */
+.image-gen-section{
+  margin-top:24px;
+  padding:20px;
+  background:linear-gradient(135deg, rgba(79,140,255,0.08), rgba(124,92,255,0.08));
+  border:1px solid rgba(79,140,255,0.2);
+  border-radius:16px;
+  display:none;
+}
+.image-gen-section.show{display:block}
+.image-gen-header{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:16px;
+}
+.image-gen-header i{
+  font-size:24px;
+  color:var(--accent);
+}
+.image-gen-title{
+  font-size:16px;
+  font-weight:700;
+  color:var(--text);
+}
+.image-gen-subtitle{
+  font-size:12px;
+  color:var(--text-muted);
+  margin-top:2px;
+}
+.image-gen-btn{
+  width:100%;
+  padding:14px;
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  border:none;
+  border-radius:12px;
+  color:#fff;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  transition:all 0.2s;
+}
+.image-gen-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(79,140,255,0.3)}
+.image-gen-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+.image-gen-loading{
+  margin-top:16px;
+  padding:16px;
+  background:rgba(0,0,0,0.3);
+  border-radius:12px;
+  text-align:center;
+  display:none;
+}
+.image-gen-loading.show{display:block}
+.image-gen-loading i{font-size:28px;color:var(--primary);margin-bottom:8px}
+.image-gen-loading-text{font-size:14px;color:var(--text);margin-bottom:4px}
+.image-gen-loading-sub{font-size:12px;color:var(--text-muted)}
+.image-gen-result{
+  margin-top:16px;
+  display:none;
+}
+.image-gen-result.show{display:block}
+.image-gen-preview{
+  width:100%;
+  border-radius:12px;
+  border:2px solid var(--border);
+  margin-bottom:12px;
+}
+.image-download-btn{
+  width:100%;
+  padding:12px;
+  background:var(--green);
+  border:none;
+  border-radius:10px;
+  color:#fff;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  transition:all 0.2s;
+}
+.image-download-btn:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(16,185,129,0.3)}
+
 /* 반응형 - 데스크톱 (1200px+) */
 @media(min-width:1200px){
   .main{max-width:1400px}
@@ -2864,6 +2955,27 @@ body{
     box-shadow:0 0 30px rgba(79,140,255,0.5), 0 8px 30px rgba(79,140,255,0.3) !important;
   }
   
+  /* 이미지 생성 섹션 */
+  .image-gen-section{
+    background:linear-gradient(135deg, rgba(79,140,255,0.1), rgba(0,255,133,0.1)) !important;
+    border:2px solid rgba(0,255,133,0.4) !important;
+    box-shadow:0 0 30px rgba(0,255,133,0.2) !important;
+  }
+  .image-gen-btn{
+    background:linear-gradient(135deg, #00FF85, #B6FF3B) !important;
+    color:#000 !important;
+    border:none !important;
+    box-shadow:0 0 25px rgba(0,255,133,0.5) !important;
+    font-weight:900 !important;
+  }
+  .image-download-btn{
+    background:#FFBF00 !important;
+    color:#000 !important;
+    border:2px solid #FFA500 !important;
+    box-shadow:0 0 20px rgba(255,191,0,0.4) !important;
+    font-weight:800 !important;
+  }
+
   /* 결과 섹션 헤더 */
   .result-section{
     border:2px solid rgba(0,255,133,0.3) !important;
@@ -3069,6 +3181,34 @@ body{
       <button class="new-btn show" id="newBtn" onclick="resetAndNew()">
         <i class="fas fa-plus"></i> 새로운 콘텐츠 생성
       </button>
+      
+      <!-- 🖼️ AI 이미지 생성 섹션 -->
+      <div class="image-gen-section" id="imageGenSection">
+        <div class="image-gen-header">
+          <i class="fas fa-magic"></i>
+          <div>
+            <div class="image-gen-title">AI 마케팅 이미지 생성</div>
+            <div class="image-gen-subtitle">보험사명 + 담보 정보로 마스킹된 이미지 자동 생성</div>
+          </div>
+        </div>
+        
+        <button class="image-gen-btn" id="imageGenBtn" onclick="generateMarketingImage()">
+          <i class="fas fa-image"></i> 마케팅 이미지 생성
+        </button>
+        
+        <div class="image-gen-loading" id="imageGenLoading">
+          <i class="fas fa-spinner fa-spin"></i>
+          <div class="image-gen-loading-text">AI가 이미지를 분석하고 마스킹 중입니다...</div>
+          <div class="image-gen-loading-sub">약 5~10초 소요됩니다</div>
+        </div>
+        
+        <div class="image-gen-result" id="imageGenResult">
+          <img class="image-gen-preview" id="imageGenPreview" src="" alt="생성된 마케팅 이미지">
+          <button class="image-download-btn" id="imageDownloadBtn" onclick="downloadGeneratedImage()">
+            <i class="fas fa-download"></i> 이미지 다운로드
+          </button>
+        </div>
+      </div>
     </div>
     
   </div>
@@ -4128,6 +4268,8 @@ async function goGenerateStream() {
                 switchTab('titles');
                 // ✅ 생성 완료 후 결과 섹션으로 자동 스크롤
                 resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // ✅ 이미지 생성 섹션 표시
+                document.getElementById('imageGenSection').classList.add('show');
               }, 1200);
               break;
               
@@ -4252,6 +4394,98 @@ searchEl.addEventListener('keydown', (e) => {
 
 // 초기화 (처음 1회만 로드, 이후 수동 새로고침)
 loadTrends();
+
+// ============================================
+// 🖼️ AI 마케팅 이미지 생성 기능
+// 미들웨어 서버: https://xivix-xiim.pages.dev/api/process
+// ============================================
+let generatedImageUrl = '';
+
+async function generateMarketingImage() {
+  const btn = document.getElementById('imageGenBtn');
+  const loading = document.getElementById('imageGenLoading');
+  const result = document.getElementById('imageGenResult');
+  
+  // 데이터 검증
+  if (!resultData || !resultData.insurance) {
+    alert('먼저 콘텐츠를 생성해 주세요.');
+    return;
+  }
+  
+  // 키워드 구성: 보험사명 + 담보내용
+  const company = resultData.company || '삼성생명';
+  const insurance = resultData.insurance || '종합보험';
+  const keyword = company + ' ' + insurance;
+  
+  // UI 상태 변경
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 생성 중...';
+  loading.classList.add('show');
+  result.classList.remove('show');
+  
+  try {
+    // 미들웨어 서버로 POST 요청
+    const response = await fetch('https://xivix-xiim.pages.dev/api/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        keyword: keyword,
+        user_id: 'xivix_user_' + Date.now()
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('서버 응답 오류: ' + response.status);
+    }
+    
+    const data = await response.json();
+    
+    if (data.processed_image_url) {
+      // 성공: 이미지 표시
+      generatedImageUrl = data.processed_image_url;
+      document.getElementById('imageGenPreview').src = generatedImageUrl;
+      result.classList.add('show');
+    } else if (data.error) {
+      throw new Error(data.error);
+    } else {
+      throw new Error('이미지 URL을 받지 못했습니다.');
+    }
+    
+  } catch (error) {
+    console.error('[XIVIX] 이미지 생성 오류:', error);
+    alert('이미지 생성 중 오류가 발생했습니다.\\n' + error.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-image"></i> 마케팅 이미지 생성';
+    loading.classList.remove('show');
+  }
+}
+
+async function downloadGeneratedImage() {
+  if (!generatedImageUrl) {
+    alert('다운로드할 이미지가 없습니다.');
+    return;
+  }
+  
+  try {
+    const response = await fetch(generatedImageUrl);
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'XIVIX_마케팅이미지_' + Date.now() + '.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+  } catch (error) {
+    console.error('[XIVIX] 이미지 다운로드 오류:', error);
+    // 직접 링크 열기 (fallback)
+    window.open(generatedImageUrl, '_blank');
+  }
+}
 </script>
 </body>
 </html>`
