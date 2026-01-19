@@ -4597,8 +4597,9 @@ loadTrends();
 // ============================================
 let generatedImageUrl = '';
 
-// 미들웨어 API 키 (프로덕션에서는 환경변수로 관리)
-const XIIM_API_KEY = 'xivix_2026_pro_key';
+// 미들웨어 API 키 (운영용 - 2026.01.19 CEO 지시로 업데이트)
+const XIIM_API_KEY = 'xivix_prod_a752571bf2f96ac9c54e5720c05a56b7';
+const XIIM_USER_ID = 'xivix_production';
 
 async function generateMarketingImage() {
   const btn = document.getElementById('imageGenBtn');
@@ -4657,7 +4658,7 @@ async function generateMarketingImage() {
         api_key: XIIM_API_KEY,  // ❗ 최상위에 위치 필수
         request_info: {
           keyword: keyword,                    // ❗ 필수
-          user_id: 'xivix_2026_pro_' + Date.now(),  // ❗ 필수
+          user_id: XIIM_USER_ID,  // ❗ 필수 (운영용 ID)
           target_company: targetCompany,       // 선택
           source_url: window.location.href     // 선택
         }
