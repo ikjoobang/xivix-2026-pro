@@ -4781,18 +4781,49 @@ async function generateMarketingImage() {
     
   } catch (error) {
     console.error('[XIVIX] 이미지 생성 오류:', error);
-    // 사용자 친화적 에러 메시지
+    
+    // ============================================
+    // ✅ CEO 지시 (2026.01.19) - UX 고도화
+    // 에러 코드별 친절한 안내 및 대안 제시
+    // ============================================
     let userMsg = '이미지 생성 중 오류가 발생했습니다.';
-    if (error.message.includes('INVALID_REQUEST')) {
+    let showSourceUrlInput = false;
+    
+    if (error.message.includes('VERIFICATION_FAILED')) {
+      // 🔴 현재 주요 병목: 광고 이미지 수집 시
+      userMsg = '⚠️ 적절한 설계안 이미지를 찾지 못했습니다.\\n\\n';
+      userMsg += '검색에서 광고/홍보 이미지가 수집되어 검증에 실패했습니다.\\n\\n';
+      userMsg += '💡 해결 방법:\\n';
+      userMsg += '1. 다른 보험사/상품으로 다시 시도해 보세요.\\n';
+      userMsg += '2. 직접 설계안 이미지 URL을 입력할 수 있습니다.';
+      showSourceUrlInput = true;
+    } else if (error.message.includes('INVALID_IMAGE') || error.message.includes('UPLOAD_FAILED')) {
+      userMsg = '⚠️ 이미지 파일이 손상되었습니다.\\n\\n';
+      userMsg += '수집된 이미지가 유효하지 않습니다.\\n\\n';
+      userMsg += '💡 해결: "다시 생성하기" 버튼을 눌러주세요.';
+    } else if (error.message.includes('SCRAPING_FAILED')) {
+      userMsg = '⚠️ 이미지 수집에 실패했습니다.\\n\\n';
+      userMsg += '네트워크 문제 또는 검색 결과가 없습니다.\\n\\n';
+      userMsg += '💡 해결: 잠시 후 다시 시도해 주세요.';
+    } else if (error.message.includes('INVALID_REQUEST')) {
       userMsg += '\\n\\n원인: API 키 또는 필수 파라미터 누락\\n해결: 관리자에게 문의해 주세요.';
     } else if (error.message.includes('FORBIDDEN')) {
       userMsg += '\\n\\n원인: 접근 권한 없음\\n해결: 허용된 도메인에서 접속해 주세요.';
     } else if (error.message.includes('RATE_LIMIT')) {
       userMsg += '\\n\\n원인: 일일 사용량 초과\\n해결: 내일 다시 시도해 주세요.';
+    } else if (error.message.includes('INVALID_PATH')) {
+      userMsg = '⚠️ 이미지 경로가 유효하지 않습니다.\\n\\n';
+      userMsg += '💡 해결: 다시 생성하기 버튼을 눌러주세요.';
     } else {
       userMsg += '\\n\\n' + error.message;
     }
+    
     alert(userMsg);
+    
+    // VERIFICATION_FAILED 시 source_url 입력 모달 표시 (향후 구현)
+    if (showSourceUrlInput) {
+      console.log('[XIVIX] source_url 직접 입력 안내 - 향후 입력창 모달 추가 예정');
+    }
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-image"></i> 마케팅 이미지 생성';
