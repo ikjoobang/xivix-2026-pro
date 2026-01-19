@@ -17,15 +17,36 @@ app.use('/*', cors())
 // 모델 설정 (용도별 분리)
 // ============================================
 // ============================================
-// ✅ XIVIX V38 최종 설계도 - 모델 설정
-// gemini-2.5-pro: 전문가 브레인 (품질 글쓰기, 1,200자 전문가 답변)
+// ✅ XIVIX V39 FINAL_LOGIC_SYNC - 모델 설정
+// gemini-2.5-pro: 전문가 브레인 (품질 글쓰기)
 // gemini-2.0-flash: 데이터 엔진 (빠른 처리, 제목/질문 생성)
-// API 검증 완료: 2026.01.18
+// API 검증 완료: 2026.01.19
 // ============================================
 const ENGINE = {
   FLASH: 'gemini-2.0-flash',       // 데이터 엔진 (빠른 처리용)
   PRO: 'gemini-2.5-pro',           // 전문가 브레인 (품질 글쓰기용)
-  VISION: 'gemini-2.0-flash'       // 이미지 분석용
+  VISION: 'gemini-2.5-pro'         // 이미지 OCR 분석용 (PRO로 변경 - 담보/보험료 추출)
+}
+
+// ============================================
+// 🎲 콘텐츠 길이 가변제 (Short/Mid/Long 랜덤 출력)
+// 지루한 답변 방지 - 핵심 위주 전달
+// ============================================
+const CONTENT_LENGTH_MODES = {
+  SHORT: { min: 350, max: 450, label: '핵심형', probability: 0.3 },
+  MID: { min: 600, max: 800, label: '적정형', probability: 0.5 },
+  LONG: { min: 1000, max: 1300, label: '상세형', probability: 0.2 }
+}
+
+function selectContentLength(): { mode: string, min: number, max: number, label: string } {
+  const rand = Math.random()
+  if (rand < CONTENT_LENGTH_MODES.SHORT.probability) {
+    return { mode: 'SHORT', ...CONTENT_LENGTH_MODES.SHORT }
+  } else if (rand < CONTENT_LENGTH_MODES.SHORT.probability + CONTENT_LENGTH_MODES.MID.probability) {
+    return { mode: 'MID', ...CONTENT_LENGTH_MODES.MID }
+  } else {
+    return { mode: 'LONG', ...CONTENT_LENGTH_MODES.LONG }
+  }
 }
 
 // ============================================
@@ -1045,19 +1066,47 @@ app.post('/api/generate/full-package-stream', async (c) => {
       // Step 1: 이미지 분석 (우선순위 1)
       await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '🔍 API 연결 및 트렌드 분석 중...' }) + '\n')
       
+      // ============================================
+      // 🔥 V39 USER_CONTEXT_PRIORITY: 사용자 입력 강제 바인딩
+      // 사용자가 입력한 문장 = 모든 콘텐츠의 뿌리 데이터
+      // ============================================
+      const userContextAngle = inputTopic // 사용자 입력 원본 보존
+      
       if (image) {
         contextSource = 'image'
-        await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '🖼️ 이미지 분석 중 (최우선 컨텍스트)...' }) + '\n')
+        await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '🖼️ 이미지 OCR 분석 중 (담보/보험료 추출)...' }) + '\n')
         
-        const visionPrompt = `이미지를 분석하고 detected_keyword(보험 종류), company(보험사), summary(요약)을 JSON으로 응답.`
-        const visionEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`
+        // V39: 강화된 이미지 OCR 프롬프트 - 담보 정보/보험료 즉시 대입
+        const visionPrompt = `## 보험 설계서/증권 이미지 OCR 분석 ##
+
+🚨 [최우선 지시] 이미지에서 다음 정보를 정확히 추출하세요:
+
+1. detected_keyword: 보험 종류 (암보험, 실손보험, 종신보험, 치매보험 등)
+2. company: 보험사명
+3. monthly_premium: 월 보험료 (숫자만, 예: 124000)
+4. total_premium: 총 보험료 또는 납입기간
+5. insured_name: 피보험자 이름 (있으면)
+6. insured_age: 피보험자 나이 (있으면)
+7. contract_date: 계약일자 (있으면)
+8. summary: 설계서 핵심 요약 (2~3문장)
+
+9. report_data: 담보 항목 배열 (가장 중요!)
+   - item: 담보명 (예: 암 진단비, 수술비, 입원일당 등)
+   - current: 현재 가입 금액 (예: 3,000만원)
+   - target: 권장 금액 (예: 5,000만원) - 없으면 null
+   - status: "critical" | "essential" | "good"
+
+모든 숫자와 담보 정보를 이미지에서 정확히 읽어 JSON으로 응답하세요.
+이미지에 없는 정보는 null로 표시하세요.`
+
+        const visionEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.VISION}:generateContent?key=${proKey}`
         
         const visionResponse = await fetch(visionEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ role: 'user', parts: [{ text: visionPrompt }, { inline_data: { mime_type: mimeType, data: image } }] }],
-            generationConfig: { temperature: 0.4, maxOutputTokens: 2048, responseMimeType: 'application/json' }
+            generationConfig: { temperature: 0.2, maxOutputTokens: 4096, responseMimeType: 'application/json' }
           })
         })
         
@@ -1067,13 +1116,35 @@ app.post('/api/generate/full-package-stream', async (c) => {
           try {
             const parsed = JSON.parse(rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim())
             if (parsed.detected_keyword) {
-              topic = parsed.detected_keyword
+              // 🔥 이미지에서 추출한 키워드 + 사용자 입력 병합
+              topic = userContextAngle ? `${userContextAngle} (${parsed.detected_keyword})` : parsed.detected_keyword
               imageDetectedKeyword = parsed.detected_keyword
             }
-            imageAnalysis = parsed.summary || rawText
+            imageAnalysis = JSON.stringify({
+              company: parsed.company,
+              premium: parsed.monthly_premium,
+              insured_age: parsed.insured_age,
+              summary: parsed.summary
+            })
             reportData = parsed.report_data || []
-            await stream.write(JSON.stringify({ type: 'context_switch', from: trendKeyword || inputTopic, to: topic, source: 'image' }) + '\n')
-          } catch (e) { imageAnalysis = rawText }
+            
+            // OCR 결과 스트림 전송
+            await stream.write(JSON.stringify({ 
+              type: 'ocr_result', 
+              data: {
+                keyword: parsed.detected_keyword,
+                company: parsed.company,
+                premium: parsed.monthly_premium,
+                insured_age: parsed.insured_age,
+                report_data_count: reportData.length
+              }
+            }) + '\n')
+            await stream.write(JSON.stringify({ type: 'context_switch', from: userContextAngle || trendKeyword, to: topic, source: 'image' }) + '\n')
+          } catch (e) { 
+            imageAnalysis = rawText
+            // 파싱 실패해도 사용자 입력은 유지
+            if (userContextAngle) topic = userContextAngle
+          }
         }
       } else if (inputTopic) {
         contextSource = 'input'
@@ -1158,11 +1229,29 @@ JSON 형식으로만 응답:
       await stream.write(JSON.stringify({ type: 'titles', data: titles }) + '\n')
       await stream.write(JSON.stringify({ type: 'viral_questions', data: viralQuestions }) + '\n')
       
-      // Step 3: 본문 3개 생성 (1,200자 이상 압도적 정보량)
-      await stream.write(JSON.stringify({ type: 'step', step: 4, msg: '📝 전문가 본문 생성 중 (1,200자 이상)...' }) + '\n')
+      // ============================================
+      // Step 3: 본문 3개 생성 - V39 가변 길이 시스템
+      // Short(400자) / Mid(700자) / Long(1,200자) 랜덤 출력
+      // ============================================
+      const lengthMode = selectContentLength()
+      await stream.write(JSON.stringify({ 
+        type: 'step', 
+        step: 4, 
+        msg: `📝 전문가 본문 생성 중 (${lengthMode.label} ${lengthMode.min}~${lengthMode.max}자)...` 
+      }) + '\n')
       
       const styles = ['공감형', '팩트형', '영업형']
       const contents: any[] = []
+      
+      // 이미지 OCR 데이터가 있으면 본문에 강제 바인딩
+      const ocrDataBinding = reportData.length > 0 
+        ? `\n\n■ [이미지에서 추출한 담보 정보 - 반드시 답변에 언급할 것!]\n${reportData.map((r: any) => `- ${r.item}: 현재 ${r.current || '미가입'} → 권장 ${r.target || '확인 필요'} (${r.status === 'critical' ? '⚠️위험' : r.status === 'essential' ? '📌필수' : '✅양호'})`).join('\n')}`
+        : ''
+      
+      // 사용자 입력 원본 강제 바인딩
+      const userInputBinding = userContextAngle 
+        ? `\n\n🚨 [USER_CONTEXT_PRIORITY - 최우선 반영 필수!]\n사용자의 원본 고민: "${userContextAngle}"\n→ 이 고민에 직접적으로 답변해야 합니다. 엉뚱한 소리 금지!`
+        : ''
       
       for (let i = 0; i < 3; i++) {
         const style = styles[i]
@@ -1171,68 +1260,62 @@ JSON 형식으로만 응답:
         // 전문 지식 베이스 참조
         let expertKnowledge = ''
         if (insuranceProduct.includes('상속') || insuranceProduct.includes('증여') || topic.includes('상속') || topic.includes('증여')) {
-          expertKnowledge = `■ 전문 지식 (반드시 본문에 자연스럽게 포함할 것):
-- 상속세 및 증여세법 제8조 (증여 추정 배제): 배우자간 6억원, 직계존비속 5천만원(미성년 2천만원) 공제
-- 세율: 1억 이하 10%, 5억 이하 20%, 10억 이하 30%, 30억 이하 40%, 30억 초과 50%
-- 10년 합산 과세 제도: 동일인으로부터 10년간 1천만원 초과 증여 시 합산 과세`
+          expertKnowledge = `■ 전문 지식 (핵심만 간결하게):
+- 상증법 제8조: 배우자 6억, 직계존비속 5천만원(미성년 2천만원) 공제
+- 세율: 1억↓10%, 5억↓20%, 10억↓30%, 30억↓40%, 30억↑50%`
         } else if (insuranceProduct.includes('치매') || insuranceProduct.includes('간병') || topic.includes('치매')) {
-          expertKnowledge = `■ 전문 지식 (반드시 본문에 자연스럽게 포함할 것):
-- CDR(Clinical Dementia Rating) 척도: 0(정상)~5(말기), 대부분 CDR 2(중등도) 이상 시 진단금 지급
-- 요양병원 입원일당, 간병인 비용 평균 월 300만원 이상
-- 2026년 기준 65세 이상 치매 유병률 10.2% (약 90만명)`
+          expertKnowledge = `■ 전문 지식 (핵심만 간결하게):
+- CDR척도: 0~5단계, 대부분 CDR2(중등도) 이상 시 진단금 지급
+- 간병비용 월 300만원↑, 65세 이상 치매 유병률 10.2%`
         } else if (insuranceProduct.includes('법인') || topic.includes('CEO') || topic.includes('법인')) {
-          expertKnowledge = `■ 전문 지식 (반드시 본문에 자연스럽게 포함할 것):
-- 법인세 손비처리: 임원 퇴직금 한도 내 보험료 경비 인정 (세법 시행령 제44조)
-- 체증형 설계: CEO 퇴직 시점에 맞춰 보험금 극대화 (가지급금 정리 활용)
-- 가지급금 이자: 4.6% (2026년 기준) → 인정이자 세무 리스크 주의`
+          expertKnowledge = `■ 전문 지식 (핵심만 간결하게):
+- 법인세 손비처리: 퇴직금 한도 내 보험료 경비 인정
+- 체증형 설계로 퇴직 시점 보험금 극대화, 가지급금 이자 4.6%`
         } else if (insuranceProduct.includes('암')) {
-          expertKnowledge = `■ 전문 지식 (반드시 본문에 자연스럽게 포함할 것):
-- 유사암(갑상선암, 경계성종양 등): 일반암 진단비의 10~20%만 지급하는 상품 다수
-- 비갱신형 vs 갱신형: 30대 가입 시 비갱신형이 총 납입보험료 기준 유리
-- 암 직접치료비: 수술비, 항암치료비, 방사선치료비 특약 필수 확인`
+          expertKnowledge = `■ 전문 지식 (핵심만 간결하게):
+- 유사암(갑상선 등): 일반암의 10~20%만 지급
+- 30대 비갱신형 유리, 암 직접치료비 특약 필수`
         } else {
-          expertKnowledge = `■ 전문 지식 (반드시 본문에 자연스럽게 포함할 것):
-- 실손의료보험 4세대: 자기부담금 20~30%, 비급여 본인부담 상향
-- 보험 약관의 '부담보 조항': 가입 전 고지의무 위반 시 보상 거절 가능
-- 2026년 보험료 인상률: 평균 3.5~7% (손해율 반영)`
+          expertKnowledge = `■ 전문 지식 (핵심만 간결하게):
+- 4세대 실손: 자기부담 20~30%, 2026년 인상률 3.5~7%
+- 부담보 조항: 고지의무 위반 시 보상 거절 가능`
         }
         
-        const contentPrompt = `## XIVIX V38 전문가 답변 생성 ##
+        const contentPrompt = `## XIVIX V39 전문가 답변 생성 ##
 
 주제: ${topic}
 타겟: ${targetAudience}
 보험: ${insuranceProduct}
 스타일: ${style}
+${userInputBinding}
+${ocrDataBinding}
 
-🚨🚨🚨 [최우선 제약 - 반드시 준수] 🚨🚨🚨
+🚨🚨🚨 [V39 최우선 제약 - 반드시 준수] 🚨🚨🚨
 
-■ 본문 길이: 1,200자 이상 (압도적 정보량 필수!)
+■ 본문 길이: ${lengthMode.min}~${lengthMode.max}자 (${lengthMode.label})
+■ 핵심만 팩트로! 지루한 서론 금지!
 ■ ${style} 스타일로 작성
-■ 마지막에 '보험 콘텐츠 마스터'를 자연스럽게 언급
-■ 문단 구분 시 줄바꿈 사용 (가독성 중요)
+■ 줄바꿈으로 가독성 확보
 
 ${expertKnowledge}
 
 📌 [${style} 작성 가이드]
 ${style === '공감형' ? `
-- 질문자의 불안과 고민을 먼저 공감하며 시작
-- "저도 같은 고민을 했었는데요..." 같은 공감 어투
-- 따뜻하면서도 전문적인 정보 전달
-- 마지막에 "언제든 도움이 필요하시면 말씀해주세요" 형태로 마무리
+- 공감 한 줄 → 핵심 정보 바로 전달
+- "저도 같은 고민 했어요" + 바로 해결책
+- 마무리: "도움 필요하시면 말씀해주세요"
 ` : style === '팩트형' ? `
-- 객관적인 통계와 수치로 시작
-- 약관의 숨겨진 함정과 주의사항 폭로
-- "실제로 OO건의 보상 청구 중 XX%가 거절되는 이유는..." 형태의 팩트 중심
-- 체크리스트 형태로 핵심 사항 정리
+- 숫자와 통계로 시작
+- 약관 함정과 주의사항 폭로
+- 체크리스트 형태로 핵심만 정리
 ` : `
-- 심리적 트리거로 관심 유도 (손실 회피, 긴급성)
-- "지금 확인하지 않으면..." 형태의 긴박감 조성
-- 전문 상담의 필요성 강조
-- CTA: "무료 진단 신청하세요" 형태로 마무리
+- 심리적 트리거 (손실 회피, 긴급성)
+- "지금 확인 안 하면..." 긴박감
+- CTA: "무료 진단 신청" 마무리
 `}
 
 반드시 아래 JSON 형식으로만 응답:
-{"text": "1,200자 이상의 전문가 본문 내용"}`
+{"text": "${lengthMode.min}~${lengthMode.max}자의 핵심 위주 답변"}`
         
         // 비스트리밍 API 사용 (안정성 향상)
         const contentResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`, {
@@ -2651,6 +2734,105 @@ body{
   .wrapper{padding-top:60px}
   .logo{margin-bottom:12px}
   .title{margin-bottom:12px}
+}
+
+/* ============================================ */
+/* V39 모바일 시인성 강화 (768px 이하) */
+/* Glow 효과 + High-Contrast Border */
+/* ============================================ */
+@media(max-width:768px){
+  /* 메인 생성 버튼 - 네온 그린 Glow */
+  .search-btn{
+    background:#00FF85 !important;
+    color:#000 !important;
+    border:2px solid #B6FF3B !important;
+    box-shadow:0 0 20px rgba(0,255,133,0.5), 0 0 40px rgba(0,255,133,0.3) !important;
+    font-weight:900 !important;
+    font-size:17px !important;
+    padding:20px 32px !important;
+  }
+  .search-btn:hover, .search-btn:active{
+    box-shadow:0 0 30px rgba(0,255,133,0.7), 0 0 60px rgba(0,255,133,0.4) !important;
+    transform:scale(1.02);
+  }
+  
+  /* 탭 버튼 - 골드 포인트 */
+  .tab-btn{
+    border:2px solid transparent !important;
+    font-weight:700 !important;
+    padding:14px 12px !important;
+  }
+  .tab-btn.active{
+    border-color:#FFBF00 !important;
+    box-shadow:0 0 15px rgba(255,191,0,0.4) !important;
+    filter:drop-shadow(0 0 8px rgba(255,191,0,0.3));
+  }
+  
+  /* 복사 버튼 - 네온 그린 */
+  .copy-btn{
+    background:#00FF85 !important;
+    color:#000 !important;
+    border:2px solid #B6FF3B !important;
+    box-shadow:0 0 10px rgba(0,255,133,0.3) !important;
+    font-weight:700 !important;
+    padding:10px 16px !important;
+    font-size:13px !important;
+  }
+  .copy-btn:hover{
+    box-shadow:0 0 20px rgba(0,255,133,0.5) !important;
+  }
+  
+  /* 전체 복사 버튼 */
+  .copy-all-btn{
+    background:#00FF85 !important;
+    color:#000 !important;
+    border:2px solid #B6FF3B !important;
+    box-shadow:0 0 25px rgba(0,255,133,0.5) !important;
+    font-weight:900 !important;
+    font-size:16px !important;
+  }
+  
+  /* 새로운 콘텐츠 생성 버튼 */
+  .new-btn{
+    border:2px solid #FFBF00 !important;
+    color:#FFBF00 !important;
+    box-shadow:0 0 15px rgba(255,191,0,0.3) !important;
+    font-weight:700 !important;
+  }
+  
+  /* 트렌드 새로고침 버튼 */
+  .refresh-btn{
+    background:#00FF85 !important;
+    color:#000 !important;
+    border:2px solid #B6FF3B !important;
+    box-shadow:0 0 15px rgba(0,255,133,0.4) !important;
+    font-weight:800 !important;
+  }
+  
+  /* 이미지 첨부 버튼 */
+  .upload-btn{
+    border:2px solid #B6FF3B !important;
+    background:rgba(0,255,133,0.15) !important;
+    color:#00FF85 !important;
+    box-shadow:0 0 10px rgba(0,255,133,0.2) !important;
+  }
+  
+  /* 아이템 카드 선택 시 */
+  .item-card.selected{
+    border:2px solid #FFBF00 !important;
+    box-shadow:0 0 20px rgba(255,191,0,0.3) !important;
+  }
+  
+  /* SEO 등급 배지 */
+  .grade-badge{
+    box-shadow:0 0 30px rgba(79,140,255,0.5), 0 8px 30px rgba(79,140,255,0.3) !important;
+  }
+  
+  /* 결과 섹션 헤더 */
+  .result-section{
+    border:2px solid rgba(0,255,133,0.3) !important;
+    box-shadow:0 0 30px rgba(0,255,133,0.1) !important;
+  }
 }
 </style>
 </head>
