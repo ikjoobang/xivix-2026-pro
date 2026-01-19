@@ -3928,16 +3928,26 @@ function selectTrend(el) {
   selectedContent = 0;
   
   // Step 2: UI 즉시 클리어 (이전 데이터 렌더링 제거)
-  document.getElementById('titlesContainer').innerHTML = '';
-  document.getElementById('contentsContainer').innerHTML = '';
-  document.getElementById('extrasContainer').innerHTML = '';
-  document.getElementById('viralQuestions').innerHTML = '';
-  document.getElementById('viralQuestions').style.display = 'none';
-  document.getElementById('seoAuditCard').style.display = 'none';
-  document.getElementById('reportTable').style.display = 'none';
+  // V39: 실제 HTML ID에 맞춰 수정 (tab-* 형식)
+  const titlesEl = document.getElementById('tab-titles');
+  const contentsEl = document.getElementById('tab-contents');
+  const extrasEl = document.getElementById('tab-extras');
+  if (titlesEl) titlesEl.innerHTML = '';
+  if (contentsEl) contentsEl.innerHTML = '';
+  if (extrasEl) extrasEl.innerHTML = '';
+  
+  const viralEl = document.getElementById('viralQuestions');
+  if (viralEl) {
+    viralEl.innerHTML = '';
+    viralEl.style.display = 'none';
+  }
+  const seoAuditEl = document.getElementById('seoAuditCard');
+  if (seoAuditEl) seoAuditEl.style.display = 'none';
+  const reportEl = document.getElementById('reportTable');
+  if (reportEl) reportEl.style.display = 'none';
   
   // Step 3: SEO 키워드 초기화
-  const seoContainer = document.getElementById('seoKeywordsContainer');
+  const seoContainer = document.getElementById('seoKeywords');
   if (seoContainer) seoContainer.innerHTML = '';
   
   const clearTime = performance.now() - startTime;
