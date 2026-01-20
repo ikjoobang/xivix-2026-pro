@@ -2569,6 +2569,7 @@ body{
 .result-section{
   width:100%;
   display:none;
+  min-height:600px;  /* ✅ CLS 최적화: 레이아웃 시프트 방지 */
 }
 .result-section.show{display:block}
 
