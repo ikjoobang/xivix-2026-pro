@@ -5020,7 +5020,16 @@ async function generateMarketingImage() {
     let userMsg = '이미지 생성 중 오류가 발생했습니다.';
     let showSourceUrlInput = false;
     
-    if (error.message.includes('VERIFICATION_FAILED')) {
+    // ✅ CEO 지시 (2026.01.20) - 네트워크 에러와 이미지 수집 실패 분리
+    if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+      // 🔴 네트워크 에러 (CORS, 연결 실패 등)
+      userMsg = '🌐 네트워크 연결에 실패했습니다.\\n\\n';
+      userMsg += '원인:\\n';
+      userMsg += '• 인터넷 연결 상태를 확인해 주세요.\\n';
+      userMsg += '• 현재 도메인이 API 허용 목록에 없을 수 있습니다.\\n\\n';
+      userMsg += '💡 해결: 잠시 후 다시 시도하거나, 관리자에게 문의해 주세요.';
+      console.error('[XIVIX] 네트워크 에러 - CORS 또는 연결 실패:', error);
+    } else if (error.message.includes('VERIFICATION_FAILED')) {
       // 🔴 현재 주요 병목: 광고 이미지 수집 시
       userMsg = '⚠️ 적절한 설계안 이미지를 찾지 못했습니다.\\n\\n';
       userMsg += '검색에서 광고/홍보 이미지가 수집되어 검증에 실패했습니다.\\n\\n';
