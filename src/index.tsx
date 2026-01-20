@@ -1424,7 +1424,8 @@ JSON 형식으로만 응답:
           const parsed = JSON.parse(rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim())
           titles = (parsed.titles || []).map((t: any) => ({
             ...t,
-            text: t.text?.length > 25 ? t.text.substring(0, 22) + '...' : t.text
+            // V2026.37.15 - TITLE_CONTAINER_FIX: truncate 제거, AI 생성 그대로 출력
+            text: t.text
           }))
           viralQuestions = parsed.viral_questions || []
         } catch (e) {}
@@ -4207,9 +4208,12 @@ function renderSeoAudit(seoAudit) {
       '</div>' +
       '<div class="analysis"><i class="fas fa-lightbulb"></i> ' + analysis + '</div>' +
       '<div style="margin-top:8px;font-size:10px;color:var(--text-muted)">' + dataSource + '</div>' +
-      '<a href="' + naverSearchUrl + '" target="_blank" style="display:inline-block;margin-top:10px;padding:8px 16px;background:var(--naver-green, #03c75a);color:#fff;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none">' +
+      '<a href="' + naverSearchUrl + '" target="_blank" id="naverSearchBtn" onclick="showNaverSearchLoading()" style="display:inline-block;margin-top:10px;padding:8px 16px;background:var(--naver-green, #03c75a);color:#fff;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none">' +
         '<i class="fas fa-search"></i> 네이버 실시간 검색 확인' +
       '</a>' +
+      '<span id="naverSearchLoading" style="display:none;margin-left:10px;font-size:11px;color:var(--text-muted)">' +
+        '<i class="fas fa-spinner fa-spin"></i> 실시간 경쟁도 분석 중...' +
+      '</span>' +
     '</div>';
 }
 
@@ -4245,6 +4249,18 @@ function renderReportData(reportData) {
   
   tableHtml += '</tbody></table>';
   container.innerHTML = tableHtml;
+}
+
+// V2026.37.15 - SEO_SCORE_CLARIFICATION: 네이버 검색 버튼 클릭 시 로딩 표시
+function showNaverSearchLoading() {
+  const loadingEl = document.getElementById('naverSearchLoading');
+  if (loadingEl) {
+    loadingEl.style.display = 'inline';
+    // 3초 후 자동으로 숨김 (새 탭이 열린 후)
+    setTimeout(function() {
+      loadingEl.style.display = 'none';
+    }, 3000);
+  }
 }
 
 // report_data 테이블 복사
