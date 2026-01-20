@@ -1357,7 +1357,8 @@ ${ocrPriorityBlock}
 - "급하다", "답답하다" 단독 사용 금지
 - 반드시 구체적 상황으로 시작할 것!
 
-⚡ [도입부 20종 - 구체적 상황 필수!]
+⚡ [도입부 30종 - V2026.37.16 확장! 구체적 상황 필수!]
+★ 일상 상황형 (10종)
 - "오늘 보험금 청구했다가 거절당했는데..."
 - "방금 설계사한테 전화 받고 멘붕 왔어요"
 - "어제 건강검진 결과 나왔는데 갑자기 보험 생각이..."
@@ -1368,6 +1369,7 @@ ${ocrPriorityBlock}
 - "회사 동료가 보험으로 2천만원 받았다고 자랑하길래"
 - "지인 설계사가 자꾸 연락 오는데 믿어도 되나요"
 - "보험 가입한 지 10년 됐는데 한 번도 안 써봤거든요"
+★ 가족/생애주기형 (10종)
 - "엄마가 보험금 못 받으셨다고 하소연하시길래"
 - "실손보험 리모델링하라는데 뭔 소린지..."
 - "카페 글 보다가 내 보험도 문제 있나 싶어서"
@@ -1378,6 +1380,18 @@ ${ocrPriorityBlock}
 - "보험사 직원이 이 상품 없어진다고 빨리 가입하래요"
 - "건강 안 좋아지니까 갑자기 보험 생각나서"
 - "솔직히 보험 잘 모르는데 설계사 말만 믿어도 될까요?"
+★ 돈/비용 걱정형 (5종) - V2026.37.16 추가!
+- "월 보험료가 30만원인데 이게 정상인가요?"
+- "갱신형이라 60세 되면 100만원 넘는다는데..."
+- "해지하면 얼마나 돌려받을 수 있는지 모르겠어요"
+- "보험 리모델링하면 진짜 돈 아낄 수 있어요?"
+- "같은 보험인데 친구는 절반 가격이래요 ㅠㅠ"
+★ 불신/의심형 (5종) - V2026.37.16 추가!
+- "설계사가 좋다는 건 다 본인 수당 때문 아니에요?"
+- "보험사 직원 말 믿으면 호구 되는 거 아닌가요?"
+- "인터넷에선 다 가입하지 말라는데..."
+- "이 상품 진짜 괜찮은 건지 모르겠어요"
+- "후기가 너무 좋아서 오히려 의심돼요"
 
 ⚡ [종결부 15종]
 - "이런 경우 어떻게 하셨어요?"
@@ -2932,6 +2946,9 @@ body{
   word-break:keep-all;
   white-space:normal;
   overflow-wrap:break-word;
+  /* V2026.37.16 - TITLE_UI_CSS: 고정 높이 제거, 자동 확장 */
+  max-height:none;
+  overflow:visible;
 }
 .item-meta{
   margin-top:10px;
@@ -4189,7 +4206,8 @@ function renderSeoAudit(seoAudit) {
   
   // ✅ V2026.37.14 - SEO 점수 산출 로직 투명화
   const scoreFormula = '(키워드 연관도 40% + 본문 길이 30% + 구조화 20% + 가독성 10%)';
-  const dataSource = '※ 본 점수는 프롬프트 기반 예측치입니다. 실제 순위는 네이버 검색에서 확인하세요.';
+  // V2026.37.16 - SEO_TRANSPARENCY: (AI 예측치) 문구 강화
+  const dataSource = '⚠️ 본 점수는 AI 예측치입니다 (실제 네이버 순위와 다를 수 있음)';
   
   // 네이버 실시간 검증 URL 생성
   const keyword = resultData?.insurance || resultData?.topic || '보험';
@@ -4203,7 +4221,7 @@ function renderSeoAudit(seoAudit) {
     '<div class="seo-stats">' +
       '<div class="title"><i class="fas fa-chart-line"></i> SEO 감사 리포트</div>' +
       '<div class="metrics">' +
-        '<div class="metric"><div class="value">' + score + '<small>/100</small></div><div class="name">SEO 점수</div></div>' +
+        '<div class="metric"><div class="value">' + score + '<small>/100</small></div><div class="name">SEO 점수 <span style="font-size:9px;color:var(--orange)">(AI 예측치)</span></div></div>' +
         '<div class="metric"><div class="value">' + rank + '</div><div class="name">예상 순위</div></div>' +
       '</div>' +
       '<div class="analysis"><i class="fas fa-lightbulb"></i> ' + analysis + '</div>' +
