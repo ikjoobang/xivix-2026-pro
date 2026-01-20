@@ -1085,13 +1085,12 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
     }
     
     // ============================================
-    // 🎯 제목 25자 후처리 (백엔드에서 강제 truncate)
+    // 🎯 제목 후처리 (truncate 제거 - AI 생성 그대로 사용)
     // ============================================
     const processedTitles = (expertData.titles || []).map((t: any) => ({
       ...t,
-      text: t.text?.length > 25 ? t.text.substring(0, 22) + '...' : t.text,
-      original_length: t.text?.length || 0,
-      truncated: (t.text?.length || 0) > 25
+      text: t.text,  // truncate 제거: AI가 생성한 그대로 사용
+      original_length: t.text?.length || 0
     }))
     
     // Final: 구조화된 JSON 응답 (v4 - Context Switching + 제목 25자 + 본문 1,000자)
@@ -4924,6 +4923,19 @@ async function generateMarketingImage() {
     // 서버 응답 구조: { "status": "success", "data": { "final_url": "..." } }
     // 반드시 result.data.final_url 경로로 읽어야 함
     // ============================================
+    
+    // ✅ CEO 지시 (2026.01.20) - 디버깅: 응답 헤더 및 본문 로깅
+    const responseContentType = response.headers.get('Content-Type') || '';
+    console.log('[XIVIX] 미들웨어 응답 상태:', response.status, response.statusText);
+    console.log('[XIVIX] 미들웨어 응답 Content-Type:', responseContentType);
+    
+    // HTML 응답 감지 (JSON 파싱 전 체크)
+    if (responseContentType.includes('text/html')) {
+      const htmlPreview = await response.text();
+      console.error('[XIVIX] 미들웨어가 HTML 반환:', htmlPreview.substring(0, 500));
+      throw new Error('DOWNLOAD_FAILED: 미들웨어가 JSON이 아닌 HTML을 반환했습니다.');
+    }
+    
     const result = await response.json();
     console.log('[XIVIX] 미들웨어 응답:', result);
     
