@@ -5085,6 +5085,31 @@ async function generateMarketingImage() {
       document.getElementById('imageGenResult').classList.add('show');
       console.log('[XIVIX] 이미지 생성 성공:', imageUrl);
       
+      // ============================================
+      // ✅ V2026.37.17 - USER_NOTIFICATION_LOGIC
+      // 폴백/샘플 이미지 감지 시 사용자에게 안내
+      // 미들웨어가 is_fallback, is_sample, fallback 플래그를 반환하거나
+      // URL에 /sample/, /fallback/, /default/ 포함 시 감지
+      // ============================================
+      const isFallback = result.data?.is_fallback || result.data?.is_sample || result.data?.fallback || 
+                         imageUrl.includes('/sample/') || imageUrl.includes('/fallback/') || imageUrl.includes('/default/');
+      
+      let fallbackNotice = document.getElementById('fallbackNotice');
+      if (!fallbackNotice) {
+        fallbackNotice = document.createElement('div');
+        fallbackNotice.id = 'fallbackNotice';
+        fallbackNotice.style.cssText = 'margin-top:8px;padding:8px 12px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);border-radius:8px;font-size:11px;color:var(--orange);display:none;';
+        document.getElementById('imageGenResult').appendChild(fallbackNotice);
+      }
+      
+      if (isFallback) {
+        fallbackNotice.innerHTML = '<i class="fas fa-info-circle"></i> 실시간 수집에 실패하여 샘플 이미지를 보여드립니다.';
+        fallbackNotice.style.display = 'block';
+        console.log('[XIVIX] 폴백 이미지 사용됨');
+      } else {
+        fallbackNotice.style.display = 'none';
+      }
+      
     } else if (result.status === 'error') {
       // 에러 응답 처리
       const errorCode = result.error?.code || 'UNKNOWN';
