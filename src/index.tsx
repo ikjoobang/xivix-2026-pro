@@ -1089,9 +1089,9 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
     // ============================================
     const processedTitles = (expertData.titles || []).map((t: any) => ({
       ...t,
-      text: t.text?.length > 30 ? t.text.substring(0, 27) + '...' : t.text,
+      text: t.text?.length > 25 ? t.text.substring(0, 22) + '...' : t.text,
       original_length: t.text?.length || 0,
-      truncated: (t.text?.length || 0) > 30
+      truncated: (t.text?.length || 0) > 25
     }))
     
     // Final: 구조화된 JSON 응답 (v4 - Context Switching + 제목 25자 + 본문 1,000자)
@@ -1315,20 +1315,20 @@ ${ocrPriorityBlock}
 "제목은 설계사가 아니라 고객이 짓는 거다"
 "현직 설계사입니다"가 아니라 "너무 막막한 ${targetAudience}입니다"라는 느낌!
 
-📌 [제목 5개 생성 규칙 - 다양성 필수!]
-■ 공백 포함 20~28자 (네이버 모바일 최적화!)
-■ ⚠️ 핵심 키워드는 앞 15자 안에 배치!
-■ ⚠️ 5개 제목이 모두 다른 패턴으로 생성! (비슷한 제목 절대 금지!)
+📌 [제목 5개 생성 규칙]
+■ 공백 포함 25자 이내 필수!
 ■ ✅ 고객 관점 질문형 스타일 (막막함, 도움 요청)
 ■ ❌ 설계사용 홍보 제목 절대 금지
+■ ⚠️ 5개 제목이 모두 완전히 다른 패턴이어야 함! (비슷한 제목 반복 금지!)
+■ ⚠️ 네이버 검색 1위 목표 - 클릭 유도하는 후킹 문구 필수!
 ■ 금지어: "가이드", "전략", "포인트", "대비", "선택", "추천", "충격", "손해", "필독", "경악", "대박", "~한 이유", "~하는 이유"
 
-✔️ 좋은 제목 예시 (20~28자, 각각 다른 패턴!):
-- "타입A: ${insuranceProduct} 해지하면 손해인가요?"
-- "타입B: 부모님 ${insuranceProduct} 대신 내도 되나요?"
-- "타입C: ${insuranceProduct} 갱신료 2배 뛰었어요ㅠ"
-- "타입D: 결혼 앞두고 ${insuranceProduct} 어쩌죠?"
-- "타입E: ${insuranceProduct} 지금 가입해도 될까요?"
+✔️ 좋은 제목 예시 (5개 모두 다른 패턴!):
+- "패턴A 질문형: ${insuranceProduct} 해지하면 진짜 손해일까요?"
+- "패턴B 상황형: 부모님 대신 ${insuranceProduct} 알아보는데..."
+- "패턴C 긴급형: ${insuranceProduct} 갱신료 2배 올랐어요 ㅠㅠ"
+- "패턴D 고민형: 결혼 앞두고 ${insuranceProduct} 정리해야 할까요?"
+- "패턴E 초보형: ${insuranceProduct} 완전 초보인데 뭐부터 해야..."
 
 ❌ 나쁜 제목 예시 (설계사 관점 - 절대 금지):
 - "30대를 위한 암보험 선택 가이드"
@@ -1336,33 +1336,34 @@ ${ocrPriorityBlock}
 - "${targetAge}살에 ${insuranceProduct} 안 들면 후회하는 이유"
 - "현직 설계사가 알려주는 보험 꿀팁"
 
-📌 [바이럴 질문 3개 생성 규칙 - 다양한 시작과 길이!]
+📌 [바이럴 질문 3개 생성 규칙 - 랜덤 길이 + 다양한 패턴!]
 ■ 질문1: 200~350자 (짧은 질문)
 ■ 질문2: 400~600자 (중간 질문) 
 ■ 질문3: 700~900자 (긴 질문)
-■ ⚠️ 3개 질문 시작이 모두 달라야 함! "안녕하세요"로만 시작 금지!
-■ ⚠️ 3개 질문 끝이 모두 달라야 함! "도와주세요"로만 끝나기 금지!
+■ 3개 질문이 각각 다른 길이로 랜덤 생성되어야 함!
 ■ 보험을 전혀 모르는 초보자가 간절하게 질문하는 형태!
+■ ⚠️ 시작 문장 다양화 필수! "안녕하세요"만 쓰지 말 것!
+■ ⚠️ 끝 문장 다양화 필수! "도와주세요"만 쓰지 말 것!
 ■ 사용자 입력에서 추출한 나이/상황/금액을 그대로 사용 (하드코딩 금지)
 ■ 전문가 어투 절대 금지: "손해", "필수", "꼭", "반드시"
 
-✔️ 질문 시작 예시 (모두 다르게!):
+✔️ 시작 문장 예시 (3개 모두 다르게!):
 - "안녕하세요. ${targetAudience}인데요..."
-- "급하게 글 올립니다. ${insuranceProduct} 관련해서..."
-- "이런 글 처음 써보는데... ${insuranceProduct} 때문에..."
-- "고민 끝에 용기내서 글 남겨요. ${insuranceProduct}..."
-- "보험 완전 초보입니다ㅠㅠ ${insuranceProduct}..."
+- "급하게 질문 올립니다. ${insuranceProduct} 관련해서..."
+- "이런 글 처음 써봐요. ${insuranceProduct} 때문에..."
+- "고민 끝에 용기내서 글 남겨요..."
+- "보험 완전 초보입니다 ㅠㅠ"
 
-✔️ 질문 끝 예시 (모두 다르게!):
+✔️ 끝 문장 예시 (3개 모두 다르게!):
 - "...아시는 분 답변 부탁드려요!"
 - "...경험담 공유해주시면 감사하겠습니다"
-- "...조언 좀 해주세요ㅠㅠ"
-- "...뭘 어떻게 해야 할지 모르겠어요"
 - "...비슷한 상황 겪으신 분 계신가요?"
+- "...조언 좀 해주세요 ㅠㅠ"
+- "...뭘 어떻게 해야 할지 모르겠어요"
 
 JSON 형식으로만 응답:
 {
-  "titles": [{"id":1,"text":"20~28자 제목 (타입A)"},{"id":2,"text":"20~28자 제목 (타입B)"},{"id":3,"text":"20~28자 제목 (타입C)"},{"id":4,"text":"20~28자 제목 (타입D)"},{"id":5,"text":"20~28자 제목 (타입E)"}],
+  "titles": [{"id":1,"text":"25자 이내 고객관점 제목"},{"id":2,"text":"25자 이내 고객관점 제목"},{"id":3,"text":"25자 이내 고객관점 제목"},{"id":4,"text":"25자 이내 고객관점 제목"},{"id":5,"text":"25자 이내 고객관점 제목"}],
   "viral_questions": [{"id":1,"text":"초보자 관점의 짧은 질문 200~350자"},{"id":2,"text":"초보자 관점의 중간 질문 400~600자"},{"id":3,"text":"초보자 관점의 긴 질문 700~900자"}]
 }`
       
@@ -1385,7 +1386,7 @@ JSON 형식으로만 응답:
           const parsed = JSON.parse(rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim())
           titles = (parsed.titles || []).map((t: any) => ({
             ...t,
-            text: t.text?.length > 30 ? t.text.substring(0, 27) + '...' : t.text
+            text: t.text?.length > 25 ? t.text.substring(0, 22) + '...' : t.text
           }))
           viralQuestions = parsed.viral_questions || []
         } catch (e) {}
@@ -2884,6 +2885,8 @@ body{
   line-height:1.8;
   color:var(--text);
   word-break:keep-all;
+  white-space:normal;
+  overflow-wrap:break-word;
 }
 .item-meta{
   margin-top:10px;
@@ -4308,45 +4311,29 @@ function renderHashtags(hashtags) {
     return;
   }
   
-  // 중복 제거
-  const uniqueHashtags = [...new Set(hashtags.map(tag => tag.startsWith('#') ? tag : '#' + tag))].slice(0, 5);
+  // 중복 제거 후 5개만
+  const uniqueTags = [...new Set(hashtags.map(tag => tag.startsWith('#') ? tag : '#' + tag))].slice(0, 5);
   
   // 전체 복사 버튼 + 개별 태그
   let html = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">';
+  html += '<button onclick="copyAllHashtags()" style="background:var(--primary);color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600"><i class="fas fa-copy"></i> 5개 전체복사</button>';
   
-  // 전체 복사 버튼
-  const allTags = uniqueHashtags.join(' ');
-  html += '<button class="copy-all-hashtags-btn" onclick="copyAllHashtags()" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px"><i class="fas fa-copy"></i> 전체 복사</button>';
-  
-  // 개별 태그
-  uniqueHashtags.forEach(tag => {
-    html += '<span class="keyword-tag" onclick="copyKeyword(this, \\'' + tag + '\\')" style="cursor:pointer"><i class="fas fa-hashtag"></i> ' + tag.replace('#', '') + '</span>';
+  uniqueTags.forEach(tag => {
+    html += '<span class="keyword-tag" onclick="copyKeyword(this, \\'' + tag + '\\')"><i class="fas fa-hashtag"></i> ' + tag.replace('#', '') + '</span>';
   });
-  
   html += '</div>';
   
-  // 전체 해시태그 저장 (전체 복사용)
-  window.allHashtags = allTags;
-  
+  // 전체 복사용 데이터 저장
+  window.hashtagsForCopy = uniqueTags.join(' ');
   container.innerHTML = html;
 }
 
-// 전체 해시태그 복사 함수
+// 해시태그 5개 전체 복사
 function copyAllHashtags() {
-  const allTags = window.allHashtags || '';
-  if (!allTags) return;
-  
-  navigator.clipboard.writeText(allTags).then(() => {
-    const btn = document.querySelector('.copy-all-hashtags-btn');
-    if (btn) {
-      const originalHTML = btn.innerHTML;
-      btn.innerHTML = '<i class="fas fa-check"></i> 복사 완료!';
-      btn.style.background = 'var(--green)';
-      setTimeout(() => {
-        btn.innerHTML = originalHTML;
-        btn.style.background = 'var(--primary)';
-      }, 1500);
-    }
+  const text = window.hashtagsForCopy || '';
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    alert('해시태그 5개 복사 완료!\\n\\n' + text);
   });
 }
 
