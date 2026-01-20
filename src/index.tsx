@@ -1114,6 +1114,8 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         contents: expertData.contents || [],
         content_constraint: '1,000자 내외 (800-1,100자)',
         seoKeywords: expertData.seoKeywords || [],
+        // CEO 지시 (2026.01.20): 해시태그 추가
+        hashtags: (expertData.seoKeywords || []).slice(0, 5).map((k: string) => '#' + k.replace(/\s+/g, '')),
         comments: commentsData.comments || [],
         generatedAt: new Date().toISOString()
       },
@@ -1608,13 +1610,17 @@ JSON 형식으로만 응답:
       await stream.write(JSON.stringify({ type: 'comments', data: comments }) + '\n')
       console.log('[XIVIX] 댓글 전송 완료:', comments.length, '개')
       
-      // Final
+      // Final - CEO 지시 (2026.01.20): seoKeywords + hashtags 추가
+      const seoKeywords = [insuranceProduct, targetAudience, topic.split(' ')[0], '보험상담', '보험리모델링'].filter(Boolean).slice(0, 5)
+      const hashtags = seoKeywords.map(k => '#' + String(k).replace(/\s+/g, ''))
+      
       await stream.write(JSON.stringify({
         type: 'complete',
         package: {
           topic, context_source: contextSource, insurance: insuranceProduct, target: targetAudience,
           image_detected_keyword: imageDetectedKeyword || null,
-          titles, viral_questions: viralQuestions, contents, comments, report_data: reportData
+          titles, viral_questions: viralQuestions, contents, comments, report_data: reportData,
+          seoKeywords, hashtags
         },
         version: '2026.18.0'
       }) + '\n')
@@ -4615,7 +4621,7 @@ async function goGenerateStream() {
               renderViralQuestions(resultData.viral_questions);
               renderTitles(resultData.titles || []);
               renderContents(resultData.contents || []);
-              renderExtras(resultData.comments || [], resultData.seoKeywords || [], resultData.imageAnalysis);
+              renderExtras(resultData.comments || [], resultData.seoKeywords || [], resultData.imageAnalysis, resultData.hashtags || []);
               
               // 완료 처리
               progressFill.style.width = '100%';
@@ -4659,7 +4665,7 @@ async function goGenerateStream() {
           renderViralQuestions(resultData.viral_questions);
           renderTitles(resultData.titles || []);
           renderContents(resultData.contents || []);
-          renderExtras(resultData.comments || [], resultData.seoKeywords || [], resultData.imageAnalysis);
+          renderExtras(resultData.comments || [], resultData.seoKeywords || [], resultData.imageAnalysis, resultData.hashtags || []);
           progressFill.style.width = '100%';
           progressPct.textContent = '100%';
           progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ SSE 스트리밍 완료! (v' + event.version + ')';
