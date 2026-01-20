@@ -37,10 +37,36 @@ const ENGINE = {
 // 글이 너무 길다 → 짧고 임팩트있게 수정
 // 네이버 C-RANK, DIA 알고리즘 최적화
 // ============================================
+// ============================================
+// 📏 전문가 답변 길이 설정 - CEO 지시 (2026.01.20)
+// "전문가 느낌이 없다" → 깊이 있는 답변으로 수정
+// 네이버 C-RANK/DIA 최적화 + 전문성 유지
+// ============================================
 const CONTENT_LENGTH_MODES = {
-  SHORT: { min: 250, max: 350, label: '핵심형', probability: 0.4 },
-  MID: { min: 400, max: 550, label: '적정형', probability: 0.5 },
-  LONG: { min: 600, max: 800, label: '상세형', probability: 0.1 }
+  SHORT: { min: 500, max: 700, label: '핵심형', probability: 0.3 },
+  MID: { min: 800, max: 1000, label: '전문형', probability: 0.5 },
+  LONG: { min: 1100, max: 1400, label: '심층형', probability: 0.2 }
+}
+
+// ============================================
+// 📏 바이럴 질문 길이 설정 - CEO 지시 (2026.01.20)
+// "길고, 짧고, 중간 랜덤" 요청 반영
+// ============================================
+const VIRAL_QUESTION_LENGTH_MODES = {
+  SHORT: { min: 200, max: 350, label: '짧은 질문', probability: 0.33 },
+  MID: { min: 400, max: 600, label: '중간 질문', probability: 0.34 },
+  LONG: { min: 700, max: 900, label: '긴 질문', probability: 0.33 }
+}
+
+function selectViralQuestionLength(): { mode: string, min: number, max: number, label: string } {
+  const rand = Math.random()
+  if (rand < VIRAL_QUESTION_LENGTH_MODES.SHORT.probability) {
+    return { mode: 'SHORT', ...VIRAL_QUESTION_LENGTH_MODES.SHORT }
+  } else if (rand < VIRAL_QUESTION_LENGTH_MODES.SHORT.probability + VIRAL_QUESTION_LENGTH_MODES.MID.probability) {
+    return { mode: 'MID', ...VIRAL_QUESTION_LENGTH_MODES.MID }
+  } else {
+    return { mode: 'LONG', ...VIRAL_QUESTION_LENGTH_MODES.LONG }
+  }
 }
 
 function selectContentLength(): { mode: string, min: number, max: number, label: string } {
@@ -101,7 +127,7 @@ const MASTER_INSTRUCTION_V3 = {
   model: 'gemini-2.5-pro',  // API 확인됨 (2026.01.19)
   persona: '30년 경력 MDRT 보험왕 & 심리 영업 마스터',
   constraints: {
-    text_limit: '본문 300~500자 (짧고 임팩트 있게)',
+    text_limit: '본문 500~1400자 (전문가 깊이 + C-RANK 최적화)',
     multimodal: '이미지 첨부 시 최우선 분석하여 report_data에 반영할 것',
     knowledge: '상증법 제8조, CDR 척도, 법인세 손비처리, 체증형 설계 등 전문 지식 필수 포함',
     seo_goal: '네이버 C-RANK, DIA 알고리즘 분석 기반 상위노출 1위 목표'
@@ -121,7 +147,7 @@ const PERSONA_CONFIG = {
 
 [출력 규칙]
 - 반드시 유효한 JSON 형식으로만 응답
-- 본문은 공백 포함 300~500자 (네이버 C-RANK 최적화, 짧고 임팩트 있게)
+- 본문은 공백 포함 500~1400자 (네이버 C-RANK 최적화, 전문가 느낌 + 깊이 있게)
 - 이미지 분석 시 report_data 필드에 보장 분석 결과 포함`,
     writing_strategy: [
       "질문의 의도 뒤에 숨겨진 '공포'를 먼저 어루만질 것",
@@ -354,7 +380,7 @@ function buildExpertPrompt(topic: string) {
 참고 패턴:
 - ${titleHint}
 
-[📌 2. 본문 작성] (공백 포함 300~500자 - 네이버 C-RANK 최적화, 짧고 임팩트!)
+[📌 2. 본문 작성] (공백 포함 500~1400자 - 네이버 C-RANK 최적화, 전문가 깊이!)
 ■ 서론: 공감과 핵심 포인트 (2줄 이내)
 ■ 본론: 핵심 정보 1~2가지만 간결하게
 ■ 결론: 댓글 유도 질문 (1줄)
@@ -386,7 +412,7 @@ function buildBeginnerPrompt(topic: string, situation: string) {
 [📌 출력 형식]
 📌 제목: (클릭 안 할 수 없는 급박한 제목)
 
-📌 본문: (300~500자)
+📌 본문: (500~1400자, 전문가 깊이 유지!)
 - 구체적인 현재 상황 (날짜, 상황, 금액 등 디테일)
 - 느끼는 불안함과 막막함
 - 선배님들에게 구체적인 질문
@@ -921,7 +947,7 @@ app.post('/api/generate/full-package', async (c) => {
 
 🚨🚨🚨 [최우선 제약 - 네이버 상위노출 1위 목표] 🚨🚨🚨
 1. 제목: 공백 포함 25자 이내 (C-RANK 최적화, 클릭율 극대화)
-2. 본문: 공백 포함 300~500자 (짧고 임팩트 있게! DIA 알고리즘 최적화)
+2. 본문: 공백 포함 500~1400자 (전문가 깊이 + DIA 알고리즘 최적화)
 3. 바이럴 질문: 공백 포함 200~300자 (짧고 간절하게)
 4. 댓글: 50자 이내로 짧게
 5. 자극적/어그로 단어 절대 금지: "충격", "손해", "필독", "경악", "대박", "100%", "절대", "이거 모르면" 등
@@ -959,9 +985,9 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
     {"id": 2, "text": "바이럴 질문2 (200~300자, 짧고 간절한 초보자 질문)"}
   ],
   "contents": [
-    {"id": 1, "style": "공감형", "text": "본문1 (300~500자, 짧고 임팩트 있게)"},
-    {"id": 2, "style": "팩트형", "text": "본문2 (300~500자, 짧고 임팩트 있게)"},
-    {"id": 3, "style": "영업형", "text": "본문3 (300~500자, 짧고 임팩트 있게)"}
+    {"id": 1, "style": "공감형", "text": "본문1 (500~1400자, 전문가 깊이)"},
+    {"id": 2, "style": "팩트형", "text": "본문2 (500~1400자, 전문가 깊이)"},
+    {"id": 3, "style": "영업형", "text": "본문3 (500~1400자, 전문가 깊이)"}
   ],
   "seoKeywords": ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5"],
   "hashtags": ["#보험", "#실손보험", "#암보험", "#보험설계사", "#보험상담"]
@@ -1305,8 +1331,11 @@ ${ocrPriorityBlock}
 - "${targetAge}살에 ${insuranceProduct} 안 들면 후회하는 이유"
 - "현직 설계사가 알려주는 보험 꿀팁"
 
-📌 [바이럴 질문 3개 생성 규칙]
-■ 각 질문 500~800자
+📌 [바이럴 질문 3개 생성 규칙 - 랜덤 길이!]
+■ 질문1: 200~350자 (짧은 질문)
+■ 질문2: 400~600자 (중간 질문) 
+■ 질문3: 700~900자 (긴 질문)
+■ 3개 질문이 각각 다른 길이로 랜덤 생성되어야 함!
 ■ 보험을 전혀 모르는 초보자가 간절하게 질문하는 형태!
 ■ "너무 막막해요", "도와주세요", "용어가 너무 어려워요" 어투 필수
 ■ 사용자 입력에서 추출한 나이/상황/금액을 그대로 사용 (하드코딩 금지)
@@ -1318,7 +1347,7 @@ ${ocrPriorityBlock}
 JSON 형식으로만 응답:
 {
   "titles": [{"id":1,"text":"25자 이내 고객관점 제목"},{"id":2,"text":"25자 이내 고객관점 제목"},{"id":3,"text":"25자 이내 고객관점 제목"},{"id":4,"text":"25자 이내 고객관점 제목"},{"id":5,"text":"25자 이내 고객관점 제목"}],
-  "viral_questions": [{"id":1,"text":"초보자 관점의 간절한 질문 500~800자"},{"id":2,"text":"초보자 관점의 간절한 질문 500~800자"},{"id":3,"text":"초보자 관점의 간절한 질문 500~800자"}]
+  "viral_questions": [{"id":1,"text":"초보자 관점의 짧은 질문 200~350자"},{"id":2,"text":"초보자 관점의 중간 질문 400~600자"},{"id":3,"text":"초보자 관점의 긴 질문 700~900자"}]
 }`
       
       const titleResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.FLASH}:generateContent?key=${flashKey}`, {
