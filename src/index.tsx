@@ -32,10 +32,15 @@ const ENGINE = {
 // 🎲 콘텐츠 길이 가변제 (Short/Mid/Long 랜덤 출력)
 // 지루한 답변 방지 - 핵심 위주 전달
 // ============================================
+// ============================================
+// 📏 콘텐츠 길이 설정 - CEO 지시 (2026.01.20)
+// 글이 너무 길다 → 짧고 임팩트있게 수정
+// 네이버 C-RANK, DIA 알고리즘 최적화
+// ============================================
 const CONTENT_LENGTH_MODES = {
-  SHORT: { min: 350, max: 450, label: '핵심형', probability: 0.3 },
-  MID: { min: 600, max: 800, label: '적정형', probability: 0.5 },
-  LONG: { min: 1000, max: 1300, label: '상세형', probability: 0.2 }
+  SHORT: { min: 250, max: 350, label: '핵심형', probability: 0.4 },
+  MID: { min: 400, max: 550, label: '적정형', probability: 0.5 },
+  LONG: { min: 600, max: 800, label: '상세형', probability: 0.1 }
 }
 
 function selectContentLength(): { mode: string, min: number, max: number, label: string } {
@@ -87,13 +92,19 @@ const EXPERT_KNOWLEDGE_BASE = {
 // 모델: gemini-2.5-pro (API 확인됨) ← 최종 확정
 // 핵심: 가변 본문 + 전문 지식 베이스
 // ============================================
+// ============================================
+// XIVIX V39 마스터 프롬프트 - CEO 지시 (2026.01.20)
+// 목표: 네이버 C-RANK, DIA 알고리즘 최적화
+// 핵심: 상위노출 1위 목표 - 짧고 임팩트 있는 콘텐츠
+// ============================================
 const MASTER_INSTRUCTION_V3 = {
   model: 'gemini-2.5-pro',  // API 확인됨 (2026.01.19)
   persona: '30년 경력 MDRT 보험왕 & 심리 영업 마스터',
   constraints: {
-    text_limit: '본문은 공백 포함 1,200자 이상 (압도적 정보량)',
+    text_limit: '본문 300~500자 (짧고 임팩트 있게)',
     multimodal: '이미지 첨부 시 최우선 분석하여 report_data에 반영할 것',
-    knowledge: '상증법 제8조, CDR 척도, 법인세 손비처리, 체증형 설계 등 전문 지식 필수 포함'
+    knowledge: '상증법 제8조, CDR 척도, 법인세 손비처리, 체증형 설계 등 전문 지식 필수 포함',
+    seo_goal: '네이버 C-RANK, DIA 알고리즘 분석 기반 상위노출 1위 목표'
   },
   output_format: 'JSON_OBJECT'
 }
@@ -110,7 +121,7 @@ const PERSONA_CONFIG = {
 
 [출력 규칙]
 - 반드시 유효한 JSON 형식으로만 응답
-- 본문은 공백 포함 1,000자 내외 (네이버 카페 포스팅 최적화)
+- 본문은 공백 포함 300~500자 (네이버 C-RANK 최적화, 짧고 임팩트 있게)
 - 이미지 분석 시 report_data 필드에 보장 분석 결과 포함`,
     writing_strategy: [
       "질문의 의도 뒤에 숨겨진 '공포'를 먼저 어루만질 것",
@@ -343,10 +354,10 @@ function buildExpertPrompt(topic: string) {
 참고 패턴:
 - ${titleHint}
 
-[📌 2. 본문 작성] (공백 포함 1,000자 내외 - 네이버 카페 포스팅임을 명심!)
-■ 서론 (공감과 위로): 질문의 의도 뒤에 숨겨진 '공포'를 먼저 어루만지고, 독자가 "이 사람 내 마음을 아는구나"라고 느끼게 하라
-■ 본론 (핵심 정보 2~3가지 간결하게): 약관 함정, 보상 청구 팁, 2026년 트렌드
-■ 결론 (열린 질문): 댓글 참여를 유도하는 질문 퍼포먼스
+[📌 2. 본문 작성] (공백 포함 300~500자 - 네이버 C-RANK 최적화, 짧고 임팩트!)
+■ 서론: 공감과 핵심 포인트 (2줄 이내)
+■ 본론: 핵심 정보 1~2가지만 간결하게
+■ 결론: 댓글 유도 질문 (1줄)
 
 [📌 3. 영업 포인트]
 - "이런 분들은 꼭 상담받아보세요" 형태의 CTA
@@ -560,166 +571,6 @@ function generateRealtimeTrends() {
     }
   })
 }
-
-// ============================================
-// [4번] 약관 페이지 - CEO v2026.30 지시
-// ============================================
-
-// 서비스 이용약관 페이지
-app.get('/terms', (c) => {
-  return c.html(`<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>서비스 이용약관 - XIVIX 2026 PRO</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0f;color:#e5e5e5;line-height:1.8;padding:40px 20px}
-    .container{max-width:800px;margin:0 auto}
-    .logo{display:flex;align-items:center;gap:12px;margin-bottom:40px}
-    .logo-icon{width:40px;height:40px;background:linear-gradient(135deg,#4F8CFF,#00FF85);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff}
-    .logo-text{font-size:20px;font-weight:700;color:#fff}
-    .logo-text span{background:linear-gradient(135deg,#4F8CFF,#00FF85);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-    h1{font-size:28px;margin-bottom:24px;color:#fff}
-    h2{font-size:20px;margin:32px 0 16px;color:#4F8CFF;border-bottom:1px solid #333;padding-bottom:8px}
-    h3{font-size:16px;margin:24px 0 12px;color:#00FF85}
-    p,li{font-size:15px;color:#b5b5b5;margin-bottom:12px}
-    ul{padding-left:24px}
-    .highlight{background:rgba(79,140,255,0.1);border-left:3px solid #4F8CFF;padding:16px;margin:16px 0;border-radius:0 8px 8px 0}
-    .back-btn{display:inline-flex;align-items:center;gap:8px;color:#4F8CFF;text-decoration:none;margin-top:40px;font-size:14px}
-    .back-btn:hover{text-decoration:underline}
-    .updated{font-size:12px;color:#666;margin-top:40px;padding-top:20px;border-top:1px solid #222}
-  </style>
-</head>
-<body>
-  <div class="container">
-    <a href="/" class="logo">
-      <div class="logo-icon">X</div>
-      <div class="logo-text">XIVIX <span>2026</span> PRO</div>
-    </a>
-    
-    <h1>서비스 이용약관</h1>
-    
-    <h2>제1조 (목적)</h2>
-    <p>본 약관은 XIVIX / Combine Technology & Business(이하 '회사')가 제공하는 AI 보험 콘텐츠 생성 서비스 'XIVIX 2026 PRO'의 이용 조건 및 절차에 관한 사항을 규정함을 목적으로 합니다.</p>
-    
-    <h2>제2조 (서비스의 제공 및 제한)</h2>
-    <h3>1. 서비스 내용</h3>
-    <p>회사는 이용자에게 AI를 활용한 보험 마케팅 콘텐츠 생성 서비스를 제공합니다.</p>
-    
-    <h3>2. 이용 제한</h3>
-    <div class="highlight">
-      <p>서비스의 품질 유지 및 운영 비용 관리를 위해, 이용자는 <strong>1일 최대 4회</strong>의 콘텐츠 생성 기회를 가집니다.</p>
-      <p>잔여 횟수는 <strong>매일 00:00(KST)</strong>에 초기화됩니다.</p>
-    </div>
-    
-    <h3>3. 계정 관리</h3>
-    <p>본 서비스는 <strong>1인 1계정 상시 접속</strong>을 원칙으로 하며, 중복 로그인이 감지될 경우 기존 세션은 즉시 종료됩니다.</p>
-    
-    <h2>제3조 (회원가입 및 인증)</h2>
-    <p>본 서비스는 이용자의 편의를 위해 <strong>카카오 간편로그인(Kakao Sync)</strong> 인증 체계를 채택하며, 이용자는 카카오 계정을 통해 본 약관에 동의함으로써 가입이 완료됩니다.</p>
-    
-    <h2>제4조 (지식재산권 및 책임 제한)</h2>
-    <ul>
-      <li>생성된 콘텐츠의 저작권은 이용자에게 귀속되나, AI 모델의 로직 및 시스템에 대한 권리는 회사에 있습니다.</li>
-      <li>본 서비스가 제공하는 분석 결과는 AI에 의한 참고 자료이며, 보험 법리적 최종 판단 및 영업 결과에 대한 책임은 이용자 본인에게 있습니다.</li>
-    </ul>
-    
-    <a href="/" class="back-btn">← 메인으로 돌아가기</a>
-    
-    <p class="updated">최종 업데이트: 2026년 1월 19일</p>
-  </div>
-</body>
-</html>`)
-})
-
-// 개인정보 처리방침 페이지
-app.get('/privacy', (c) => {
-  return c.html(`<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>개인정보 처리방침 - XIVIX 2026 PRO</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0f;color:#e5e5e5;line-height:1.8;padding:40px 20px}
-    .container{max-width:800px;margin:0 auto}
-    .logo{display:flex;align-items:center;gap:12px;margin-bottom:40px}
-    .logo-icon{width:40px;height:40px;background:linear-gradient(135deg,#4F8CFF,#00FF85);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff}
-    .logo-text{font-size:20px;font-weight:700;color:#fff}
-    .logo-text span{background:linear-gradient(135deg,#4F8CFF,#00FF85);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-    h1{font-size:28px;margin-bottom:24px;color:#fff}
-    h2{font-size:20px;margin:32px 0 16px;color:#4F8CFF;border-bottom:1px solid #333;padding-bottom:8px}
-    h3{font-size:16px;margin:24px 0 12px;color:#00FF85}
-    p,li{font-size:15px;color:#b5b5b5;margin-bottom:12px}
-    ul{padding-left:24px}
-    table{width:100%;border-collapse:collapse;margin:16px 0}
-    th,td{padding:12px;text-align:left;border:1px solid #333}
-    th{background:rgba(79,140,255,0.1);color:#4F8CFF;font-weight:600}
-    td{color:#b5b5b5}
-    .highlight{background:rgba(79,140,255,0.1);border-left:3px solid #4F8CFF;padding:16px;margin:16px 0;border-radius:0 8px 8px 0}
-    .back-btn{display:inline-flex;align-items:center;gap:8px;color:#4F8CFF;text-decoration:none;margin-top:40px;font-size:14px}
-    .back-btn:hover{text-decoration:underline}
-    .updated{font-size:12px;color:#666;margin-top:40px;padding-top:20px;border-top:1px solid #222}
-  </style>
-</head>
-<body>
-  <div class="container">
-    <a href="/" class="logo">
-      <div class="logo-icon">X</div>
-      <div class="logo-text">XIVIX <span>2026</span> PRO</div>
-    </a>
-    
-    <h1>개인정보 처리방침</h1>
-    
-    <h2>1. 수집하는 개인정보 항목</h2>
-    <p>회사는 카카오 간편로그인 연동을 통해 아래의 정보를 수집합니다.</p>
-    
-    <table>
-      <tr>
-        <th>구분</th>
-        <th>수집 항목</th>
-      </tr>
-      <tr>
-        <td>필수 항목</td>
-        <td>닉네임(이름), 카카오 계정(이메일), 전화번호</td>
-      </tr>
-    </table>
-    
-    <h2>2. 수집 및 이용 목적</h2>
-    <ul>
-      <li>서비스 이용에 따른 본인 식별 및 회원 관리</li>
-      <li>일일 사용량(4회) 제한 로직 적용 및 중복 로그인 방지</li>
-      <li>보험 트렌드 및 XIVIX 서비스 관련 마케팅 정보 전달</li>
-    </ul>
-    
-    <h2>3. 보유 및 이용 기간</h2>
-    <div class="highlight">
-      <p>회원 탈퇴 시 또는 서비스 종료 시까지 보유하며, 법령에서 정한 기간 동안 안전하게 보관 후 파기합니다.</p>
-    </div>
-    
-    <h2>4. 개인정보의 제3자 제공</h2>
-    <p>회사는 이용자의 개인정보를 원칙적으로 외부에 제공하지 않습니다. 다만, 아래의 경우에는 예외로 합니다.</p>
-    <ul>
-      <li>이용자가 사전에 동의한 경우</li>
-      <li>법령의 규정에 의거하거나, 수사 목적으로 법령에 정해진 절차와 방법에 따라 수사기관의 요구가 있는 경우</li>
-    </ul>
-    
-    <h2>5. 개인정보의 파기</h2>
-    <p>회사는 개인정보 보유기간의 경과, 처리목적 달성 등 개인정보가 불필요하게 되었을 때에는 지체없이 해당 개인정보를 파기합니다.</p>
-    
-    <h2>6. 이용자 권리</h2>
-    <p>이용자는 언제든지 본인의 개인정보를 조회하거나 수정할 수 있으며, 회원탈퇴를 요청할 수 있습니다.</p>
-    
-    <a href="/" class="back-btn">← 메인으로 돌아가기</a>
-    
-    <p class="updated">최종 업데이트: 2026년 1월 19일</p>
-  </div>
-</body>
-</html>`)
-})
 
 // 네이버 실시간 검색 트렌드 API
 app.get('/api/trend', async (c) => {
@@ -1068,11 +919,13 @@ app.post('/api/generate/full-package', async (c) => {
     // ============================================
     const fullPackagePrompt = `## XIVIX 2026 마케팅 콘텐츠 생성 (v4) ##
 
-🚨🚨🚨 [최우선 제약 - 반드시 준수] 🚨🚨🚨
-1. 제목: 공백 포함 25자 이내 (모바일 카페 앱에서 잘리지 않게!)
-2. 본문: 공백 포함 1,000자 내외 (800~1,100자 범위)
-3. 바이럴 질문: 공백 포함 800자 이내 (보험 초보자가 간절하게 질문하는 형태)
-4. 자극적/어그로 단어 절대 금지: "충격", "손해", "필독", "경악", "대박", "100%", "절대", "이거 모르면" 등
+🚨🚨🚨 [최우선 제약 - 네이버 상위노출 1위 목표] 🚨🚨🚨
+1. 제목: 공백 포함 25자 이내 (C-RANK 최적화, 클릭율 극대화)
+2. 본문: 공백 포함 300~500자 (짧고 임팩트 있게! DIA 알고리즘 최적화)
+3. 바이럴 질문: 공백 포함 200~300자 (짧고 간절하게)
+4. 댓글: 50자 이내로 짧게
+5. 자극적/어그로 단어 절대 금지: "충격", "손해", "필독", "경악", "대박", "100%", "절대", "이거 모르면" 등
+6. 해시태그: 반드시 5개 포함 (#보험 #실손보험 #암보험 등)
 
 [📊 입력 정보]
 - 컨텍스트 소스: ${contextSource} (image > input > trend 우선순위)
@@ -1102,15 +955,16 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
     {"id": 5, "text": "제목5 (25자 이내)"}
   ],
   "viral_questions": [
-    {"id": 1, "text": "바이럴 질문1 (800자 이내, 보험을 전혀 모르는 초보자가 구체적 상황을 설명하며 간절하게 도움을 구하는 질문. 전문가 어투 금지!)"},
-    {"id": 2, "text": "바이럴 질문2 (800자 이내, 초보자 관점의 순수한 질문)"}
+    {"id": 1, "text": "바이럴 질문1 (200~300자, 짧고 간절한 초보자 질문)"},
+    {"id": 2, "text": "바이럴 질문2 (200~300자, 짧고 간절한 초보자 질문)"}
   ],
   "contents": [
-    {"id": 1, "style": "공감형", "text": "본문1 (800~1,100자, 독자의 불안을 어루만지는 따뜻한 글)"},
-    {"id": 2, "style": "팩트형", "text": "본문2 (800~1,100자, 약관 함정 폭로)"},
-    {"id": 3, "style": "영업형", "text": "본문3 (800~1,100자, 심리적 트리거로 상담 유도)"}
+    {"id": 1, "style": "공감형", "text": "본문1 (300~500자, 짧고 임팩트 있게)"},
+    {"id": 2, "style": "팩트형", "text": "본문2 (300~500자, 짧고 임팩트 있게)"},
+    {"id": 3, "style": "영업형", "text": "본문3 (300~500자, 짧고 임팩트 있게)"}
   ],
-  "seoKeywords": ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5"]
+  "seoKeywords": ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5"],
+  "hashtags": ["#보험", "#실손보험", "#암보험", "#보험설계사", "#보험상담"]
 }`
     
     const expertEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`
@@ -1972,106 +1826,69 @@ body{
 }
 @keyframes gridDrift{to{transform:translate(60px,60px)}}
 
-/* ============================================
-   ✅ CEO 지시 (2026.01.19) - v2026.35 UI/UX 최적화
-   - 상단 빈 공간 60% 압축
-   - PC/Tablet: 2컬럼 Grid 레이아웃
-   - Mobile: 1컬럼 Stack + 입력창 하단 Sticky
-   ============================================ */
-
-/* ============================================
-   [1번] CEO 마스터 업데이트 v2026.30
-   상단 여백 70% 축소 + 로고 좌측 상단 이동
-   ============================================ */
+/* 레이아웃 - 화면 전체 활용 */
 .wrapper{
   display:flex;
   flex-direction:column;
-  align-items:stretch;  /* 전체 너비 활용 */
+  align-items:center;
   width:100%;
   max-width:100%;
-  gap:8px;  /* 70% 압축: 24px → 8px */
-  padding:8px 16px;  /* 최소 패딩 */
+  gap:clamp(20px, 3vh, 32px);
+  padding-top:clamp(20px, 4vh, 40px);
 }
 
-/* 상단 헤더 바 - 로고 좌측, 사용량 중앙, 메뉴 우측 */
-.top-header{
+/* 네비게이션 */
+.nav{
+  position:fixed;
+  top:clamp(12px, 2vw, 24px);
+  right:clamp(12px, 2vw, 24px);
   display:flex;
-  align-items:center;
-  justify-content:space-between;
-  width:100%;
-  padding:8px 0;
-  border-bottom:1px solid var(--border);
-  margin-bottom:8px;
+  gap:clamp(8px, 1.5vw, 16px);
+  z-index:100;
 }
-.top-header .logo{
-  margin:0;
-  justify-content:flex-start;
-}
-.top-header .usage-badge{
-  background:linear-gradient(135deg, var(--primary-soft), rgba(0,255,133,0.1));
-  border:1px solid var(--primary);
-  border-radius:20px;
-  padding:6px 16px;
-  font-size:13px;
-  font-weight:600;
-  color:var(--primary);
-  display:flex;
-  align-items:center;
-  gap:8px;
-}
-.top-header .usage-badge .count{
-  background:var(--primary);
-  color:#000;
-  border-radius:12px;
-  padding:2px 8px;
-  font-weight:700;
-}
-.top-header .header-nav{
-  display:flex;
-  gap:8px;
-}
-.top-header .header-nav a{
+.nav a{
   color:var(--text-muted);
   text-decoration:none;
-  font-size:12px;
-  padding:6px 12px;
-  border-radius:6px;
+  font-size:clamp(11px, 1.2vw, 13px);
+  padding:8px 12px;
+  border-radius:8px;
   background:var(--card-bg);
   border:1px solid var(--border);
   transition:all 0.2s;
+  display:flex;
+  align-items:center;
+  gap:6px;
 }
-.top-header .header-nav a:hover{
-  color:var(--primary);
-  border-color:var(--primary);
-}
+.nav a:hover{color:var(--primary);border-color:var(--primary-soft);background:var(--primary-soft)}
 
-/* 네비게이션 - 상단 헤더에 통합됨 (기존 고정 nav 제거) */
-.nav{
-  display:none;  /* 상단 헤더로 대체 */
-}
-
-/* 로고 - 슬림화 + 좌측 정렬 (CEO v2026.30 지시) */
+/* 로고 */
 .logo{
   display:flex;
   align-items:center;
-  gap:8px;
+  justify-content:center;
+  gap:clamp(10px, 1.5vw, 16px);
 }
 .logo-icon{
-  width:32px;
-  height:32px;
+  width:clamp(44px, 5vw, 56px);
+  height:clamp(44px, 5vw, 56px);
   background:linear-gradient(135deg, var(--primary), var(--accent));
-  border-radius:8px;
+  border-radius:clamp(12px, 1.5vw, 16px);
   display:flex;
   align-items:center;
   justify-content:center;
   font-weight:900;
-  font-size:clamp(14px, 1.8vw, 20px);  /* 슬림화 */
+  font-size:clamp(18px, 2.2vw, 26px);
   color:#fff;
-  box-shadow:0 0 20px rgba(79,140,255,0.2);
+  box-shadow:0 0 30px rgba(79,140,255,0.25);
+  animation:logoPulse 4s ease-in-out infinite;
+}
+@keyframes logoPulse{
+  0%,100%{box-shadow:0 0 30px rgba(79,140,255,0.25)}
+  50%{box-shadow:0 0 50px rgba(79,140,255,0.35), 0 0 80px rgba(124,92,255,0.15)}
 }
 .logo-text{
-  font-size:18px;  /* 슬림화 */
-  font-weight:700;
+  font-size:clamp(22px, 3vw, 32px);
+  font-weight:800;
   letter-spacing:-0.5px;
 }
 .logo-text span{
@@ -2081,125 +1898,21 @@ body{
   background-clip:text;
 }
 
-/* 타이틀 - 숨김 (상단 압축으로 제거) */
+/* 타이틀 */
 .title{
-  display:none;
+  font-size:clamp(14px, 1.8vw, 18px);
+  color:var(--text-muted);
+  font-weight:400;
+  text-align:center;
 }
 
-/* 메인 컨테이너 - 2컬럼 Grid (PC/Tablet), 1컬럼 (Mobile) */
+/* 메인 컨테이너 - 화면 전체 활용 */
 .main{
   width:100%;
-  max-width:1600px;
-  margin:0 auto;
-  display:grid;
-  grid-template-columns:minmax(400px, 1fr) minmax(400px, 1fr);  /* 2컬럼 강제 */
-  gap:24px;
-  align-items:start;
-  padding:0 16px;
-}
-/* 왼쪽 컬럼: 입력/트렌드 */
-.main-left{
+  max-width:1200px;
   display:flex;
   flex-direction:column;
-  gap:16px;
-  position:sticky;
-  top:20px;
-}
-/* 오른쪽 컬럼: 결과물 스트리밍 */
-.main-right{
-  display:flex;
-  flex-direction:column;
-  gap:16px;
-  max-height:calc(100vh - 120px);
-  overflow-y:auto;
-  padding-right:8px;
-}
-.main-right::-webkit-scrollbar{width:6px}
-.main-right::-webkit-scrollbar-track{background:transparent}
-.main-right::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-
-/* 모바일: 1컬럼 Stack */
-/* ============================================
-   [1번] 모바일 반응형 - CEO v2026.30 지시
-   상단: 결과물 / 하단: 고정 입력바 (Sticky Input)
-   ============================================ */
-/* 태블릿: 1024px 이하 */
-@media(max-width:1024px){
-  .main{
-    grid-template-columns:1fr;  /* 1컬럼 */
-    max-width:100%;
-    gap:16px;
-    padding:0 12px;
-  }
-}
-
-/* 모바일: 768px 이하 */
-@media(max-width:768px){
-  .wrapper{
-    padding:8px;
-  }
-  .top-header{
-    flex-wrap:wrap;
-    gap:8px;
-    padding:8px 4px;
-  }
-  .top-header .logo{
-    order:1;
-  }
-  .top-header .usage-badge{
-    order:3;
-    width:100%;
-    justify-content:center;
-    font-size:12px;
-    padding:4px 12px;
-  }
-  .top-header .header-nav{
-    order:2;
-    margin-left:auto;
-  }
-  .main-left{
-    position:fixed;
-    bottom:0;
-    left:0;
-    right:0;
-    top:auto;
-    background:var(--bg);
-    z-index:100;
-    padding:12px;
-    border-top:1px solid var(--border);
-    box-shadow:0 -4px 20px rgba(0,0,0,0.3);
-    max-height:45vh;
-    overflow-y:auto;
-  }
-  .main-left .trend-section{
-    display:none;  /* 모바일에서 트렌드 숨김 */
-  }
-  .main-right{
-    max-height:none;
-    overflow-y:visible;
-    order:-1;
-    padding-bottom:200px;  /* 하단 입력바 공간 확보 */
-  }
-  /* 모바일 트렌드 토글 버튼 */
-  .mobile-trend-toggle{
-    display:flex !important;
-    align-items:center;
-    justify-content:center;
-    gap:8px;
-    padding:10px;
-    background:var(--card-bg);
-    border:1px solid var(--border);
-    border-radius:8px;
-    color:var(--text-muted);
-    font-size:13px;
-    cursor:pointer;
-    margin-top:8px;
-  }
-}
-@media(min-width:901px){
-  .mobile-trend-toggle{
-    display:none;
-  }
+  gap:clamp(20px, 3vh, 32px);
 }
 
 /* GPT 스타일 검색창 */
@@ -2800,87 +2513,6 @@ body{
   padding:20px;
   margin-bottom:20px;
 }
-
-/* ✅ CEO 지시 - Real-time Process Tracker CSS */
-.process-tracker{
-  margin-top:16px;
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-}
-.tracker-step{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:10px 14px;
-  background:rgba(255,255,255,0.02);
-  border-radius:10px;
-  border-left:3px solid var(--border);
-  opacity:0.5;
-  transition:all 0.3s ease;
-}
-.tracker-step[data-status="active"]{
-  opacity:1;
-  border-left-color:var(--primary);
-  background:rgba(79,140,255,0.08);
-}
-.tracker-step[data-status="active"] .tracker-icon{
-  animation:pulse 1s infinite;
-}
-.tracker-step[data-status="done"]{
-  opacity:1;
-  border-left-color:var(--green);
-  background:rgba(16,185,129,0.08);
-}
-.tracker-icon{font-size:18px}
-.tracker-text{font-size:13px;color:var(--text-muted)}
-.tracker-step[data-status="active"] .tracker-text,
-.tracker-step[data-status="done"] .tracker-text{color:var(--text)}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
-
-.tracker-complete{
-  margin-top:16px;
-  padding:14px 18px;
-  background:linear-gradient(135deg, rgba(16,185,129,0.15), rgba(79,140,255,0.1));
-  border:1px solid rgba(16,185,129,0.3);
-  border-radius:12px;
-}
-
-/* [1번] 완료 가이드 팝업 - CEO 지시 */
-.completion-guide{
-  margin-top:12px;
-  padding:16px;
-  background:linear-gradient(135deg, rgba(0,255,133,0.15), rgba(79,140,255,0.1));
-  border:2px solid var(--primary);
-  border-radius:12px;
-  text-align:center;
-  animation:guideGlow 2s infinite;
-}
-.completion-guide .guide-arrow{
-  font-size:24px;
-  animation:bounce 1s infinite;
-  color:var(--primary);
-}
-.completion-guide .guide-text{
-  font-size:14px;
-  color:var(--text);
-  margin-top:8px;
-}
-@keyframes guideGlow{
-  0%,100%{box-shadow:0 0 10px rgba(0,255,133,0.3)}
-  50%{box-shadow:0 0 25px rgba(0,255,133,0.5)}
-}
-@keyframes bounce{
-  0%,100%{transform:translateY(0)}
-  50%{transform:translateY(5px)}
-  display:flex;
-  align-items:center;
-  gap:10px;
-  font-size:14px;
-  color:var(--green);
-}
-.tracker-complete i{font-size:20px}
-.tracker-complete b{color:var(--primary)}
 .progress-header{
   display:flex;
   justify-content:space-between;
@@ -3544,271 +3176,9 @@ body{
     box-shadow:0 0 30px rgba(0,255,133,0.1) !important;
   }
 }
-
-/* ============================================
-   [2번] 카카오 로그인 환영 모달 - CEO v2026.30
-   ============================================ */
-.welcome-modal-overlay{
-  position:fixed;
-  top:0;left:0;right:0;bottom:0;
-  background:rgba(0,0,0,0.85);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:10000;
-  opacity:0;
-  visibility:hidden;
-  transition:all 0.3s ease;
-}
-.welcome-modal-overlay.show{
-  opacity:1;
-  visibility:visible;
-}
-.welcome-modal{
-  background:linear-gradient(135deg, #1a1a2e, #16213e);
-  border:1px solid rgba(0,255,133,0.3);
-  border-radius:24px;
-  padding:40px;
-  max-width:480px;
-  width:90%;
-  text-align:center;
-  box-shadow:0 0 60px rgba(0,255,133,0.2);
-  transform:scale(0.9);
-  transition:transform 0.3s ease;
-}
-.welcome-modal-overlay.show .welcome-modal{
-  transform:scale(1);
-}
-.welcome-modal .modal-icon{
-  width:80px;
-  height:80px;
-  background:linear-gradient(135deg, var(--primary), #00FF85);
-  border-radius:50%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  margin:0 auto 24px;
-  font-size:36px;
-}
-.welcome-modal .modal-title{
-  font-size:22px;
-  font-weight:700;
-  color:#fff;
-  margin-bottom:8px;
-}
-.welcome-modal .modal-subtitle{
-  font-size:14px;
-  color:var(--text-muted);
-  line-height:1.6;
-  margin-bottom:24px;
-}
-.welcome-modal .modal-badge{
-  background:linear-gradient(135deg, rgba(0,255,133,0.15), rgba(79,140,255,0.1));
-  border:1px solid var(--primary);
-  border-radius:12px;
-  padding:16px;
-  margin-bottom:24px;
-}
-.welcome-modal .modal-badge-title{
-  font-size:12px;
-  color:var(--text-muted);
-  margin-bottom:8px;
-}
-.welcome-modal .modal-badge-value{
-  font-size:28px;
-  font-weight:900;
-  color:var(--primary);
-}
-.welcome-modal .modal-features{
-  text-align:left;
-  margin-bottom:24px;
-}
-.welcome-modal .modal-feature{
-  display:flex;
-  align-items:flex-start;
-  gap:12px;
-  padding:10px 0;
-  border-bottom:1px solid rgba(255,255,255,0.05);
-}
-.welcome-modal .modal-feature:last-child{
-  border-bottom:none;
-}
-.welcome-modal .modal-feature i{
-  color:var(--primary);
-  font-size:14px;
-  margin-top:2px;
-}
-.welcome-modal .modal-feature span{
-  font-size:13px;
-  color:var(--text);
-  line-height:1.5;
-}
-.welcome-modal .modal-cta{
-  background:linear-gradient(135deg, var(--primary), #00FF85);
-  color:#000;
-  border:none;
-  border-radius:12px;
-  padding:14px 32px;
-  font-size:15px;
-  font-weight:700;
-  cursor:pointer;
-  width:100%;
-  transition:all 0.2s;
-}
-.welcome-modal .modal-cta:hover{
-  transform:translateY(-2px);
-  box-shadow:0 8px 25px rgba(0,255,133,0.3);
-}
-
-/* [3번] 미로그인 잠금 UI */
-.locked-overlay{
-  position:fixed;
-  top:0;left:0;right:0;bottom:0;
-  background:rgba(0,0,0,0.9);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:9000;
-  opacity:0;
-  visibility:hidden;
-  transition:all 0.3s ease;
-}
-.locked-overlay.show{
-  opacity:1;
-  visibility:visible;
-}
-.locked-content{
-  text-align:center;
-  max-width:400px;
-  padding:40px;
-}
-.locked-content .lock-icon{
-  font-size:64px;
-  color:var(--primary);
-  margin-bottom:24px;
-}
-.locked-content .lock-title{
-  font-size:20px;
-  font-weight:700;
-  color:#fff;
-  margin-bottom:12px;
-}
-.locked-content .lock-desc{
-  font-size:14px;
-  color:var(--text-muted);
-  line-height:1.6;
-  margin-bottom:24px;
-}
-.kakao-login-btn{
-  background:#FEE500;
-  color:#000;
-  border:none;
-  border-radius:12px;
-  padding:14px 24px;
-  font-size:15px;
-  font-weight:700;
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:10px;
-  width:100%;
-  transition:all 0.2s;
-}
-.kakao-login-btn:hover{
-  background:#F5DC00;
-  transform:translateY(-2px);
-}
-.kakao-login-btn img{
-  width:20px;
-  height:20px;
-}
-.terms-link{
-  font-size:12px;
-  color:var(--text-muted);
-  margin-top:16px;
-}
-.terms-link a{
-  color:var(--primary);
-  text-decoration:underline;
-}
-
-/* 결과물 영역 블러 효과 (미로그인 시) */
-.result-section.blurred{
-  filter:blur(8px);
-  pointer-events:none;
-  user-select:none;
-}
 </style>
 </head>
 <body>
-
-<!-- ============================================
-     [2번] 카카오 로그인 환영 모달 - CEO v2026.30
-     ============================================ -->
-<div class="welcome-modal-overlay" id="welcomeModal">
-  <div class="welcome-modal">
-    <div class="modal-icon">
-      <i class="fas fa-crown"></i>
-    </div>
-    <div class="modal-title">반갑습니다, XIVIX 파트너님.</div>
-    <div class="modal-subtitle">
-      대한민국 1%의 전문성을 AI로 완성하는<br>
-      <strong>XIVIX 2026 PRO</strong>에 오신 것을 환영합니다.
-    </div>
-    
-    <div class="modal-badge">
-      <div class="modal-badge-title">오늘의 생성 기회</div>
-      <div class="modal-badge-value" id="welcomeUsageCount">4회 남음</div>
-    </div>
-    
-    <div class="modal-features">
-      <div class="modal-feature">
-        <i class="fas fa-check-circle"></i>
-        <span><strong>❶ 카카오 연동 완료:</strong> 안전한 1인 1계정 환경에서 작업이 보호됩니다.</span>
-      </div>
-      <div class="modal-feature">
-        <i class="fas fa-check-circle"></i>
-        <span><strong>❷ 생성 제한 안내:</strong> 최상의 퀄리티 유지를 위해 1일 4회 생성이 가능합니다.</span>
-      </div>
-      <div class="modal-feature">
-        <i class="fas fa-check-circle"></i>
-        <span><strong>❸ 최적화 완료:</strong> PC 환경에 최적화된 '2분할 작업 공간'이 적용되었습니다.</span>
-      </div>
-    </div>
-    
-    <button class="modal-cta" onclick="closeWelcomeModal()">
-      <i class="fas fa-rocket"></i> 지금 바로 시작하기
-    </button>
-  </div>
-</div>
-
-<!-- ============================================
-     [3번] 미로그인 사용자용 잠금 UI - CEO v2026.30
-     ============================================ -->
-<div class="locked-overlay" id="lockedOverlay">
-  <div class="locked-content">
-    <div class="lock-icon">
-      <i class="fas fa-lock"></i>
-    </div>
-    <div class="lock-title">이 분석 결과는 XIVIX 파트너에게만 공개됩니다</div>
-    <div class="lock-desc">
-      카카오 1초 로그인으로 MDRT급 통찰을 확인하세요.<br>
-      매일 4회의 무료 생성 기회가 제공됩니다.
-    </div>
-    
-    <button class="kakao-login-btn" onclick="loginWithKakao()">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="#000">
-        <path d="M12 3c5.799 0 10.5 3.664 10.5 8.185 0 4.52-4.701 8.184-10.5 8.184a13.5 13.5 0 0 1-1.727-.11l-4.408 2.883c-.501.265-.678.236-.472-.413l.892-3.678c-2.88-1.46-4.785-3.99-4.785-6.866C1.5 6.665 6.201 3 12 3z"/>
-      </svg>
-      카카오로 1초 만에 시작하기
-    </button>
-    
-    <div class="terms-link">
-      로그인 시 <a href="/terms">서비스 이용약관</a> 및 <a href="/privacy">개인정보 처리방침</a>에 동의합니다
-    </div>
-  </div>
-</div>
 
 <!-- XIVIX 2026 PRO 초정밀 랜덤화 엔진 오버레이 -->
 <div class="seo-overlay" id="seoOverlay">
@@ -3874,34 +3244,21 @@ body{
   <div class="grid"></div>
 </div>
 
-<!-- ============================================
-     [1번] CEO v2026.30 마스터 업데이트
-     상단 여백 70% 축소 + 2컬럼 Split View
-     ============================================ -->
+<nav class="nav">
+  <a href="/admin"><i class="fas fa-cog"></i> Admin</a>
+  <a href="/api/docs"><i class="fas fa-book"></i> Docs</a>
+</nav>
+
 <div class="wrapper">
   
-  <!-- 상단 헤더 바: 로고(좌측) + 사용량(중앙) + 메뉴(우측) -->
-  <header class="top-header">
-    <div class="logo">
-      <div class="logo-icon">X</div>
-      <div class="logo-text">XIVIX <span>2026</span> PRO</div>
-    </div>
-    
-    <div class="usage-badge" id="usageBadge">
-      <i class="fas fa-bolt"></i>
-      오늘 남은 횟수: <span class="count" id="usageCount">4/4</span>
-    </div>
-    
-    <nav class="header-nav">
-      <a href="/terms"><i class="fas fa-file-contract"></i> 약관</a>
-      <a href="/admin"><i class="fas fa-cog"></i> Admin</a>
-    </nav>
-  </header>
+  <div class="logo">
+    <div class="logo-icon">X</div>
+    <div class="logo-text">XIVIX <span>2026</span> PRO</div>
+  </div>
+  
+  <p class="title">AI 보험 전문가 콘텐츠 생성 엔진</p>
   
   <div class="main">
-    
-    <!-- ✅ CEO 지시 - 왼쪽 컬럼: 입력/트렌드 -->
-    <div class="main-left">
     
     <!-- GPT 스타일 검색창 + 파일 업로드 -->
     <div class="search-box" id="searchBox">
@@ -3969,52 +3326,14 @@ body{
       </div>
     </div>
     
-    </div><!-- // main-left 닫기 -->
-    
-    <!-- ✅ CEO 지시 - 오른쪽 컬럼: 결과물 스트리밍 -->
-    <div class="main-right">
-    
     <!-- 결과 영역 (탭 분할 UI) -->
     <div class="result-section" id="resultSection">
-      <!-- ✅ CEO 지시 - Real-time Process Tracker -->
       <div class="progress-box" id="progressBox">
         <div class="progress-header">
           <span id="progressText" class="progress-text"><i class="fas fa-spinner fa-spin"></i> 분석 중...</span>
           <span id="progressPct" class="progress-pct">0%</span>
         </div>
         <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
-        
-        <!-- Real-time Process Tracker Steps -->
-        <div class="process-tracker" id="processTracker">
-          <div class="tracker-step" id="trackerStep1" data-status="pending">
-            <span class="tracker-icon">🔍</span>
-            <span class="tracker-text">데이터 분석 및 컨텍스트 로딩 중</span>
-          </div>
-          <div class="tracker-step" id="trackerStep2" data-status="pending">
-            <span class="tracker-icon">✅</span>
-            <span class="tracker-text">날카로운 제목 및 미끼 질문 생성 완료</span>
-          </div>
-          <div class="tracker-step" id="trackerStep3" data-status="pending">
-            <span class="tracker-icon">✍️</span>
-            <span class="tracker-text">❶❷❸ 전문가 답변 정밀 분석 중</span>
-          </div>
-          <div class="tracker-step" id="trackerStep4" data-status="pending">
-            <span class="tracker-icon">💬</span>
-            <span class="tracker-text">사회적 증거(댓글) 동기화 완료</span>
-          </div>
-        </div>
-        
-        <!-- 완료 CTA - 가이드 팝업 -->
-        <div class="tracker-complete" id="trackerComplete" style="display:none">
-          <i class="fas fa-check-circle"></i>
-          <span>🎉 모든 텍스트 생성 완료!</span>
-        </div>
-        <div class="completion-guide" id="completionGuide" style="display:none">
-          <div class="guide-arrow">↓</div>
-          <div class="guide-text">
-            <strong>다음 단계:</strong> 아래 <span style="color:var(--primary);font-weight:700">[마케팅 이미지 생성]</span> 버튼을 클릭하세요
-          </div>
-        </div>
       </div>
       
       <!-- SEO 감사 리포트 (상단) -->
@@ -4050,6 +3369,16 @@ body{
           <span class="badge">5</span>
         </div>
         <div class="section-content" id="seoKeywords"></div>
+      </div>
+      
+      <!-- ❷-2 해시태그 섹션 (CEO 지시 2026.01.20 추가) -->
+      <div class="sequential-section" id="section-hashtags">
+        <div class="section-header">
+          <i class="fas fa-hashtag"></i>
+          <span>❷ 해시태그</span>
+          <span class="badge">5</span>
+        </div>
+        <div class="section-content" id="hashtagsContent"></div>
       </div>
       
       <!-- ❸ 전문가 답변 섹션 -->
@@ -4123,99 +3452,10 @@ body{
       </div>
     </div>
     
-    </div><!-- // main-right 닫기 -->
-    
-  </div><!-- // main 닫기 -->
-</div><!-- // wrapper 닫기 -->
+  </div>
+</div>
 
 <script>
-// ============================================
-// [2번][3번] 카카오 로그인 & 잠금 UI 로직 - CEO v2026.30
-// ============================================
-const AUTH_KEY = 'xivix_auth';
-const WELCOME_SHOWN_KEY = 'xivix_welcome_shown';
-
-// 로그인 상태 확인 (임시: localStorage 기반, 실제로는 카카오 SDK 연동)
-function isLoggedIn() {
-  const auth = localStorage.getItem(AUTH_KEY);
-  return auth && JSON.parse(auth).loggedIn === true;
-}
-
-// 로그인 처리 (카카오 SDK 연동 시 대체)
-function loginWithKakao() {
-  // 실제 카카오 로그인 구현 시:
-  // Kakao.Auth.login({ success: handleKakaoLogin, fail: handleKakaoError });
-  
-  // 임시 데모: 로그인 성공 시뮬레이션
-  const authData = {
-    loggedIn: true,
-    nickname: 'XIVIX 파트너',
-    loginTime: new Date().toISOString()
-  };
-  localStorage.setItem(AUTH_KEY, JSON.stringify(authData));
-  
-  // 잠금 UI 닫기
-  document.getElementById('lockedOverlay').classList.remove('show');
-  document.getElementById('resultSection').classList.remove('blurred');
-  
-  // 환영 모달 표시 (첫 로그인 시에만)
-  if (!localStorage.getItem(WELCOME_SHOWN_KEY)) {
-    showWelcomeModal();
-  }
-}
-
-// 환영 모달 표시
-function showWelcomeModal() {
-  const remaining = getRemainingCount();
-  document.getElementById('welcomeUsageCount').textContent = remaining + '회 남음';
-  document.getElementById('welcomeModal').classList.add('show');
-  localStorage.setItem(WELCOME_SHOWN_KEY, new Date().toDateString());
-}
-
-// 환영 모달 닫기
-function closeWelcomeModal() {
-  document.getElementById('welcomeModal').classList.remove('show');
-}
-
-// 잠금 UI 표시 (미로그인 시)
-function showLockedUI() {
-  document.getElementById('lockedOverlay').classList.add('show');
-  document.getElementById('resultSection').classList.add('blurred');
-}
-
-// 로그아웃
-function logout() {
-  localStorage.removeItem(AUTH_KEY);
-  localStorage.removeItem(WELCOME_SHOWN_KEY);
-  location.reload();
-}
-
-// 생성 버튼 클릭 시 로그인 체크
-function checkAuthBeforeGenerate() {
-  if (!isLoggedIn()) {
-    showLockedUI();
-    return false;
-  }
-  return true;
-}
-
-// 페이지 로드 시 로그인 상태 확인
-function initAuth() {
-  // 날짜가 바뀌면 환영 모달 다시 표시 가능하도록
-  const welcomeDate = localStorage.getItem(WELCOME_SHOWN_KEY);
-  if (welcomeDate && welcomeDate !== new Date().toDateString()) {
-    localStorage.removeItem(WELCOME_SHOWN_KEY);
-  }
-  
-  // 로그인 되어있고 오늘 환영 모달을 안 봤으면 표시
-  if (isLoggedIn() && !localStorage.getItem(WELCOME_SHOWN_KEY)) {
-    setTimeout(showWelcomeModal, 500);
-  }
-}
-
-// ============================================
-// DOM 요소 참조
-// ============================================
 const searchEl = document.getElementById('search');
 const charEl = document.getElementById('char');
 const btn = document.getElementById('btn');
@@ -4226,7 +3466,7 @@ const refreshBtn = document.getElementById('refreshBtn');
 const trendTimeEl = document.getElementById('trendTime');
 const searchBox = document.getElementById('searchBox');
 const trendSection = document.getElementById('trendSection');
-const hintSection = document.getElementById('hintSection');
+const hintSection = document.getElementById('hintSection'); // 제거됨 - 안전한 null 체크 적용
 const resultSection = document.getElementById('resultSection');
 const progressBox = document.getElementById('progressBox');
 const progressText = document.getElementById('progressText');
@@ -4239,94 +3479,6 @@ let uploadedFiles = [];
 let isGenerating = false;
 let lastTrendUpdate = null;
 
-// ============================================
-// ✅ CEO 지시 (2026.01.19) - 일일 4회 생성 제한 로직
-// ============================================
-const DAILY_LIMIT = 4;
-const USAGE_KEY = 'xivix_daily_usage';
-
-function getDailyUsage() {
-  const stored = localStorage.getItem(USAGE_KEY);
-  if (!stored) return { count: 0, date: new Date().toDateString() };
-  const data = JSON.parse(stored);
-  // 날짜가 바뀌면 리셋 (00:00 KST)
-  if (data.date !== new Date().toDateString()) {
-    return { count: 0, date: new Date().toDateString() };
-  }
-  return data;
-}
-
-function incrementUsage() {
-  const usage = getDailyUsage();
-  usage.count++;
-  usage.date = new Date().toDateString();
-  localStorage.setItem(USAGE_KEY, JSON.stringify(usage));
-  updateUsageDisplay();
-  return usage.count;
-}
-
-function canGenerate() {
-  const usage = getDailyUsage();
-  return usage.count < DAILY_LIMIT;
-}
-
-function getRemainingCount() {
-  const usage = getDailyUsage();
-  return Math.max(0, DAILY_LIMIT - usage.count);
-}
-
-function updateUsageDisplay() {
-  const remaining = getRemainingCount();
-  // 새로운 상단 헤더 배지 업데이트
-  const usageCountEl = document.getElementById('usageCount');
-  const usageBadgeEl = document.getElementById('usageBadge');
-  if (usageCountEl) {
-    usageCountEl.textContent = remaining + '/' + DAILY_LIMIT;
-  }
-  if (usageBadgeEl) {
-    if (remaining <= 1) {
-      usageBadgeEl.style.borderColor = '#ef4444';
-      usageBadgeEl.style.color = '#ef4444';
-    } else {
-      usageBadgeEl.style.borderColor = '';
-      usageBadgeEl.style.color = '';
-    }
-  }
-}
-
-// ============================================
-// ✅ CEO 지시 - ❶❷❸ 기호 검증 로직
-// 전문가 답변에 기호 누락 시 자동 재호출
-// ============================================
-function validateTypography(content) {
-  if (!content) return false;
-  const requiredSymbols = ['❶', '❷', '❸'];
-  return requiredSymbols.every(symbol => content.includes(symbol));
-}
-
-// ============================================
-// ✅ CEO 지시 - Process Tracker 업데이트 함수
-// ============================================
-function updateTrackerStep(stepNum, status) {
-  for (let i = 1; i <= 4; i++) {
-    const el = document.getElementById('trackerStep' + i);
-    if (el) {
-      if (i < stepNum) {
-        el.setAttribute('data-status', 'done');
-      } else if (i === stepNum) {
-        el.setAttribute('data-status', status);
-      } else {
-        el.setAttribute('data-status', 'pending');
-      }
-    }
-  }
-  // 완료 시 CTA 표시
-  if (stepNum > 4 || (stepNum === 4 && status === 'done')) {
-    const completeEl = document.getElementById('trackerComplete');
-    if (completeEl) completeEl.style.display = 'flex';
-  }
-}
-
 // ✅ V39 기본 옵션값 - 하드코딩 나이 제거 (CEO 지시)
 // target은 사용자 입력에서 동적 추출하므로 빈 값으로 설정
 const DEFAULT_OPTIONS = {
@@ -4335,12 +3487,6 @@ const DEFAULT_OPTIONS = {
   company: '',  // 동적 추출
   style: '전문가 팩트체크형'
 };
-
-// 페이지 로드 시 초기화
-document.addEventListener('DOMContentLoaded', () => {
-  updateUsageDisplay();
-  initAuth();  // [2번][3번] 로그인 상태 확인 및 모달 처리
-});
 
 // 글자수 카운트
 searchEl.addEventListener('input', () => {
@@ -5095,13 +4241,40 @@ function renderSeoKeywords(keywords) {
   ).join('');
 }
 
+// ============================================
+// 해시태그 렌더링 (CEO 지시 2026.01.20 추가)
+// ============================================
+function renderHashtags(hashtags) {
+  const container = document.getElementById('hashtagsContent');
+  if (!container) return;
+  
+  // 해시태그가 없으면 키워드 기반으로 자동 생성
+  if (!hashtags || hashtags.length === 0) {
+    const keywords = resultData?.seoKeywords || [];
+    hashtags = keywords.slice(0, 5).map(k => '#' + k.replace(/\\s+/g, ''));
+  }
+  
+  if (hashtags.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-muted);font-size:13px">해시태그 생성 중...</div>';
+    return;
+  }
+  
+  container.innerHTML = hashtags.map(tag => {
+    const cleanTag = tag.startsWith('#') ? tag : '#' + tag;
+    return '<span class="keyword-tag" onclick="copyKeyword(this, \\'' + cleanTag + '\\')"><i class="fas fa-copy"></i> ' + cleanTag + '</span>';
+  }).join('');
+}
+
 // 댓글 렌더링 (V39 단일 페이지 흐름)
-function renderExtras(comments, keywords, imageAnalysis) {
+function renderExtras(comments, keywords, imageAnalysis, hashtags) {
   const container = document.getElementById('tab-extras');
   let html = '';
   
   // V39: SEO 키워드는 별도 섹션에서 렌더링
   renderSeoKeywords(keywords);
+  
+  // CEO 지시 (2026.01.20): 해시태그 섹션 렌더링
+  renderHashtags(hashtags);
   
   // 이미지 분석 결과
   if (imageAnalysis) {
@@ -5212,41 +4385,49 @@ function copyAllContent() {
 // 실시간으로 진행 상황 표시 + 본문 글자 단위 출력
 // ============================================
 async function goGenerateStream() {
-  // ✅ CEO 지시 - 일일 4회 생성 제한 체크
-  if (!canGenerate()) {
-    alert('⚠️ 오늘의 생성 횟수(' + DAILY_LIMIT + '회)를 모두 사용했습니다.\\n\\n내일 00:00에 초기화됩니다.\\n프리미엄 요금제로 업그레이드하면 무제한 이용 가능합니다.');
-    return;
-  }
-  
   let q = searchEl.value.trim();
   
-  // 입력이 비어있으면 랜덤 트렌드 키워드로 자동 채우기
+  // ============================================
+  // CEO 지시 (2026.01.20): 빈 입력 시 네이버 상위노출 가능한 보험 제목 자동 추천
+  // 트렌드 클릭 없이 바로 "미끼 질문 + 답변 세트 생성" 클릭 시 빠르게 추천
+  // ============================================
   if (!q) {
+    // 1순위: 로딩된 트렌드 키워드에서 선택
     const trendItems = document.querySelectorAll('.trend-item');
     if (trendItems.length > 0) {
-      const randomTrend = trendItems[Math.floor(Math.random() * trendItems.length)];
+      // 상위 3개 트렌드 중 랜덤 선택 (상위노출 가능성 높은 키워드)
+      const topTrends = Array.from(trendItems).slice(0, 3);
+      const randomTrend = topTrends[Math.floor(Math.random() * topTrends.length)];
       const keyword = randomTrend.getAttribute('data-keyword');
       if (keyword) {
-        q = keyword + ' 보험 비교 분석해주세요';
+        // 네이버 C-RANK 최적화 질문 형태로 구성
+        const questionPatterns = [
+          keyword + ' 가입하려는데 어디가 좋을까요?',
+          keyword + ' 이거 유지해야 할까요?',
+          keyword + ' 갱신인데 어떻게 해야 하나요?',
+          keyword + ' 지금 들어도 될까요?',
+          keyword + ' 비교 좀 해주세요'
+        ];
+        q = questionPatterns[Math.floor(Math.random() * questionPatterns.length)];
         searchEl.value = q;
         charEl.textContent = q.length;
-        console.log('[XIVIX] 트렌드 키워드 자동 선택:', keyword);
+        console.log('[XIVIX] 네이버 상위노출 키워드 자동 선택:', keyword);
       }
     }
     
-    // ✅ V39 - 빈 입력 시 알림 (하드코딩 기본값 제거)
+    // 2순위: 트렌드도 없으면 핫 보험 키워드로 기본 제공
     if (!q) {
-      alert('검색어를 입력해 주세요. (예: 52세 자영업자 실손보험 갱신)');
-      return;
+      const hotKeywords = ['실손보험 4세대', '암보험', '종신보험', '건강보험', '치아보험'];
+      const randomKeyword = hotKeywords[Math.floor(Math.random() * hotKeywords.length)];
+      q = randomKeyword + ' 가입하려는데 어떤 게 좋을까요?';
+      searchEl.value = q;
+      charEl.textContent = q.length;
+      console.log('[XIVIX] 핫 키워드 자동 선택:', randomKeyword);
     }
   }
   
   if (isGenerating) return;
   isGenerating = true;
-  
-  // ✅ CEO 지시 - 사용량 증가 및 Process Tracker 초기화
-  incrementUsage();
-  updateTrackerStep(1, 'active');
   
   // ⚡ 즉시 UI 반응 - 버튼 로딩 상태
   btn.classList.add('loading');
@@ -5510,10 +4691,6 @@ function renderContentsRealtime(contents) {
 
 // 바로 콘텐츠 생성 (기본 - 스트리밍 버전 사용)
 async function goGenerate() {
-  // [3번] 미로그인 시 잠금 UI 표시
-  if (!checkAuthBeforeGenerate()) {
-    return;
-  }
   // 스트리밍 버전 호출
   return goGenerateStream();
 }
