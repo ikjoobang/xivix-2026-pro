@@ -4904,7 +4904,8 @@ async function generateMarketingImage() {
     const response = await fetch('https://xivix-xiim.pages.dev/api/process', {
       method: 'POST',
       headers: { 
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Origin': 'https://xivix-2026-pro.pages.dev'  // ✅ CORS 통과 필수 (V2026.01 규격)
       },
       body: JSON.stringify({
         api_key: XIIM_API_KEY,  // ❗ 최상위에 위치 필수
@@ -4929,11 +4930,14 @@ async function generateMarketingImage() {
     console.log('[XIVIX] 미들웨어 응답 상태:', response.status, response.statusText);
     console.log('[XIVIX] 미들웨어 응답 Content-Type:', responseContentType);
     
-    // HTML 응답 감지 (JSON 파싱 전 체크)
+    // HTML 응답 감지 (JSON 파싱 전 체크) - V2026.01 규격
     if (responseContentType.includes('text/html')) {
+      const serverHeader = response.headers.get('Server') || 'unknown';
+      const cfRay = response.headers.get('CF-Ray') || 'none';
+      console.error('[XIVIX] ❌ HTML 응답 감지 - Server:', serverHeader, '/ CF-Ray:', cfRay);
       const htmlPreview = await response.text();
-      console.error('[XIVIX] 미들웨어가 HTML 반환:', htmlPreview.substring(0, 500));
-      throw new Error('DOWNLOAD_FAILED: 미들웨어가 JSON이 아닌 HTML을 반환했습니다.');
+      console.error('[XIVIX] HTML 본문 앞부분:', htmlPreview.substring(0, 500));
+      throw new Error('DOWNLOAD_FAILED: 미들웨어가 JSON이 아닌 HTML을 반환했습니다. (Server: ' + serverHeader + ')');
     }
     
     const result = await response.json();
