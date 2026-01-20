@@ -1476,6 +1476,11 @@ ${ocrDataBinding}
 
 🚨🚨🚨 [XIVIX 김미경 지사장급 품질 기준 - 위반 시 출력 금지] 🚨🚨🚨
 
+⏰ [기준 시점 강제] 현재는 2026년입니다!
+■ 모든 통계/법률/트렌드는 "2026년 현재" 또는 "올해(2026년)" 기준으로 작성!
+■ "2023년", "2024년", "2025년"은 과거 사례로만 언급 (현재 기준 아님!)
+■ 예시: "2026년 현재 실손보험 개정안에 따르면...", "올해(2026년) 기준으로..."
+
 ■ 본문 길이: ${lengthMode.min}~${lengthMode.max}자 (${lengthMode.label})
 ■ 핵심만 팩트로! 지루한 서론 금지!
 ■ ${style} 스타일로 작성
@@ -4943,6 +4948,30 @@ async function generateMarketingImage() {
       // Cloudinary URL 유효성 검증
       if (!imageUrl.includes('cloudinary.com') || !imageUrl.includes('/xivix/')) {
         console.warn('[XIVIX] 비표준 URL 감지:', imageUrl);
+      }
+      
+      // ============================================
+      // ✅ CEO 지시 (2026.01.20) - 이미지 Content-Type 검증
+      // 미들웨어가 HTML을 이미지로 착각하는 문제 방지
+      // ============================================
+      try {
+        const imgCheck = await fetch(imageUrl, { method: 'HEAD' });
+        const contentType = imgCheck.headers.get('Content-Type') || '';
+        console.log('[XIVIX] 이미지 Content-Type:', contentType);
+        
+        if (contentType.includes('text/html') || contentType.includes('application/json')) {
+          console.error('[XIVIX] 이미지가 아닌 파일 감지:', contentType);
+          throw new Error('DOWNLOAD_FAILED: 수집된 파일이 이미지가 아닌 웹페이지입니다.');
+        }
+        
+        if (!contentType.startsWith('image/')) {
+          console.warn('[XIVIX] 비이미지 Content-Type:', contentType);
+        }
+      } catch (checkError) {
+        if (checkError.message.includes('DOWNLOAD_FAILED')) {
+          throw checkError;
+        }
+        console.warn('[XIVIX] HEAD 요청 실패, 이미지 로드로 검증 시도');
       }
       
       // 성공: 이미지 표시
