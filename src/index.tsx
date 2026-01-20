@@ -4891,9 +4891,24 @@ async function generateMarketingImage() {
     loadingText.textContent = '직접 입력한 이미지를 가공 중입니다...';
     loadingSub.textContent = 'AI 검증 없이 빠르게 처리 (약 8초)';
   } else {
-    loadingText.textContent = '설계안 검색 및 검증 중...';
-    loadingSub.textContent = '검색 결과가 부실하면 표준 샘플로 가공합니다';
+    loadingText.textContent = '🔍 AI가 최적의 설계안을 찾고 있습니다...';
+    loadingSub.textContent = '이미지 검색 → AI 검증 → 마스킹 처리 (약 15~20초 소요)';
   }
+  
+  // ✅ CEO 지시 (2026.01.20) - 진행 단계별 메시지 업데이트
+  let progressStep = 0;
+  const progressMessages = [
+    { text: '🔍 AI가 최적의 설계안을 찾고 있습니다...', sub: '1단계: 이미지 검색 중 (약 5초)' },
+    { text: '🤖 AI가 이미지를 검증하고 있습니다...', sub: '2단계: 품질 검증 중 (약 5초)' },
+    { text: '🎨 개인정보 마스킹 처리 중...', sub: '3단계: 마스킹 및 최적화 (약 10초)' }
+  ];
+  const progressInterval = setInterval(() => {
+    progressStep++;
+    if (progressStep < progressMessages.length) {
+      loadingText.textContent = progressMessages[progressStep].text;
+      loadingSub.textContent = progressMessages[progressStep].sub;
+    }
+  }, 6000);
   
   try {
     console.log('[XIVIX] 이미지 생성 요청:', { keyword, targetCompany, hasDirectUrl, directSourceUrl });
@@ -5073,6 +5088,10 @@ async function generateMarketingImage() {
       console.log('[XIVIX] source_url 직접 입력 안내 - 향후 입력창 모달 추가 예정');
     }
   } finally {
+    // ✅ CEO 지시 (2026.01.20) - 진행 단계 interval 정리
+    if (typeof progressInterval !== 'undefined') {
+      clearInterval(progressInterval);
+    }
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-image"></i> 마케팅 이미지 생성';
     loading.classList.remove('show');
