@@ -3638,6 +3638,8 @@ body{
   gap:12px;
   max-width:320px;
   margin:0 auto;
+  position:relative;
+  z-index:99999;
 }
 .landing-btn{
   padding:16px 32px;
@@ -3748,7 +3750,8 @@ body{
 }
 .landing-content{
   animation:content-float 6s ease-in-out infinite;
-  z-index:10;
+  z-index:99999;
+  position:relative;
 }
 @keyframes content-float{
   0%,100%{transform:translateY(0)}
