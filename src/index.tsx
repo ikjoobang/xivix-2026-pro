@@ -3820,33 +3820,31 @@ body{
   50%{transform:translateY(5px)}
 }
 
-/* V2026.37.27 - 버튼 클릭 최종 수정: z-index 강제 오버라이드 */
-.landing-btn{
-  z-index:99999 !important;
-  position:relative !important;
-  pointer-events:auto !important;
-  cursor:pointer !important;
+/* V2026.37.29 - 레이어 구조 전면 재배치 (CEO 지시) */
+/* 모든 배경 요소는 클릭이 아예 통과되도록 강제 */
+.landing-bg, .landing-grid, .landing-particles, .landing-scroll-hint {
+  pointer-events: none !important;
+  z-index: 1 !important;
 }
-.landing-btn-primary,
-.landing-btn-secondary{
-  z-index:99999 !important;
-  pointer-events:auto !important;
+
+/* 버튼 컨테이너를 부모의 간섭에서 분리 */
+.landing-content {
+  pointer-events: none !important; /* 컨테이너 자체는 클릭 통과 */
+  z-index: 99999 !important;
 }
-.landing-buttons{
-  z-index:99999 !important;
-  position:relative !important;
+
+/* 버튼만 클릭을 받도록 설정 */
+.landing-buttons, .landing-btn {
+  pointer-events: auto !important; /* 버튼과 그 버튼을 담은 박스만 클릭 허용 */
+  z-index: 100000 !important;
+  cursor: pointer !important;
 }
-.landing-content{
-  z-index:99999 !important;
-  position:relative !important;
-}
-/* V2026.37.28 - 배경 요소 클릭 완전 차단 */
-.landing-bg,
-.landing-grid,
-.landing-particles,
-.landing-scroll-hint,
-.landing-footer{
-  pointer-events:none !important;
+
+/* Beyond Reality 스타일 (네온 그린 #00ff00) 유지 */
+.landing-btn-primary {
+  background: #00ff00 !important;
+  color: #000 !important;
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.5) !important;
 }
 
 /* 로그인 모달 */
@@ -5229,6 +5227,51 @@ window.addEventListener('storage', function(e) {
   setTimeout(setupLandingButtons, 100);
   setTimeout(setupLandingButtons, 500);
 })();
+
+// ============================================
+// V2026.37.29 - 자바스크립트 강제 바인딩 (CEO 지시)
+// 모든 간섭을 무시하고 모달을 띄우는 강제 로직
+// ============================================
+const forceOpenReg = () => {
+  const modal = document.getElementById('registrationModal');
+  if (modal) {
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+  }
+};
+
+const forceOpenLogin = () => {
+  const modal = document.getElementById('loginModal');
+  if (modal) {
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+  }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  const regBtn = document.getElementById('btnRegisterMain');
+  if (regBtn) {
+    // 기존 리스너 제거 후 새로 등록 (이중 클릭 방지 및 확실한 실행)
+    regBtn.replaceWith(regBtn.cloneNode(true)); 
+    document.getElementById('btnRegisterMain').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[XIVIX] 🔥 강제 바인딩: 가입 신청 클릭!');
+      forceOpenReg();
+    });
+  }
+  
+  const loginBtn = document.getElementById('btnLoginMain');
+  if (loginBtn) {
+    loginBtn.replaceWith(loginBtn.cloneNode(true));
+    document.getElementById('btnLoginMain').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[XIVIX] 🔥 강제 바인딩: 로그인 클릭!');
+      forceOpenLogin();
+    });
+  }
+});
 
 // V2026.37.15 - SEO_SCORE_CLARIFICATION: 네이버 검색 버튼 클릭 시 로딩 표시
 function showNaverSearchLoading() {
