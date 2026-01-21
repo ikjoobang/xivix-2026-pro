@@ -3820,31 +3820,49 @@ body{
   50%{transform:translateY(5px)}
 }
 
-/* V2026.37.29 - 레이어 구조 전면 재배치 (CEO 지시) */
-/* 모든 배경 요소는 클릭이 아예 통과되도록 강제 */
-.landing-bg, .landing-grid, .landing-particles, .landing-scroll-hint {
-  pointer-events: none !important;
-  z-index: 1 !important;
+/* V2026.37.30 - Shield-Breaker 레이어 설계 (CEO 최종 지시) */
+/* [1] 배경 및 장식 요소: 클릭 신호 완전 통과 */
+.landing-bg, 
+.landing-grid, 
+.landing-particles, 
+.landing-scroll-hint {
+    pointer-events: none !important; /* 마우스가 그냥 통과함 */
+    z-index: 1 !important;
 }
 
-/* 버튼 컨테이너를 부모의 간섭에서 분리 */
+/* [2] 버튼 컨테이너: 부모의 간섭 제거 */
 .landing-content {
-  pointer-events: none !important; /* 컨테이너 자체는 클릭 통과 */
-  z-index: 99999 !important;
+    position: relative !important;
+    z-index: 100 !important;
+    pointer-events: none !important; /* 컨테이너 자체는 통과 */
 }
 
-/* 버튼만 클릭을 받도록 설정 */
-.landing-buttons, .landing-btn {
-  pointer-events: auto !important; /* 버튼과 그 버튼을 담은 박스만 클릭 허용 */
-  z-index: 100000 !important;
-  cursor: pointer !important;
+/* [3] 버튼: 세상에서 가장 높은 우선순위 부여 */
+.landing-buttons {
+    pointer-events: auto !important; /* 여기서부터 클릭을 받음 */
+    z-index: 999999 !important;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }
 
-/* Beyond Reality 스타일 (네온 그린 #00ff00) 유지 */
-.landing-btn-primary {
-  background: #00ff00 !important;
-  color: #000 !important;
-  box-shadow: 0 0 20px rgba(0, 255, 0, 0.5) !important;
+.landing-btn {
+    position: relative !important;
+    z-index: 1000000 !important; /* 어떤 요소보다 위에 있음 */
+    pointer-events: auto !important; 
+    cursor: pointer !important; /* 마우스 올리면 무조건 손가락 모양 */
+    background: #00ff00 !important; /* Beyond Reality 네온 그린 */
+    color: #000 !important;
+    font-weight: 900 !important;
+    padding: 20px 40px;
+    border-radius: 8px;
+    border: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.landing-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(0, 255, 0, 0.8);
 }
 
 /* 로그인 모달 */
@@ -5229,49 +5247,65 @@ window.addEventListener('storage', function(e) {
 })();
 
 // ============================================
-// V2026.37.29 - 자바스크립트 강제 바인딩 (CEO 지시)
-// 모든 간섭을 무시하고 모달을 띄우는 강제 로직
+// V2026.37.30 - 강제 이벤트 주입 (CEO 최종 지시)
 // ============================================
-const forceOpenReg = () => {
-  const modal = document.getElementById('registrationModal');
-  if (modal) {
-    modal.classList.add('show');
-    modal.style.display = 'flex';
-  }
+// [핵심] 모달을 강제로 여는 함수
+const forceOpenRegistration = () => {
+    const modal = document.getElementById('registrationModal');
+    if (modal) {
+        modal.classList.add('show');
+        modal.style.display = 'flex';
+        console.log('[XIVIX] ✅ 가입 신청 모달 강제 활성화');
+    } else {
+        alert('시스템 오류: 가입 창(Modal)을 찾을 수 없습니다. 개발팀에 문의하세요.');
+    }
 };
 
-const forceOpenLogin = () => {
-  const modal = document.getElementById('loginModal');
-  if (modal) {
-    modal.classList.add('show');
-    modal.style.display = 'flex';
-  }
+const forceOpenLoginModal = () => {
+    const modal = document.getElementById('loginModal');
+    if (modal) {
+        modal.classList.add('show');
+        modal.style.display = 'flex';
+        console.log('[XIVIX] ✅ 로그인 모달 강제 활성화');
+    }
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-  const regBtn = document.getElementById('btnRegisterMain');
-  if (regBtn) {
-    // 기존 리스너 제거 후 새로 등록 (이중 클릭 방지 및 확실한 실행)
-    regBtn.replaceWith(regBtn.cloneNode(true)); 
-    document.getElementById('btnRegisterMain').addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('[XIVIX] 🔥 강제 바인딩: 가입 신청 클릭!');
-      forceOpenReg();
-    });
-  }
-  
-  const loginBtn = document.getElementById('btnLoginMain');
-  if (loginBtn) {
-    loginBtn.replaceWith(loginBtn.cloneNode(true));
-    document.getElementById('btnLoginMain').addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('[XIVIX] 🔥 강제 바인딩: 로그인 클릭!');
-      forceOpenLogin();
-    });
-  }
-});
+// [핵심] 버튼에 기능을 강제로 박아버리는 로직
+const syncButtons = () => {
+    const regBtn = document.getElementById('btnRegisterMain');
+    if (regBtn) {
+        // 기존에 걸려있던 모든 방해 요소를 제거하고 새로 바인딩
+        regBtn.onmousedown = (e) => e.stopPropagation();
+        regBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            forceOpenRegistration();
+        };
+        // 모바일 터치 대응
+        regBtn.ontouchend = (e) => {
+            e.preventDefault();
+            forceOpenRegistration();
+        };
+    }
+    
+    const loginBtn = document.getElementById('btnLoginMain');
+    if (loginBtn) {
+        loginBtn.onmousedown = (e) => e.stopPropagation();
+        loginBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            forceOpenLoginModal();
+        };
+        loginBtn.ontouchend = (e) => {
+            e.preventDefault();
+            forceOpenLoginModal();
+        };
+    }
+};
+
+// 페이지 로드 즉시 실행 및 안전장치로 0.5초 후 재실행
+window.onload = syncButtons;
+setTimeout(syncButtons, 500);
 
 // V2026.37.15 - SEO_SCORE_CLARIFICATION: 네이버 검색 버튼 클릭 시 로딩 표시
 function showNaverSearchLoading() {
