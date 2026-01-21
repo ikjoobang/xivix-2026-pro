@@ -1974,15 +1974,22 @@ app.get('/api/admin/stats', (c) => c.json({
 const pendingUsers: any[] = [];
 
 // ============================================
-// V2026.37.35 - 솔라피(Solapi) 카카오 알림톡/SMS 연동 (CEO 지시 v4.2)
+// V2026.37.37 - 솔라피(Solapi) 카카오 알림톡/SMS 연동 (CEO 지시 v4.9)
+// API Key/Secret은 환경 변수로 분리 저장 (Wrangler Secret)
 // ============================================
 const SOLAPI_CONFIG = {
-  apiKey: 'NCSHNQ0FZDBGIGQZ',
-  apiSecret: 'TPPENHJQL9WXN9KLOTUA8ZRFK3EHSWNY',
   apiUrl: 'https://api.solapi.com/messages/v4/send',
   pfId: '', // 카카오 비즈니스 채널 ID (템플릿 승인 후 설정)
   templateId: '' // 알림톡 템플릿 ID (승인 후 설정)
 };
+
+// 환경 변수에서 솔라피 키 가져오기
+function getSolapiCredentials(env: any): { apiKey: string; apiSecret: string } {
+  return {
+    apiKey: env?.SOLAPI_API_KEY || '',
+    apiSecret: env?.SOLAPI_API_SECRET || ''
+  };
+}
 
 // 솔라피 API 인증 시그니처 생성 (HMAC-SHA256 with Web Crypto API)
 async function generateSolapiSignature(apiSecret: string, date: string, salt: string): Promise<string> {
@@ -2012,11 +2019,19 @@ async function generateSolapiSignature(apiSecret: string, date: string, salt: st
 }
 
 // 솔라피 메시지 발송 함수 (카카오 알림톡 + SMS Fallback)
-async function sendSolapiMessage(phone: string, message: string, type: 'approval' | 'expiry' | 'suspension') {
+// env 파라미터로 환경 변수 전달 필수
+async function sendSolapiMessage(phone: string, message: string, type: 'approval' | 'expiry' | 'suspension', env?: any) {
   try {
+    const { apiKey, apiSecret } = getSolapiCredentials(env);
+    
+    if (!apiKey || !apiSecret) {
+      console.error('[XIVIX] ❌ 솔라피 API 키 미설정');
+      return { success: false, error: 'API credentials not configured' };
+    }
+    
     const date = new Date().toISOString();
     const salt = crypto.randomUUID();
-    const signature = await generateSolapiSignature(SOLAPI_CONFIG.apiSecret, date, salt);
+    const signature = await generateSolapiSignature(apiSecret, date, salt);
     
     console.log(`[XIVIX] 📱 솔라피 메시지 발송 시도 (${type}):`, phone);
     
@@ -2025,7 +2040,7 @@ async function sendSolapiMessage(phone: string, message: string, type: 'approval
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `HMAC-SHA256 apiKey=${SOLAPI_CONFIG.apiKey}, date=${date}, salt=${salt}, signature=${signature}`
+        'Authorization': `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`
       },
       body: JSON.stringify({
         message: {
@@ -2217,9 +2232,9 @@ app.post('/api/admin/approve', async (c) => {
       
       console.log('[XIVIX] ✅ D1 유저 승인 완료:', phone, '플랜:', planType, '만료일:', expiryDate);
       
-      // 솔라피 승인 완료 알림 발송
+      // 솔라피 승인 완료 알림 발송 (환경 변수 전달)
       const approvalMessage = getApprovalMessage(user.name, expiryDate);
-      await sendSolapiMessage(phone, approvalMessage, 'approval');
+      await sendSolapiMessage(phone, approvalMessage, 'approval', c.env);
       
       return c.json({
         success: true,
@@ -2273,9 +2288,9 @@ app.post('/api/admin/suspend', async (c) => {
       
       console.log('[XIVIX] 🚫 유저 정지 처리:', phone);
       
-      // 솔라피 정지 알림 발송
+      // 솔라피 정지 알림 발송 (환경 변수 전달)
       const suspensionMessage = getSuspensionMessage(user.name);
-      await sendSolapiMessage(phone, suspensionMessage, 'suspension');
+      await sendSolapiMessage(phone, suspensionMessage, 'suspension', c.env);
       
       return c.json({
         success: true,
@@ -2302,7 +2317,7 @@ app.post('/api/admin/test-sms', async (c) => {
     
     console.log('[XIVIX] 📱 테스트 SMS 발송:', targetPhone);
     
-    const result = await sendSolapiMessage(targetPhone, testMessage, 'approval');
+    const result = await sendSolapiMessage(targetPhone, testMessage, 'approval', c.env);
     
     return c.json({
       success: result.success,
@@ -2370,7 +2385,7 @@ app.post('/api/admin/send-expiry-reminders', async (c) => {
     
     for (const user of users) {
       const reminderMessage = getExpiryReminderMessage(user.name, user.expiry_date);
-      const sendResult = await sendSolapiMessage(user.phone, reminderMessage, 'expiry');
+      const sendResult = await sendSolapiMessage(user.phone, reminderMessage, 'expiry', c.env);
       sentResults.push({ phone: user.phone, name: user.name, success: sendResult.success });
     }
     
