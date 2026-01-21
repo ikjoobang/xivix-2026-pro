@@ -1705,6 +1705,68 @@ JSON 형식으로만 응답:
 })
 
 // ============================================
+// V2026.37.20 - 로그인 API (CEO 지시 v3.8)
+// 승인 상태 확인 후 로그인 처리
+// ============================================
+app.post('/api/login', async (c) => {
+  try {
+    const { phone, password } = await c.req.json()
+    
+    if (!phone || !password) {
+      return c.json({ success: false, message: '휴대폰 번호와 비밀번호를 입력해 주세요.' }, 400)
+    }
+    
+    // TODO: 실제 DB에서 사용자 조회 (현재는 KV 조회 시뮬레이션)
+    // const userData = await c.env.KV.get(`reg:${phone}`)
+    
+    // CEO 승인 명단 (임시 - 실제 운영 시 DB/KV 사용)
+    // 이 부분은 관리자가 승인한 사용자 정보를 저장
+    const approvedUsers: Record<string, { password: string; name: string; status: string }> = {
+      // 예시: '010-1234-5678': { password: btoa('password123'), name: '홍길동', status: 'APPROVED' }
+    }
+    
+    // 신청자 명단 (PENDING 상태) - 임시 저장소
+    const pendingUsers: Record<string, boolean> = {}
+    
+    // 사용자 조회
+    const user = approvedUsers[phone]
+    
+    if (user) {
+      // 등록된 사용자 확인
+      if (user.password === btoa(password)) {
+        if (user.status === 'APPROVED') {
+          console.log('[XIVIX] ✅ 로그인 성공:', phone)
+          return c.json({ 
+            success: true, 
+            status: 'APPROVED',
+            message: '로그인 성공',
+            name: user.name
+          })
+        } else {
+          console.log('[XIVIX] ⏳ 승인 대기 중:', phone)
+          return c.json({ 
+            success: false, 
+            status: 'PENDING',
+            message: '현재 입금 확인 및 승인 대기 중입니다.\\n승인 완료 후 이용 가능합니다.\\n(방익주 계좌 입금 확인 중)'
+          })
+        }
+      } else {
+        return c.json({ success: false, message: '비밀번호가 일치하지 않습니다.' }, 401)
+      }
+    } else {
+      // 등록되지 않은 사용자
+      return c.json({ 
+        success: false, 
+        message: '등록되지 않은 사용자입니다.\\n멤버십 가입 신청을 먼저 해주세요.' 
+      }, 404)
+    }
+  } catch (error) {
+    console.error('[XIVIX] 로그인 오류:', error)
+    return c.json({ success: false, message: '서버 오류. 다시 시도해 주세요.' }, 500)
+  }
+})
+
+// ============================================
 // V2026.37.19 - 가입 신청 API
 // 신청 데이터를 KV 또는 D1에 저장 (현재는 로그만)
 // ============================================
@@ -3476,9 +3538,280 @@ body{
 }
 .reg-result.success{display:block;background:rgba(0,255,133,0.1);border:1px solid rgba(0,255,133,0.3);color:var(--green)}
 .reg-result.error{display:block;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444}
+
+/* ============================================
+   V2026.37.20 - Luxury Landing Page
+   Beyond Reality / High-end Professional
+   ============================================ */
+.landing-page{
+  position:fixed;
+  inset:0;
+  background:linear-gradient(180deg, #0a0a0f 0%, #12121a 50%, #0d0d14 100%);
+  z-index:10000;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+.landing-page.hidden{display:none}
+.landing-bg{
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(79,140,255,0.15) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(124,92,255,0.1) 0%, transparent 40%);
+  pointer-events:none;
+}
+.landing-grid{
+  position:absolute;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size:60px 60px;
+  opacity:0.5;
+}
+.landing-content{
+  position:relative;
+  z-index:1;
+  text-align:center;
+  max-width:600px;
+  padding:40px;
+}
+.landing-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  background:rgba(79,140,255,0.1);
+  border:1px solid rgba(79,140,255,0.3);
+  padding:8px 16px;
+  border-radius:20px;
+  font-size:11px;
+  font-weight:600;
+  color:var(--primary);
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  margin-bottom:32px;
+}
+.landing-badge i{font-size:10px}
+.landing-logo{
+  width:80px;
+  height:80px;
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  border-radius:24px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:36px;
+  font-weight:900;
+  color:#fff;
+  margin:0 auto 24px;
+  box-shadow:0 20px 60px rgba(79,140,255,0.3);
+}
+.landing-title{
+  font-size:clamp(28px, 5vw, 42px);
+  font-weight:900;
+  color:#fff;
+  line-height:1.2;
+  margin-bottom:16px;
+  letter-spacing:-0.5px;
+}
+.landing-title span{
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.landing-subtitle{
+  font-size:clamp(14px, 2vw, 16px);
+  color:var(--text-muted);
+  line-height:1.7;
+  margin-bottom:40px;
+  max-width:480px;
+  margin-left:auto;
+  margin-right:auto;
+}
+.landing-buttons{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  max-width:320px;
+  margin:0 auto;
+}
+.landing-btn{
+  padding:16px 32px;
+  border-radius:12px;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  transition:all 0.3s;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  text-decoration:none;
+}
+.landing-btn-primary{
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  border:none;
+  color:#fff;
+  box-shadow:0 8px 30px rgba(79,140,255,0.4);
+}
+.landing-btn-primary:hover{
+  transform:translateY(-3px);
+  box-shadow:0 12px 40px rgba(79,140,255,0.5);
+}
+.landing-btn-secondary{
+  background:transparent;
+  border:1px solid rgba(255,255,255,0.2);
+  color:var(--text);
+}
+.landing-btn-secondary:hover{
+  background:rgba(255,255,255,0.05);
+  border-color:rgba(255,255,255,0.3);
+}
+.landing-footer{
+  position:absolute;
+  bottom:24px;
+  font-size:11px;
+  color:rgba(255,255,255,0.3);
+  letter-spacing:0.5px;
+}
+
+/* 로그인 모달 */
+.login-modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.9);
+  z-index:10001;
+  justify-content:center;
+  align-items:center;
+  backdrop-filter:blur(10px);
+}
+.login-modal.show{display:flex}
+.login-modal-content{
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-radius:20px;
+  width:90%;
+  max-width:380px;
+  padding:32px;
+  box-shadow:0 25px 80px rgba(0,0,0,0.6);
+}
+.login-header{
+  text-align:center;
+  margin-bottom:28px;
+}
+.login-header h2{
+  font-size:20px;
+  font-weight:700;
+  color:var(--text);
+  margin-bottom:8px;
+}
+.login-header p{
+  font-size:13px;
+  color:var(--text-muted);
+}
+.login-field{margin-bottom:16px}
+.login-field label{
+  display:block;
+  font-size:12px;
+  font-weight:600;
+  color:var(--text-muted);
+  margin-bottom:6px;
+}
+.login-field input{
+  width:100%;
+  padding:14px 16px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid var(--border);
+  border-radius:10px;
+  color:var(--text);
+  font-size:15px;
+}
+.login-field input:focus{
+  outline:none;
+  border-color:var(--primary);
+}
+.login-submit{
+  width:100%;
+  padding:14px;
+  background:linear-gradient(135deg,var(--primary),var(--accent));
+  border:none;
+  border-radius:10px;
+  color:#fff;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  margin-top:8px;
+}
+.login-submit:hover{opacity:0.9}
+.login-submit:disabled{opacity:0.6;cursor:not-allowed}
+.login-result{
+  margin-top:16px;
+  padding:12px;
+  border-radius:8px;
+  font-size:13px;
+  text-align:center;
+  display:none;
+}
+.login-result.error{display:block;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444}
+.login-result.pending{display:block;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:var(--orange)}
+.login-close{
+  position:absolute;
+  top:16px;
+  right:16px;
+  background:none;
+  border:none;
+  font-size:24px;
+  color:var(--text-muted);
+  cursor:pointer;
+}
 </style>
 </head>
 <body>
+
+<!-- V2026.37.20 - Luxury Landing Page -->
+<div class="landing-page" id="landingPage">
+  <div class="landing-bg"></div>
+  <div class="landing-grid"></div>
+  <div class="landing-content">
+    <div class="landing-badge"><i class="fas fa-crown"></i> Premium Membership Only</div>
+    <div class="landing-logo">X</div>
+    <h1 class="landing-title"><span>XIVIX 2026 PRO</span><br>상위 1% 보험 전문가 전용</h1>
+    <p class="landing-subtitle">본 서비스는 멤버십 승인 후 이용 가능한<br><strong>유료 전문가 전용</strong> AI 콘텐츠 생성 웹입니다.</p>
+    <div class="landing-buttons">
+      <button class="landing-btn landing-btn-primary" onclick="openLoginModal()"><i class="fas fa-sign-in-alt"></i> 로그인</button>
+      <button class="landing-btn landing-btn-secondary" onclick="openRegistrationModal()"><i class="fas fa-user-plus"></i> 멤버십 가입 신청</button>
+    </div>
+  </div>
+  <div class="landing-footer">© 2026 XIVIX Insurance Technology. All rights reserved.</div>
+</div>
+
+<!-- 로그인 모달 -->
+<div class="login-modal" id="loginModal">
+  <div class="login-modal-content" style="position:relative">
+    <button class="login-close" onclick="closeLoginModal()">&times;</button>
+    <div class="login-header">
+      <h2><i class="fas fa-lock" style="color:var(--primary);margin-right:8px"></i>멤버십 로그인</h2>
+      <p>승인된 회원만 접속 가능합니다</p>
+    </div>
+    <form onsubmit="handleLogin(event)">
+      <div class="login-field">
+        <label>휴대폰 번호</label>
+        <input type="tel" id="loginPhone" placeholder="010-0000-0000" required>
+      </div>
+      <div class="login-field">
+        <label>비밀번호</label>
+        <input type="password" id="loginPassword" placeholder="가입 시 설정한 비밀번호" required>
+      </div>
+      <button type="submit" class="login-submit" id="loginSubmitBtn"><i class="fas fa-sign-in-alt"></i> 로그인</button>
+    </form>
+    <div class="login-result" id="loginResult"></div>
+  </div>
+</div>
 
 <!-- XIVIX 2026 PRO 초정밀 랜덤화 엔진 오버레이 -->
 <div class="seo-overlay" id="seoOverlay">
@@ -4546,6 +4879,130 @@ function renderReportData(reportData) {
   container.innerHTML = tableHtml;
 }
 
+// ============================================
+// V2026.37.20 - 접근 제어 시스템 (Landing + Login)
+// ============================================
+const AUTH_KEY = 'xivix_auth_session';
+
+function checkAuth() {
+  try {
+    const session = JSON.parse(localStorage.getItem(AUTH_KEY) || '{}');
+    // 세션 유효성 검사 (24시간)
+    if (session.status === 'APPROVED' && session.expires > Date.now()) {
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+function showLanding() {
+  document.getElementById('landingPage').classList.remove('hidden');
+}
+
+function hideLanding() {
+  document.getElementById('landingPage').classList.add('hidden');
+}
+
+function openLoginModal() {
+  document.getElementById('loginModal').classList.add('show');
+}
+
+function closeLoginModal() {
+  document.getElementById('loginModal').classList.remove('show');
+  document.getElementById('loginResult').className = 'login-result';
+  document.getElementById('loginResult').innerHTML = '';
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const phone = document.getElementById('loginPhone').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const resultEl = document.getElementById('loginResult');
+  const submitBtn = document.getElementById('loginSubmitBtn');
+  
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 확인 중...';
+  
+  try {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, password })
+    });
+    const result = await response.json();
+    
+    if (result.success && result.status === 'APPROVED') {
+      // 로그인 성공
+      localStorage.setItem(AUTH_KEY, JSON.stringify({
+        phone: phone,
+        status: 'APPROVED',
+        expires: Date.now() + (24 * 60 * 60 * 1000) // 24시간
+      }));
+      closeLoginModal();
+      hideLanding();
+      console.log('[XIVIX] ✅ 로그인 성공');
+    } else if (result.status === 'PENDING') {
+      resultEl.className = 'login-result pending';
+      resultEl.innerHTML = '<i class="fas fa-clock"></i> 승인 대기 중입니다.<br><small>입금 확인 후 1시간 내 승인됩니다.</small>';
+    } else {
+      resultEl.className = 'login-result error';
+      resultEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + (result.message || '로그인 실패');
+    }
+  } catch (err) {
+    resultEl.className = 'login-result error';
+    resultEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> 네트워크 오류';
+  }
+  
+  submitBtn.disabled = false;
+  submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> 로그인';
+}
+
+function logout() {
+  localStorage.removeItem(AUTH_KEY);
+  showLanding();
+}
+
+// ============================================
+// V2026.37.20 - 강화된 URL 우회 차단 (CEO 지시 v3.8)
+// 미인증 시 모든 UI 요소 숨기고 랜딩으로 강제 리다이렉트
+// ============================================
+
+// 페이지 로드 시 인증 체크
+if (!checkAuth()) {
+  showLanding();
+  // 추가 보안: 메인 앱 컨테이너 숨기기
+  const appContainer = document.querySelector('.app, .container, main, #app');
+  if (appContainer) appContainer.style.display = 'none';
+} else {
+  hideLanding();
+}
+
+// 주기적 인증 검사 (세션 하이재킹 방지)
+setInterval(function() {
+  if (!checkAuth()) {
+    showLanding();
+    console.log('[XIVIX] ⚠️ 세션 만료 - 랜딩 페이지로 복귀');
+  }
+}, 60000); // 1분마다 체크
+
+// URL 직접 접근 시 인증 확인 (popstate 이벤트)
+window.addEventListener('popstate', function() {
+  if (!checkAuth()) {
+    showLanding();
+    console.log('[XIVIX] ⚠️ URL 우회 시도 감지 - 랜딩 페이지로 복귀');
+  }
+});
+
+// 개발자 도구 우회 방지 (로컬스토리지 직접 수정 감지)
+window.addEventListener('storage', function(e) {
+  if (e.key === AUTH_KEY) {
+    if (!checkAuth()) {
+      showLanding();
+      console.log('[XIVIX] ⚠️ 스토리지 조작 감지 - 랜딩 페이지로 복귀');
+    }
+  }
+});
+
 // V2026.37.15 - SEO_SCORE_CLARIFICATION: 네이버 검색 버튼 클릭 시 로딩 표시
 function showNaverSearchLoading() {
   const loadingEl = document.getElementById('naverSearchLoading');
@@ -4871,11 +5328,12 @@ function copyAllContent() {
 }
 
 // ============================================
-// V2026.37.19 - 1일 4회 API 호출 제한 로직
+// V2026.37.20 - 1일 2회 API 호출 제한 로직 (CEO 지시 v3.8)
 // LocalStorage에 날짜별 호출 횟수 저장
+// 정책 변경: 데이터 가치 보존 및 멤버십 희소성 강화
 // ============================================
 const API_LIMIT_KEY = 'xivix_api_usage';
-const DAILY_API_LIMIT = 4;
+const DAILY_API_LIMIT = 2;
 
 function getApiUsage() {
   try {
@@ -4901,7 +5359,7 @@ function incrementApiUsage() {
 function checkApiLimit() {
   const usage = getApiUsage();
   if (usage.count >= DAILY_API_LIMIT) {
-    alert('⚠️ 오늘의 API 호출 한도(4회)를 초과했습니다.\\n\\n자정 이후 다시 시도해 주세요.\\n\\n현재: ' + usage.count + '/' + DAILY_API_LIMIT + '회 사용');
+    alert('⚠️ 오늘의 API 호출 한도(2회)를 초과했습니다.\\n\\n자정 이후 다시 시도해 주세요.\\n\\n현재: ' + usage.count + '/' + DAILY_API_LIMIT + '회 사용');
     return false;
   }
   return true;
