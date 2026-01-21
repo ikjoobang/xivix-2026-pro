@@ -1704,6 +1704,43 @@ JSON 형식으로만 응답:
   })
 })
 
+// ============================================
+// V2026.37.19 - 가입 신청 API
+// 신청 데이터를 KV 또는 D1에 저장 (현재는 로그만)
+// ============================================
+app.post('/api/registration', async (c) => {
+  try {
+    const { name, phone, password } = await c.req.json()
+    
+    if (!name || !phone || !password) {
+      return c.json({ success: false, message: '모든 항목을 입력해 주세요.' }, 400)
+    }
+    
+    // 신청 데이터 로깅 (관리자 확인용)
+    const registrationData = {
+      name,
+      phone,
+      password_hash: btoa(password), // 간단한 인코딩 (실제 운영 시 bcrypt 등 사용)
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+      ip: c.req.header('CF-Connecting-IP') || 'unknown'
+    }
+    
+    console.log('[XIVIX] 🆕 가입 신청:', JSON.stringify(registrationData))
+    
+    // TODO: KV 또는 D1에 저장 로직 추가
+    // await c.env.KV.put(`reg:${phone}`, JSON.stringify(registrationData))
+    
+    return c.json({ 
+      success: true, 
+      message: '가입 신청이 완료되었습니다!\\n입금 확인 후 대표님이 승인하면 비밀번호가 활성화됩니다.\\n승인까지 1~2일 소요될 수 있습니다.' 
+    })
+  } catch (error) {
+    console.error('[XIVIX] 가입 신청 오류:', error)
+    return c.json({ success: false, message: '서버 오류. 다시 시도해 주세요.' }, 500)
+  }
+})
+
 app.get('/api/health', (c) => {
   const hasProKey = !!c.env?.GEMINI_API_KEY_PRO || !!c.env?.GEMINI_API_KEY
   const hasFlashKey = !!c.env?.GEMINI_API_KEY_FLASH || !!c.env?.GEMINI_API_KEY
@@ -3290,6 +3327,155 @@ body{
     box-shadow:0 0 30px rgba(0,255,133,0.1) !important;
   }
 }
+
+/* ============================================
+   V2026.37.19 - 가입 신청 모달 스타일
+   ============================================ */
+.nav-btn{
+  color:var(--text-muted);
+  font-size:clamp(11px, 1.2vw, 13px);
+  padding:8px 12px;
+  border-radius:8px;
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  cursor:pointer;
+  transition:all 0.2s;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.nav-btn:hover{color:var(--primary);border-color:var(--primary-soft);background:var(--primary-soft)}
+.register-btn{background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;border:none;font-weight:600}
+.register-btn:hover{transform:scale(1.05);box-shadow:0 4px 15px rgba(79,140,255,0.4)}
+
+.reg-modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.8);
+  z-index:9999;
+  justify-content:center;
+  align-items:center;
+  backdrop-filter:blur(8px);
+}
+.reg-modal.show{display:flex}
+.reg-modal-content{
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-radius:20px;
+  width:90%;
+  max-width:440px;
+  max-height:90vh;
+  overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.reg-modal-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:20px 24px;
+  border-bottom:1px solid var(--border);
+}
+.reg-modal-header h2{
+  font-size:18px;
+  font-weight:700;
+  color:var(--text);
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.reg-modal-header h2 i{color:var(--primary)}
+.reg-close-btn{
+  background:none;
+  border:none;
+  font-size:28px;
+  color:var(--text-muted);
+  cursor:pointer;
+  line-height:1;
+}
+.reg-close-btn:hover{color:var(--red)}
+.reg-modal-body{padding:24px}
+.reg-deposit-info{
+  background:rgba(79,140,255,0.1);
+  border:1px solid rgba(79,140,255,0.3);
+  border-radius:12px;
+  padding:16px;
+  margin-bottom:20px;
+}
+.reg-deposit-title{
+  font-size:14px;
+  font-weight:700;
+  color:var(--primary);
+  margin-bottom:12px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.reg-account{text-align:center;padding:12px 0}
+.reg-bank{font-size:13px;color:var(--text-muted);margin-bottom:4px}
+.reg-account-num{font-size:24px;font-weight:900;color:var(--text);letter-spacing:1px}
+.reg-holder{font-size:13px;color:var(--text-muted);margin-top:4px}
+.reg-notice{
+  font-size:11px;
+  color:var(--orange);
+  line-height:1.6;
+  margin-top:12px;
+  padding-top:12px;
+  border-top:1px dashed rgba(245,158,11,0.3);
+}
+.reg-field{margin-bottom:16px}
+.reg-field label{
+  display:block;
+  font-size:12px;
+  font-weight:600;
+  color:var(--text-muted);
+  margin-bottom:6px;
+}
+.reg-field label i{margin-right:6px;color:var(--primary)}
+.reg-field input{
+  width:100%;
+  padding:12px 14px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid var(--border);
+  border-radius:10px;
+  color:var(--text);
+  font-size:14px;
+  transition:all 0.2s;
+}
+.reg-field input:focus{
+  outline:none;
+  border-color:var(--primary);
+  box-shadow:0 0 0 3px rgba(79,140,255,0.1);
+}
+.reg-field input::placeholder{color:var(--text-muted);opacity:0.6}
+.reg-submit-btn{
+  width:100%;
+  padding:14px;
+  background:linear-gradient(135deg,var(--primary),var(--accent));
+  border:none;
+  border-radius:10px;
+  color:#fff;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  transition:all 0.2s;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  margin-top:8px;
+}
+.reg-submit-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(79,140,255,0.4)}
+.reg-submit-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+.reg-result{
+  margin-top:16px;
+  padding:12px;
+  border-radius:8px;
+  font-size:13px;
+  display:none;
+}
+.reg-result.success{display:block;background:rgba(0,255,133,0.1);border:1px solid rgba(0,255,133,0.3);color:var(--green)}
+.reg-result.error{display:block;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444}
 </style>
 </head>
 <body>
@@ -3361,7 +3547,45 @@ body{
 <nav class="nav">
   <a href="/admin"><i class="fas fa-cog"></i> Admin</a>
   <a href="/api/docs"><i class="fas fa-book"></i> Docs</a>
+  <button onclick="openRegistrationModal()" class="nav-btn register-btn"><i class="fas fa-user-plus"></i> 가입 신청</button>
 </nav>
+
+<!-- V2026.37.19 - 가입 신청 모달 -->
+<div id="registrationModal" class="reg-modal">
+  <div class="reg-modal-content">
+    <div class="reg-modal-header">
+      <h2><i class="fas fa-user-plus"></i> XIVIX 2026 PRO 가입 신청</h2>
+      <button onclick="closeRegistrationModal()" class="reg-close-btn">&times;</button>
+    </div>
+    <div class="reg-modal-body">
+      <div class="reg-deposit-info">
+        <div class="reg-deposit-title"><i class="fas fa-university"></i> 입금 계좌 안내</div>
+        <div class="reg-account">
+          <div class="reg-bank">케이뱅크</div>
+          <div class="reg-account-num">100-201-341074</div>
+          <div class="reg-holder">예금주: 방익주</div>
+        </div>
+        <p class="reg-notice">※ 입금 후 아래 신청서를 작성해 주세요.<br>입금 확인 후 대표님이 승인해야 비밀번호가 활성화됩니다.</p>
+      </div>
+      <form id="registrationForm" onsubmit="submitRegistration(event)">
+        <div class="reg-field">
+          <label><i class="fas fa-user"></i> 입금자 성함</label>
+          <input type="text" id="regName" placeholder="입금자명과 동일하게 입력" required>
+        </div>
+        <div class="reg-field">
+          <label><i class="fas fa-phone"></i> 휴대폰 번호</label>
+          <input type="tel" id="regPhone" placeholder="010-0000-0000" required>
+        </div>
+        <div class="reg-field">
+          <label><i class="fas fa-lock"></i> 사용할 비밀번호</label>
+          <input type="password" id="regPassword" placeholder="승인 후 이 비밀번호로 접속" required>
+        </div>
+        <button type="submit" class="reg-submit-btn"><i class="fas fa-paper-plane"></i> 가입 신청하기</button>
+      </form>
+      <div id="regResult" class="reg-result"></div>
+    </div>
+  </div>
+</div>
 
 <div class="wrapper">
   
@@ -3602,7 +3826,57 @@ const DEFAULT_OPTIONS = {
   style: '전문가 팩트체크형'
 };
 
-// 글자수 카운트
+// 글자수 카운트 + V2026.37.19 LocalStorage 실시간 미러링
+const STATE_KEY = 'xivix_user_state';
+
+function saveUserState() {
+  const state = {
+    searchText: searchEl.value,
+    uploadedImages: uploadedImages,
+    timestamp: Date.now()
+  };
+  try {
+    localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.warn('[XIVIX] LocalStorage 저장 실패:', e);
+  }
+}
+
+function loadUserState() {
+  try {
+    const saved = localStorage.getItem(STATE_KEY);
+    if (saved) {
+      const state = JSON.parse(saved);
+      // 24시간 이내 데이터만 복원
+      if (Date.now() - state.timestamp < 24 * 60 * 60 * 1000) {
+        if (state.searchText) {
+          searchEl.value = state.searchText;
+          charEl.textContent = state.searchText.length;
+        }
+        if (state.uploadedImages && state.uploadedImages.length > 0) {
+          uploadedImages = state.uploadedImages;
+          renderImagePreviews();
+        }
+        console.log('[XIVIX] ✅ 이전 작업 상태 복원됨');
+      }
+    }
+  } catch (e) {
+    console.warn('[XIVIX] LocalStorage 복원 실패:', e);
+  }
+}
+
+// 페이지 로드 시 상태 복원
+loadUserState();
+
+// 페이지 벗어나기 전 저장
+window.addEventListener('beforeunload', saveUserState);
+// visibility 변경 시 저장 (전화 수신, 앱 전환 등)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    saveUserState();
+  }
+});
+
 searchEl.addEventListener('input', () => {
   const len = searchEl.value.length;
   charEl.textContent = len;
@@ -3610,6 +3884,9 @@ searchEl.addEventListener('input', () => {
     searchEl.value = searchEl.value.substring(0, 500);
     charEl.textContent = 500;
   }
+  // 실시간 상태 저장 (디바운스)
+  clearTimeout(window.saveStateTimeout);
+  window.saveStateTimeout = setTimeout(saveUserState, 500);
 });
 
 // 파일 업로드 처리
@@ -4468,6 +4745,57 @@ function renderExtras(comments, keywords, imageAnalysis, hashtags) {
   container.innerHTML = html || '<div style="text-align:center;color:var(--text-muted);padding:40px">댓글 데이터가 없습니다</div>';
 }
 
+// ============================================
+// V2026.37.19 - 가입 신청 시스템
+// ============================================
+function openRegistrationModal() {
+  document.getElementById('registrationModal').classList.add('show');
+}
+function closeRegistrationModal() {
+  document.getElementById('registrationModal').classList.remove('show');
+}
+async function submitRegistration(e) {
+  e.preventDefault();
+  const name = document.getElementById('regName').value.trim();
+  const phone = document.getElementById('regPhone').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const resultEl = document.getElementById('regResult');
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  
+  if (!name || !phone || !password) {
+    resultEl.className = 'reg-result error';
+    resultEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> 모든 항목을 입력해 주세요.';
+    return;
+  }
+  
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 신청 중...';
+  
+  try {
+    const response = await fetch('/api/registration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, phone, password })
+    });
+    const result = await response.json();
+    
+    if (result.success) {
+      resultEl.className = 'reg-result success';
+      resultEl.innerHTML = '<i class="fas fa-check-circle"></i> ' + (result.message || '신청이 완료되었습니다. 입금 확인 후 승인됩니다.');
+      e.target.reset();
+    } else {
+      resultEl.className = 'reg-result error';
+      resultEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + (result.message || '신청 실패. 다시 시도해 주세요.');
+    }
+  } catch (err) {
+    resultEl.className = 'reg-result error';
+    resultEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> 네트워크 오류. 다시 시도해 주세요.';
+  }
+  
+  submitBtn.disabled = false;
+  submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> 가입 신청하기';
+}
+
 // 선택 함수
 function selectTitle(idx) {
   selectedTitle = idx;
@@ -4543,10 +4871,57 @@ function copyAllContent() {
 }
 
 // ============================================
+// V2026.37.19 - 1일 4회 API 호출 제한 로직
+// LocalStorage에 날짜별 호출 횟수 저장
+// ============================================
+const API_LIMIT_KEY = 'xivix_api_usage';
+const DAILY_API_LIMIT = 4;
+
+function getApiUsage() {
+  try {
+    const data = JSON.parse(localStorage.getItem(API_LIMIT_KEY) || '{}');
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    if (data.date !== today) {
+      // 날짜가 바뀌면 초기화
+      return { date: today, count: 0 };
+    }
+    return data;
+  } catch (e) {
+    return { date: new Date().toISOString().split('T')[0], count: 0 };
+  }
+}
+
+function incrementApiUsage() {
+  const usage = getApiUsage();
+  usage.count += 1;
+  localStorage.setItem(API_LIMIT_KEY, JSON.stringify(usage));
+  return usage;
+}
+
+function checkApiLimit() {
+  const usage = getApiUsage();
+  if (usage.count >= DAILY_API_LIMIT) {
+    alert('⚠️ 오늘의 API 호출 한도(4회)를 초과했습니다.\\n\\n자정 이후 다시 시도해 주세요.\\n\\n현재: ' + usage.count + '/' + DAILY_API_LIMIT + '회 사용');
+    return false;
+  }
+  return true;
+}
+
+function getRemainingApiCalls() {
+  const usage = getApiUsage();
+  return Math.max(0, DAILY_API_LIMIT - usage.count);
+}
+
+// ============================================
 // 🔥 SSE 스트리밍 버전 콘텐츠 생성 (타임아웃 방지)
 // 실시간으로 진행 상황 표시 + 본문 글자 단위 출력
 // ============================================
 async function goGenerateStream() {
+  // V2026.37.19 - API 호출 제한 체크
+  if (!checkApiLimit()) {
+    return;
+  }
+  
   let q = searchEl.value.trim();
   
   // ============================================
@@ -4614,6 +4989,31 @@ async function goGenerateStream() {
     '<div style="font-size:15px;font-weight:600;margin-bottom:8px">🔌 AI 엔진에 연결 중...</div>' +
     '<div style="font-size:13px;color:var(--text-muted)">잠시만 기다려주세요. 약 10~30초 소요됩니다.</div>' +
   '</div>';
+  
+  // V2026.37.19 - 로딩 UX 고도화: 스티키 카운트다운 표시
+  let countdownSec = 25;
+  let countdownEl = document.getElementById('loadingCountdown');
+  if (!countdownEl) {
+    countdownEl = document.createElement('div');
+    countdownEl.id = 'loadingCountdown';
+    countdownEl.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9998;box-shadow:0 4px 15px rgba(0,0,0,0.3);display:none;';
+    document.body.appendChild(countdownEl);
+  }
+  countdownEl.style.display = 'block';
+  countdownEl.innerHTML = '<i class="fas fa-hourglass-half fa-spin"></i> 예상 대기: <span id="countdownNum">' + countdownSec + '</span>초';
+  
+  const countdownInterval = setInterval(() => {
+    countdownSec = Math.max(0, countdownSec - 1);
+    const numEl = document.getElementById('countdownNum');
+    if (numEl) numEl.textContent = countdownSec;
+    if (countdownSec <= 0) {
+      clearInterval(countdownInterval);
+      countdownEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 거의 완료...';
+    }
+  }, 1000);
+  
+  // 완료 시 카운트다운 숨김용 변수
+  window.currentCountdownInterval = countdownInterval;
   
   // 실시간 데이터 저장용
   let streamData = {
@@ -4763,6 +5163,17 @@ async function goGenerateStream() {
                 resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 // ✅ 이미지 생성 섹션 표시
                 document.getElementById('imageGenSection').classList.add('show');
+                // V2026.37.19 - API 사용량 증가 (성공 시에만)
+                const newUsage = incrementApiUsage();
+                console.log('[XIVIX] API 사용량:', newUsage.count + '/' + DAILY_API_LIMIT);
+                // V2026.37.19 - 카운트다운 숨김 + 완료 메시지
+                if (window.currentCountdownInterval) clearInterval(window.currentCountdownInterval);
+                const cdEl = document.getElementById('loadingCountdown');
+                if (cdEl) {
+                  cdEl.innerHTML = '<i class="fas fa-check-circle"></i> 완료! 이제 복사하세요';
+                  cdEl.style.background = 'linear-gradient(135deg, var(--green), #10b981)';
+                  setTimeout(() => { cdEl.style.display = 'none'; }, 3000);
+                }
               }, 1200);
               break;
               
