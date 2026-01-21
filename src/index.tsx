@@ -1705,7 +1705,7 @@ JSON 형식으로만 응답:
 })
 
 // ============================================
-// V2026.37.20 - 로그인 API (CEO 지시 v3.8)
+// V2026.37.32 - 로그인 API (pendingUsers 배열 연동)
 // 승인 상태 확인 후 로그인 처리
 // ============================================
 app.post('/api/login', async (c) => {
@@ -1716,24 +1716,12 @@ app.post('/api/login', async (c) => {
       return c.json({ success: false, message: '휴대폰 번호와 비밀번호를 입력해 주세요.' }, 400)
     }
     
-    // TODO: 실제 DB에서 사용자 조회 (현재는 KV 조회 시뮬레이션)
-    // const userData = await c.env.KV.get(`reg:${phone}`)
-    
-    // CEO 승인 명단 (임시 - 실제 운영 시 DB/KV 사용)
-    // 이 부분은 관리자가 승인한 사용자 정보를 저장
-    const approvedUsers: Record<string, { password: string; name: string; status: string }> = {
-      // 예시: '010-1234-5678': { password: btoa('password123'), name: '홍길동', status: 'APPROVED' }
-    }
-    
-    // 신청자 명단 (PENDING 상태) - 임시 저장소
-    const pendingUsers: Record<string, boolean> = {}
-    
-    // 사용자 조회
-    const user = approvedUsers[phone]
+    // pendingUsers 배열에서 사용자 조회
+    const user = pendingUsers.find(u => u.phone === phone);
     
     if (user) {
-      // 등록된 사용자 확인
-      if (user.password === btoa(password)) {
+      // 등록된 사용자 확인 (비밀번호 체크)
+      if (user.password_hash === btoa(password)) {
         if (user.status === 'APPROVED') {
           console.log('[XIVIX] ✅ 로그인 성공:', phone)
           return c.json({ 
@@ -1790,12 +1778,19 @@ app.post('/api/registration', async (c) => {
     
     console.log('[XIVIX] 🆕 가입 신청:', JSON.stringify(registrationData))
     
-    // TODO: KV 또는 D1에 저장 로직 추가
-    // await c.env.KV.put(`reg:${phone}`, JSON.stringify(registrationData))
+    // V2026.37.32 - 메모리 저장소에 추가 (어드민에서 조회 가능)
+    // 중복 체크
+    const existingIndex = pendingUsers.findIndex(u => u.phone === phone);
+    if (existingIndex !== -1) {
+      // 이미 신청한 경우 업데이트
+      pendingUsers[existingIndex] = registrationData;
+    } else {
+      pendingUsers.push(registrationData);
+    }
     
     return c.json({ 
       success: true, 
-      message: '가입 신청이 완료되었습니다!\\n입금 확인 후 대표님이 승인하면 비밀번호가 활성화됩니다.\\n승인까지 1~2일 소요될 수 있습니다.' 
+      message: '가입 신청이 완료되었습니다!\\n입금 확인 후 1시간 내로 승인됩니다.' 
     })
   } catch (error) {
     console.error('[XIVIX] 가입 신청 오류:', error)
@@ -1937,6 +1932,46 @@ app.get('/api/admin/stats', (c) => c.json({
   ],
   lastUpdated: new Date().toISOString()
 }))
+
+// ============================================
+// V2026.37.32 - 관리자 API (승인 대기 명단, 승인 처리)
+// ============================================
+// 임시 메모리 저장소 (실제 운영 시 D1/KV로 교체 필요)
+const pendingUsers: any[] = [];
+
+// 승인 대기 유저 목록 조회
+app.get('/api/admin/pending-users', (c) => {
+  return c.json({
+    success: true,
+    users: pendingUsers,
+    total: pendingUsers.length
+  });
+});
+
+// 유저 승인 처리
+app.post('/api/admin/approve', async (c) => {
+  try {
+    const { phone } = await c.req.json();
+    
+    const userIndex = pendingUsers.findIndex(u => u.phone === phone);
+    if (userIndex === -1) {
+      return c.json({ success: false, message: '해당 사용자를 찾을 수 없습니다.' });
+    }
+    
+    pendingUsers[userIndex].status = 'APPROVED';
+    pendingUsers[userIndex].approved_at = new Date().toISOString();
+    
+    console.log('[XIVIX] ✅ 유저 승인 완료:', phone);
+    
+    return c.json({
+      success: true,
+      message: '승인이 완료되었습니다.',
+      user: pendingUsers[userIndex]
+    });
+  } catch (err) {
+    return c.json({ success: false, message: '승인 처리 중 오류가 발생했습니다.' });
+  }
+});
 
 // ============================================
 // 첫 페이지: GPT 스타일 검색창 + 실시간 보험 트렌드 + 바로 결과 출력
@@ -3454,8 +3489,11 @@ body{
   color:var(--text-muted);
   cursor:pointer;
   line-height:1;
+  position:relative;
+  z-index:99999999 !important;
+  pointer-events:auto !important;
 }
-.reg-close-btn:hover{color:var(--red)}
+.reg-close-btn:hover{color:var(--red);transform:scale(1.2)}
 .reg-modal-body{padding:24px}
 .reg-deposit-info{
   background:rgba(79,140,255,0.1);
@@ -5285,6 +5323,125 @@ const repairRegistrationFlow = () => {
 window.onload = repairRegistrationFlow;
 setInterval(repairRegistrationFlow, 1000);
 
+// ============================================
+// V2026.37.32 - 모달 X 버튼 및 UX 개선 (CEO 지시 v3.96)
+// ============================================
+// 모달 닫기 버튼 강제 바인딩
+const repairModalCloseButtons = () => {
+    // 가입 신청 모달 X 버튼
+    const regCloseBtn = document.querySelector('#registrationModal .reg-close-btn');
+    const regModal = document.getElementById('registrationModal');
+    if (regCloseBtn && regModal) {
+        regCloseBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            regModal.classList.remove('show');
+            regModal.style.display = 'none';
+            console.log('[XIVIX] ✅ 가입 모달 닫기 성공');
+        };
+        regCloseBtn.ontouchend = (e) => {
+            e.preventDefault();
+            regModal.classList.remove('show');
+            regModal.style.display = 'none';
+        };
+    }
+    
+    // 로그인 모달 X 버튼
+    const loginCloseBtn = document.querySelector('#loginModal .login-close-btn');
+    const loginModal = document.getElementById('loginModal');
+    if (loginCloseBtn && loginModal) {
+        loginCloseBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            loginModal.classList.remove('show');
+            loginModal.style.display = 'none';
+            console.log('[XIVIX] ✅ 로그인 모달 닫기 성공');
+        };
+        loginCloseBtn.ontouchend = (e) => {
+            e.preventDefault();
+            loginModal.classList.remove('show');
+            loginModal.style.display = 'none';
+        };
+    }
+    
+    // 모달 외부 클릭 시 닫기
+    if (regModal) {
+        regModal.onclick = (e) => {
+            if (e.target === regModal) {
+                regModal.classList.remove('show');
+                regModal.style.display = 'none';
+            }
+        };
+    }
+    if (loginModal) {
+        loginModal.onclick = (e) => {
+            if (e.target === loginModal) {
+                loginModal.classList.remove('show');
+                loginModal.style.display = 'none';
+            }
+        };
+    }
+};
+
+// 승인 대기 안내 표시 함수
+function showPendingNotification() {
+    // 기존 알림이 있으면 제거
+    const existingNotif = document.getElementById('pendingNotification');
+    if (existingNotif) existingNotif.remove();
+    
+    const notif = document.createElement('div');
+    notif.id = 'pendingNotification';
+    notif.innerHTML = \`
+        <div style="
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 2px solid #00ff00;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            z-index: 99999999;
+            box-shadow: 0 0 50px rgba(0, 255, 0, 0.3);
+            max-width: 400px;
+            width: 90%;
+        ">
+            <div style="font-size: 60px; margin-bottom: 20px;">⏳</div>
+            <h2 style="color: #00ff00; font-size: 24px; margin-bottom: 15px;">승인 대기 중</h2>
+            <p style="color: #fff; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+                가입 신청이 완료되었습니다.<br>
+                <strong style="color: #00ff00;">입금 확인 후 1시간 내</strong>로 승인됩니다.
+            </p>
+            <p style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 25px;">
+                승인 완료 시 로그인이 가능합니다.
+            </p>
+            <button onclick="this.parentElement.parentElement.remove()" style="
+                background: #00ff00;
+                color: #000;
+                border: none;
+                padding: 15px 40px;
+                border-radius: 10px;
+                font-size: 16px;
+                font-weight: 700;
+                cursor: pointer;
+                transition: all 0.3s;
+            ">확인</button>
+        </div>
+        <div style="
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 99999998;
+        " onclick="document.getElementById('pendingNotification').remove()"></div>
+    \`;
+    document.body.appendChild(notif);
+}
+
+// 모달 닫기 버튼도 1초 간격으로 바인딩
+setInterval(repairModalCloseButtons, 1000);
+setTimeout(repairModalCloseButtons, 100);
+
 // V2026.37.15 - SEO_SCORE_CLARIFICATION: 네이버 검색 버튼 클릭 시 로딩 표시
 function showNaverSearchLoading() {
   const loadingEl = document.getElementById('naverSearchLoading');
@@ -5522,6 +5679,13 @@ async function submitRegistration(e) {
       resultEl.className = 'reg-result success';
       resultEl.innerHTML = '<i class="fas fa-check-circle"></i> ' + (result.message || '신청이 완료되었습니다. 입금 확인 후 승인됩니다.');
       e.target.reset();
+      
+      // V2026.37.32 - 신청 완료 후 2초 뒤 모달 자동 닫기 + 승인 대기 안내
+      setTimeout(() => {
+        closeRegistrationModal();
+        // 메인 화면에 승인 대기 안내 표시
+        showPendingNotification();
+      }, 2000);
     } else {
       resultEl.className = 'reg-result error';
       resultEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + (result.message || '신청 실패. 다시 시도해 주세요.');
@@ -6397,40 +6561,154 @@ const adminPageHtml = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>XIVIX Admin</title>
+<title>XIVIX Admin - 관리자 대시보드</title>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
 <style>
-body{background:#0a0a0a;color:#fff;font-family:sans-serif;padding:24px}
-.wrap{max-width:600px;margin:0 auto}
+body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',sans-serif;padding:24px;margin:0}
+.wrap{max-width:900px;margin:0 auto}
 .header{display:flex;align-items:center;gap:12px;margin-bottom:24px}
-.icon{width:40px;height:40px;background:linear-gradient(135deg,#00D4FF,#A855F7);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900}
-.cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+.icon{width:50px;height:50px;background:linear-gradient(135deg,#00ff00,#00cc00);border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:24px;color:#000}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
 .card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px}
-.card-value{font-size:24px;font-weight:900;color:#00D4FF}
-.card-label{font-size:12px;color:rgba(255,255,255,0.5)}
-.links{display:flex;gap:8px}
-.links a{flex:1;padding:12px;text-align:center;border-radius:10px;text-decoration:none;font-size:13px}
-.links a:nth-child(1){background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00D4FF}
+.card-value{font-size:28px;font-weight:900;color:#00ff00}
+.card-label{font-size:12px;color:rgba(255,255,255,0.5);margin-top:4px}
+.links{display:flex;gap:8px;margin-bottom:24px}
+.links a{flex:1;padding:12px;text-align:center;border-radius:10px;text-decoration:none;font-size:13px;transition:all 0.3s}
+.links a:nth-child(1){background:rgba(0,255,0,0.1);border:1px solid rgba(0,255,0,0.3);color:#00ff00}
 .links a:nth-child(2){background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10B981}
 .links a:nth-child(3){background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:#F59E0B}
+.links a:hover{transform:translateY(-2px)}
+
+/* 승인 대기 명단 테이블 */
+.pending-section{background:rgba(255,255,255,0.02);border:1px solid rgba(0,255,0,0.2);border-radius:16px;padding:20px;margin-top:24px}
+.pending-title{font-size:18px;font-weight:700;color:#00ff00;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.pending-table{width:100%;border-collapse:collapse}
+.pending-table th{text-align:left;padding:12px;background:rgba(0,255,0,0.1);color:#00ff00;font-size:13px;border-bottom:1px solid rgba(0,255,0,0.2)}
+.pending-table td{padding:12px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:14px}
+.pending-table tr:hover{background:rgba(255,255,255,0.02)}
+.status-pending{color:#F59E0B;font-weight:600}
+.status-approved{color:#10B981;font-weight:600}
+.btn-approve{background:#00ff00;color:#000;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;transition:all 0.3s}
+.btn-approve:hover{transform:scale(1.05);box-shadow:0 0 15px rgba(0,255,0,0.5)}
+.btn-approve:disabled{background:#666;cursor:not-allowed}
+.empty-msg{text-align:center;padding:40px;color:rgba(255,255,255,0.5)}
+.refresh-btn{background:rgba(0,255,0,0.1);border:1px solid rgba(0,255,0,0.3);color:#00ff00;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px}
+.refresh-btn:hover{background:rgba(0,255,0,0.2)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="header">
     <div class="icon">X</div>
-    <div><div style="font-size:18px;font-weight:800">Admin Dashboard</div><div style="font-size:12px;color:rgba(255,255,255,0.5)">XIVIX 2026 PRO v2026.6</div></div>
+    <div>
+      <div style="font-size:20px;font-weight:800">XIVIX Admin Dashboard</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.5)">v2026.37.32 - 관리자 전용</div>
+    </div>
   </div>
+  
   <div class="cards">
-    <div class="card"><div id="keys" class="card-value">-</div><div class="card-label">API Keys</div></div>
-    <div class="card"><div class="card-value" style="color:#F59E0B">v2026.6</div><div class="card-label">Version</div></div>
+    <div class="card"><div id="keys" class="card-value">-</div><div class="card-label"><i class="fas fa-key"></i> API Keys</div></div>
+    <div class="card"><div id="pendingCount" class="card-value" style="color:#F59E0B">-</div><div class="card-label"><i class="fas fa-clock"></i> 승인 대기</div></div>
+    <div class="card"><div class="card-value" style="color:#00ff00">v37.32</div><div class="card-label"><i class="fas fa-code-branch"></i> Version</div></div>
   </div>
+  
   <div class="links">
-    <a href="/">메인</a>
-    <a href="/api/health">Health</a>
-    <a href="/api/docs">Docs</a>
+    <a href="/"><i class="fas fa-home"></i> 메인</a>
+    <a href="/api/health"><i class="fas fa-heartbeat"></i> Health</a>
+    <a href="/api/docs"><i class="fas fa-book"></i> Docs</a>
+  </div>
+  
+  <!-- 승인 대기 명단 섹션 -->
+  <div class="pending-section">
+    <div class="pending-title">
+      <i class="fas fa-user-clock"></i> 가입 승인 대기 명단
+      <button class="refresh-btn" onclick="loadPendingUsers()"><i class="fas fa-sync-alt"></i> 새로고침</button>
+    </div>
+    <table class="pending-table">
+      <thead>
+        <tr>
+          <th>입금자 성함</th>
+          <th>휴대폰 번호</th>
+          <th>신청 시간</th>
+          <th>상태</th>
+          <th>관리</th>
+        </tr>
+      </thead>
+      <tbody id="pendingList">
+        <tr><td colspan="5" class="empty-msg"><i class="fas fa-inbox"></i> 로딩 중...</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
-<script>fetch('/api/admin/stats').then(r=>r.json()).then(d=>{document.getElementById('keys').textContent=d.totalKeys})</script>
+
+<script>
+// API 통계 로드
+fetch('/api/admin/stats').then(r=>r.json()).then(d=>{
+  document.getElementById('keys').textContent = d.totalKeys || 3;
+});
+
+// 승인 대기 유저 로드
+async function loadPendingUsers() {
+  const tbody = document.getElementById('pendingList');
+  tbody.innerHTML = '<tr><td colspan="5" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 로딩 중...</td></tr>';
+  
+  try {
+    const res = await fetch('/api/admin/pending-users');
+    const data = await res.json();
+    
+    if (data.users && data.users.length > 0) {
+      document.getElementById('pendingCount').textContent = data.users.length;
+      tbody.innerHTML = data.users.map(user => \`
+        <tr>
+          <td><strong>\${user.name}</strong></td>
+          <td>\${user.phone}</td>
+          <td>\${new Date(user.created_at).toLocaleString('ko-KR')}</td>
+          <td class="status-\${user.status.toLowerCase()}">\${user.status === 'PENDING' ? '⏳ 대기중' : '✅ 승인됨'}</td>
+          <td>
+            \${user.status === 'PENDING' 
+              ? \`<button class="btn-approve" onclick="approveUser('\${user.phone}')"><i class="fas fa-check"></i> 승인</button>\`
+              : '<span style="color:#10B981">승인완료</span>'
+            }
+          </td>
+        </tr>
+      \`).join('');
+    } else {
+      document.getElementById('pendingCount').textContent = '0';
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-msg"><i class="fas fa-inbox"></i> 승인 대기 중인 신청이 없습니다.</td></tr>';
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-msg" style="color:#ff6b6b"><i class="fas fa-exclamation-triangle"></i> 데이터 로드 실패</td></tr>';
+  }
+}
+
+// 유저 승인
+async function approveUser(phone) {
+  if (!confirm('이 사용자를 승인하시겠습니까?')) return;
+  
+  try {
+    const res = await fetch('/api/admin/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone })
+    });
+    const data = await res.json();
+    
+    if (data.success) {
+      alert('✅ 승인 완료! 해당 사용자가 로그인할 수 있습니다.');
+      loadPendingUsers();
+    } else {
+      alert('❌ 승인 실패: ' + (data.message || '알 수 없는 오류'));
+    }
+  } catch (err) {
+    alert('❌ 네트워크 오류');
+  }
+}
+
+// 페이지 로드 시 실행
+loadPendingUsers();
+// 30초마다 자동 새로고침
+setInterval(loadPendingUsers, 30000);
+</script>
 </body>
 </html>`
 
