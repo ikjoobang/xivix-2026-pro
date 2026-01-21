@@ -3820,49 +3820,37 @@ body{
   50%{transform:translateY(5px)}
 }
 
-/* V2026.37.30 - Shield-Breaker 레이어 설계 (CEO 최종 지시) */
-/* [1] 배경 및 장식 요소: 클릭 신호 완전 통과 */
-.landing-bg, 
-.landing-grid, 
-.landing-particles, 
-.landing-scroll-hint {
-    pointer-events: none !important; /* 마우스가 그냥 통과함 */
+/* V2026.37.31 - 가입신청 클릭 및 브랜드 복구 (CEO 최종 지시 v3.95) */
+/* [1] 브랜드 색상 강제 고정 (Beyond Reality) */
+:root {
+    --xivix-neon: #00ff00 !important; /* 네온 그린 */
+    --xivix-black: #0a0a0a !important; /* 딥 블랙 */
+}
+
+/* [2] 배경 요소: 마우스 신호가 그냥 통과되도록 투명화 */
+.landing-bg, .landing-grid, .landing-particles, .landing-scroll-hint {
+    pointer-events: none !important;
     z-index: 1 !important;
 }
 
-/* [2] 버튼 컨테이너: 부모의 간섭 제거 */
-.landing-content {
+/* [3] 가입신청 버튼: 모든 장애물을 뚫고 최상단 배치 */
+#btnRegisterMain {
     position: relative !important;
-    z-index: 100 !important;
-    pointer-events: none !important; /* 컨테이너 자체는 통과 */
-}
-
-/* [3] 버튼: 세상에서 가장 높은 우선순위 부여 */
-.landing-buttons {
-    pointer-events: auto !important; /* 여기서부터 클릭을 받음 */
-    z-index: 999999 !important;
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.landing-btn {
-    position: relative !important;
-    z-index: 1000000 !important; /* 어떤 요소보다 위에 있음 */
-    pointer-events: auto !important; 
-    cursor: pointer !important; /* 마우스 올리면 무조건 손가락 모양 */
-    background: #00ff00 !important; /* Beyond Reality 네온 그린 */
+    z-index: 9999999 !important; /* 물리적 한계치 적용 */
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    background: var(--xivix-neon) !important;
     color: #000 !important;
     font-weight: 900 !important;
-    padding: 20px 40px;
-    border-radius: 8px;
-    border: none;
-    transition: transform 0.2s, box-shadow 0.2s;
+    border: 2px solid var(--xivix-neon) !important;
+    box-shadow: 0 0 30px rgba(0, 255, 0, 0.6) !important;
 }
 
-.landing-btn:hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 30px rgba(0, 255, 0, 0.8);
+/* [4] 가입 모달: 뒤에 숨지 않게 앞으로 당김 */
+#registrationModal {
+    z-index: 10000000 !important;
+    background: rgba(0, 0, 0, 0.95) !important;
+    backdrop-filter: blur(15px) !important;
 }
 
 /* 로그인 모달 */
@@ -5247,65 +5235,55 @@ window.addEventListener('storage', function(e) {
 })();
 
 // ============================================
-// V2026.37.30 - 강제 이벤트 주입 (CEO 최종 지시)
+// V2026.37.31 - 가입신청 클릭 강제 실행 (CEO 최종 지시 v3.95)
 // ============================================
-// [핵심] 모달을 강제로 여는 함수
-const forceOpenRegistration = () => {
-    const modal = document.getElementById('registrationModal');
-    if (modal) {
-        modal.classList.add('show');
-        modal.style.display = 'flex';
-        console.log('[XIVIX] ✅ 가입 신청 모달 강제 활성화');
-    } else {
-        alert('시스템 오류: 가입 창(Modal)을 찾을 수 없습니다. 개발팀에 문의하세요.');
-    }
-};
-
-const forceOpenLoginModal = () => {
-    const modal = document.getElementById('loginModal');
-    if (modal) {
-        modal.classList.add('show');
-        modal.style.display = 'flex';
-        console.log('[XIVIX] ✅ 로그인 모달 강제 활성화');
-    }
-};
-
-// [핵심] 버튼에 기능을 강제로 박아버리는 로직
-const syncButtons = () => {
+// [핵심] 가입신청 버튼의 모든 이벤트를 초기화하고 기능을 강제 주입
+const repairRegistrationFlow = () => {
     const regBtn = document.getElementById('btnRegisterMain');
-    if (regBtn) {
-        // 기존에 걸려있던 모든 방해 요소를 제거하고 새로 바인딩
-        regBtn.onmousedown = (e) => e.stopPropagation();
-        regBtn.onclick = (e) => {
+    const modal = document.getElementById('registrationModal');
+
+    if (regBtn && modal) {
+        // 기존에 꼬인 이벤트 리스너 완전 제거 (버튼 복제 방식)
+        const newBtn = regBtn.cloneNode(true);
+        regBtn.parentNode.replaceChild(newBtn, regBtn);
+
+        // 새로운 버튼에 클릭/터치 이벤트 강제 할당
+        const handleAction = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            forceOpenRegistration();
+            modal.classList.add('show');
+            modal.style.display = 'flex';
+            console.log('[XIVIX] ✅ 가입신청 모달 강제 오픈 성공');
         };
-        // 모바일 터치 대응
-        regBtn.ontouchend = (e) => {
-            e.preventDefault();
-            forceOpenRegistration();
-        };
+
+        newBtn.onclick = handleAction;
+        newBtn.addEventListener('touchend', handleAction, { passive: false });
     }
     
+    // 로그인 버튼도 동일하게 처리
     const loginBtn = document.getElementById('btnLoginMain');
-    if (loginBtn) {
-        loginBtn.onmousedown = (e) => e.stopPropagation();
-        loginBtn.onclick = (e) => {
+    const loginModal = document.getElementById('loginModal');
+    
+    if (loginBtn && loginModal) {
+        const newLoginBtn = loginBtn.cloneNode(true);
+        loginBtn.parentNode.replaceChild(newLoginBtn, loginBtn);
+        
+        const handleLoginAction = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            forceOpenLoginModal();
+            loginModal.classList.add('show');
+            loginModal.style.display = 'flex';
+            console.log('[XIVIX] ✅ 로그인 모달 강제 오픈 성공');
         };
-        loginBtn.ontouchend = (e) => {
-            e.preventDefault();
-            forceOpenLoginModal();
-        };
+        
+        newLoginBtn.onclick = handleLoginAction;
+        newLoginBtn.addEventListener('touchend', handleLoginAction, { passive: false });
     }
 };
 
-// 페이지 로드 즉시 실행 및 안전장치로 0.5초 후 재실행
-window.onload = syncButtons;
-setTimeout(syncButtons, 500);
+// 페이지 로드 시 및 1초 간격으로 안전하게 실행
+window.onload = repairRegistrationFlow;
+setInterval(repairRegistrationFlow, 1000);
 
 // V2026.37.15 - SEO_SCORE_CLARIFICATION: 네이버 검색 버튼 클릭 시 로딩 표시
 function showNaverSearchLoading() {
