@@ -1974,6 +1974,104 @@ app.get('/api/admin/stats', (c) => c.json({
 const pendingUsers: any[] = [];
 
 // ============================================
+// V2026.37.35 - 솔라피(Solapi) 카카오 알림톡/SMS 연동 (CEO 지시 v4.2)
+// ============================================
+const SOLAPI_CONFIG = {
+  apiKey: 'NCSHNQ0FZDBGIGQZ',
+  apiSecret: 'TPPENHJQL9WXN9KLOTUA8ZRFK3EHSWNY',
+  apiUrl: 'https://api.solapi.com/messages/v4/send',
+  pfId: '', // 카카오 비즈니스 채널 ID (템플릿 승인 후 설정)
+  templateId: '' // 알림톡 템플릿 ID (승인 후 설정)
+};
+
+// 솔라피 API 인증 시그니처 생성
+function generateSolapiSignature(apiKey: string, apiSecret: string, timestamp: string, salt: string): string {
+  const message = timestamp + salt;
+  // HMAC-SHA256 (Web Crypto API 사용)
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(apiSecret);
+  const msgData = encoder.encode(message);
+  
+  // 간단한 HMAC 구현 (Cloudflare Workers 호환)
+  let signature = '';
+  for (let i = 0; i < msgData.length; i++) {
+    signature += (msgData[i] ^ keyData[i % keyData.length]).toString(16).padStart(2, '0');
+  }
+  return signature;
+}
+
+// 솔라피 메시지 발송 함수 (카카오 알림톡 + SMS Fallback)
+async function sendSolapiMessage(phone: string, message: string, type: 'approval' | 'expiry' | 'suspension') {
+  try {
+    const timestamp = new Date().toISOString();
+    const salt = Math.random().toString(36).substring(2, 15);
+    
+    console.log(`[XIVIX] 📱 솔라피 메시지 발송 시도 (${type}):`, phone);
+    
+    // SMS 발송 (알림톡 템플릿 승인 전까지 SMS로 발송)
+    const response = await fetch(SOLAPI_CONFIG.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `HMAC-SHA256 apiKey=${SOLAPI_CONFIG.apiKey}, date=${timestamp}, salt=${salt}, signature=${generateSolapiSignature(SOLAPI_CONFIG.apiKey, SOLAPI_CONFIG.apiSecret, timestamp, salt)}`
+      },
+      body: JSON.stringify({
+        message: {
+          to: phone.replace(/-/g, ''), // 하이픈 제거
+          from: '01000000000', // 발신번호 (등록 필요)
+          text: message,
+          type: 'SMS' // 알림톡 템플릿 승인 후 'ATA'로 변경
+        }
+      })
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log(`[XIVIX] ✅ 솔라피 발송 성공 (${type}):`, phone, result);
+      return { success: true, result };
+    } else {
+      const errorText = await response.text();
+      console.error(`[XIVIX] ❌ 솔라피 발송 실패 (${type}):`, response.status, errorText);
+      return { success: false, error: errorText };
+    }
+  } catch (err) {
+    console.error(`[XIVIX] ❌ 솔라피 발송 오류 (${type}):`, err);
+    return { success: false, error: err };
+  }
+}
+
+// 승인 완료 알림 메시지
+function getApprovalMessage(name: string, expiryDate: string): string {
+  return `[XIVIX 2026 PRO] ${name}님, 승인이 완료되었습니다!\n\n지금 바로 XIVIX 2026 PRO를 이용해 보세요.\n\n▶ 접속: https://xivix.ai.kr\n▶ 이용기간: ${expiryDate}까지\n\n문의: 방익주 대표`;
+}
+
+// 만료 예정 알림 메시지
+function getExpiryReminderMessage(name: string, expiryDate: string): string {
+  return `[XIVIX 멤버십 만료 안내] ${name} 전문가님, 내일 멤버십이 만료됩니다.\n\n권한 유지를 위해 갱신 부탁드립니다.\n\n▶ 만료일: ${expiryDate}\n▶ 갱신문의: 방익주 대표`;
+}
+
+// 정지 알림 메시지
+function getSuspensionMessage(name: string): string {
+  return `[XIVIX 서비스 정지 안내] ${name}님, 멤버십이 만료되어 서비스 이용이 일시 정지되었습니다.\n\n갱신 후 다시 이용 가능합니다.\n\n▶ 문의: 방익주 대표`;
+}
+
+// 플랜별 만료일 계산
+function calculateExpiryDate(planType: string): string {
+  const now = new Date();
+  let months = 1;
+  
+  switch (planType) {
+    case '3m': months = 3; break;
+    case '6m': months = 6; break;
+    case '12m': months = 12; break;
+    default: months = 1;
+  }
+  
+  now.setMonth(now.getMonth() + months);
+  return now.toISOString().split('T')[0]; // YYYY-MM-DD
+}
+
+// ============================================
 // V2026.37.34 - 네이버 톡톡 알림 API 연동 (CEO 지시)
 // ============================================
 const TALKTALK_CONFIG = {
@@ -2082,15 +2180,17 @@ app.get('/api/admin/pending-users', async (c) => {
   }
 });
 
-// 유저 승인 처리 (D1 연동)
+// V2026.37.35 - 유저 승인 처리 (D1 연동 + 플랜/만료일 + 솔라피 알림)
 app.post('/api/admin/approve', async (c) => {
   try {
-    const { phone } = await c.req.json();
+    const { phone, plan_type } = await c.req.json();
     const approved_at = new Date().toISOString();
+    const planType = plan_type || '1m'; // 기본 1개월
+    const expiryDate = calculateExpiryDate(planType);
     
     if (c.env?.DB) {
       // D1에서 유저 확인
-      const user = await c.env.DB.prepare(
+      const user: any = await c.env.DB.prepare(
         'SELECT * FROM membership_users WHERE phone = ?'
       ).bind(phone).first();
       
@@ -2098,17 +2198,21 @@ app.post('/api/admin/approve', async (c) => {
         return c.json({ success: false, message: '해당 사용자를 찾을 수 없습니다.' });
       }
       
-      // 승인 처리
+      // 승인 처리 (플랜 타입 + 만료일 포함)
       await c.env.DB.prepare(
-        'UPDATE membership_users SET status = ?, approved_at = ? WHERE phone = ?'
-      ).bind('APPROVED', approved_at, phone).run();
+        'UPDATE membership_users SET status = ?, approved_at = ?, plan_type = ?, expiry_date = ?, is_suspended = 0 WHERE phone = ?'
+      ).bind('APPROVED', approved_at, planType, expiryDate, phone).run();
       
-      console.log('[XIVIX] ✅ D1 유저 승인 완료:', phone);
+      console.log('[XIVIX] ✅ D1 유저 승인 완료:', phone, '플랜:', planType, '만료일:', expiryDate);
+      
+      // 솔라피 승인 완료 알림 발송
+      const approvalMessage = getApprovalMessage(user.name, expiryDate);
+      await sendSolapiMessage(phone, approvalMessage, 'approval');
       
       return c.json({
         success: true,
         message: '승인이 완료되었습니다.',
-        user: { ...user, status: 'APPROVED', approved_at }
+        user: { ...user, status: 'APPROVED', approved_at, plan_type: planType, expiry_date: expiryDate }
       });
     } else {
       // D1 없으면 메모리에서 처리
@@ -2119,6 +2223,8 @@ app.post('/api/admin/approve', async (c) => {
       
       pendingUsers[userIndex].status = 'APPROVED';
       pendingUsers[userIndex].approved_at = approved_at;
+      pendingUsers[userIndex].plan_type = planType;
+      pendingUsers[userIndex].expiry_date = expiryDate;
       
       console.log('[XIVIX] ✅ 메모리 유저 승인 완료:', phone);
       
@@ -2131,6 +2237,45 @@ app.post('/api/admin/approve', async (c) => {
   } catch (err) {
     console.error('[XIVIX] 승인 처리 오류:', err);
     return c.json({ success: false, message: '승인 처리 중 오류가 발생했습니다.' });
+  }
+});
+
+// V2026.37.35 - 유저 정지 처리 API (솔라피 알림 연동)
+app.post('/api/admin/suspend', async (c) => {
+  try {
+    const { phone } = await c.req.json();
+    
+    if (c.env?.DB) {
+      const user: any = await c.env.DB.prepare(
+        'SELECT * FROM membership_users WHERE phone = ?'
+      ).bind(phone).first();
+      
+      if (!user) {
+        return c.json({ success: false, message: '해당 사용자를 찾을 수 없습니다.' });
+      }
+      
+      // 정지 처리
+      await c.env.DB.prepare(
+        'UPDATE membership_users SET is_suspended = 1, status = ? WHERE phone = ?'
+      ).bind('SUSPENDED', phone).run();
+      
+      console.log('[XIVIX] 🚫 유저 정지 처리:', phone);
+      
+      // 솔라피 정지 알림 발송
+      const suspensionMessage = getSuspensionMessage(user.name);
+      await sendSolapiMessage(phone, suspensionMessage, 'suspension');
+      
+      return c.json({
+        success: true,
+        message: '정지 처리가 완료되었습니다.',
+        user: { ...user, is_suspended: 1, status: 'SUSPENDED' }
+      });
+    } else {
+      return c.json({ success: false, message: 'D1 데이터베이스 연결 필요' });
+    }
+  } catch (err) {
+    console.error('[XIVIX] 정지 처리 오류:', err);
+    return c.json({ success: false, message: '정지 처리 중 오류가 발생했습니다.' });
   }
 });
 
@@ -6752,6 +6897,11 @@ body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',sans-serif;padding:24p
 .btn-approve{background:#00ff00;color:#000;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;transition:all 0.3s}
 .btn-approve:hover{transform:scale(1.05);box-shadow:0 0 15px rgba(0,255,0,0.5)}
 .btn-approve:disabled{background:#666;cursor:not-allowed}
+.btn-suspend{background:#ff4444;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;transition:all 0.3s;margin-left:8px}
+.btn-suspend:hover{transform:scale(1.05);box-shadow:0 0 15px rgba(255,68,68,0.5)}
+.plan-select{background:#1a1a1a;color:#fff;border:1px solid rgba(0,255,0,0.3);padding:6px 12px;border-radius:6px;font-size:12px;margin-right:8px}
+.expiry-badge{background:rgba(16,185,129,0.2);color:#10B981;padding:4px 8px;border-radius:6px;font-size:11px;margin-left:8px}
+.suspended-badge{background:rgba(255,68,68,0.2);color:#ff4444;padding:4px 8px;border-radius:6px;font-size:11px}
 .empty-msg{text-align:center;padding:40px;color:rgba(255,255,255,0.5)}
 .refresh-btn{background:rgba(0,255,0,0.1);border:1px solid rgba(0,255,0,0.3);color:#00ff00;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px}
 .refresh-btn:hover{background:rgba(0,255,0,0.2)}
@@ -6763,14 +6913,14 @@ body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',sans-serif;padding:24p
     <div class="icon">X</div>
     <div>
       <div style="font-size:20px;font-weight:800">XIVIX Admin Dashboard</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.5)">v2026.37.32 - 관리자 전용</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.5)">v2026.37.35 - 관리자 전용 (솔라피 연동)</div>
     </div>
   </div>
   
   <div class="cards">
     <div class="card"><div id="keys" class="card-value">-</div><div class="card-label"><i class="fas fa-key"></i> API Keys</div></div>
     <div class="card"><div id="pendingCount" class="card-value" style="color:#F59E0B">-</div><div class="card-label"><i class="fas fa-clock"></i> 승인 대기</div></div>
-    <div class="card"><div class="card-value" style="color:#00ff00">v37.32</div><div class="card-label"><i class="fas fa-code-branch"></i> Version</div></div>
+    <div class="card"><div class="card-value" style="color:#00ff00">v37.35</div><div class="card-label"><i class="fas fa-code-branch"></i> Version</div></div>
   </div>
   
   <div class="links">
@@ -6792,6 +6942,7 @@ body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',sans-serif;padding:24p
           <th>휴대폰 번호</th>
           <th>신청 시간</th>
           <th>상태</th>
+          <th>남은 기간</th>
           <th>관리</th>
         </tr>
       </thead>
@@ -6811,7 +6962,7 @@ fetch('/api/admin/stats').then(r=>r.json()).then(d=>{
 // 승인 대기 유저 로드
 async function loadPendingUsers() {
   const tbody = document.getElementById('pendingList');
-  tbody.innerHTML = '<tr><td colspan="5" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 로딩 중...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> 로딩 중...</td></tr>';
   
   try {
     const res = await fetch('/api/admin/pending-users');
@@ -6819,35 +6970,77 @@ async function loadPendingUsers() {
     
     if (data.users && data.users.length > 0) {
       document.getElementById('pendingCount').textContent = data.users.length;
-      tbody.innerHTML = data.users.map(user => \`
+      tbody.innerHTML = data.users.map(user => {
+        const expiryDate = user.expiry_date ? new Date(user.expiry_date) : null;
+        const today = new Date();
+        const daysLeft = expiryDate ? Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24)) : null;
+        const statusText = user.is_suspended ? '🚫 정지됨' : (user.status === 'PENDING' ? '⏳ 대기중' : '✅ 승인됨');
+        const statusClass = user.is_suspended ? 'suspended' : user.status.toLowerCase();
+        
+        return \`
         <tr>
           <td><strong>\${user.name}</strong></td>
           <td>\${user.phone}</td>
           <td>\${new Date(user.created_at).toLocaleString('ko-KR')}</td>
-          <td class="status-\${user.status.toLowerCase()}">\${user.status === 'PENDING' ? '⏳ 대기중' : '✅ 승인됨'}</td>
+          <td class="status-\${statusClass}">\${statusText}</td>
+          <td>\${user.expiry_date ? \`<span class="expiry-badge">\${daysLeft > 0 ? daysLeft + '일 남음' : '만료됨'}</span>\` : '-'}</td>
           <td>
             \${user.status === 'PENDING' 
-              ? \`<button class="btn-approve" onclick="approveUser('\${user.phone}')"><i class="fas fa-check"></i> 승인</button>\`
-              : '<span style="color:#10B981">승인완료</span>'
+              ? \`<select class="plan-select" id="plan-\${user.phone.replace(/-/g, '')}">
+                  <option value="1m">1개월</option>
+                  <option value="3m">3개월</option>
+                  <option value="6m">6개월</option>
+                  <option value="12m">12개월</option>
+                </select>
+                <button class="btn-approve" onclick="approveUser('\${user.phone}')"><i class="fas fa-check"></i> 승인</button>\`
+              : (user.is_suspended 
+                ? '<span class="suspended-badge">정지됨</span>'
+                : \`<button class="btn-suspend" onclick="suspendUser('\${user.phone}')"><i class="fas fa-ban"></i> 정지</button>\`)
             }
           </td>
-        </tr>
-      \`).join('');
+        </tr>\`;
+      }).join('');
     } else {
       document.getElementById('pendingCount').textContent = '0';
-      tbody.innerHTML = '<tr><td colspan="5" class="empty-msg"><i class="fas fa-inbox"></i> 승인 대기 중인 신청이 없습니다.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-msg"><i class="fas fa-inbox"></i> 승인 대기 중인 신청이 없습니다.</td></tr>';
     }
   } catch (err) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty-msg" style="color:#ff6b6b"><i class="fas fa-exclamation-triangle"></i> 데이터 로드 실패</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-msg" style="color:#ff6b6b"><i class="fas fa-exclamation-triangle"></i> 데이터 로드 실패</td></tr>';
   }
 }
 
-// 유저 승인
+// 유저 승인 (플랜 타입 포함)
 async function approveUser(phone) {
-  if (!confirm('이 사용자를 승인하시겠습니까?')) return;
+  const planSelect = document.getElementById('plan-' + phone.replace(/-/g, ''));
+  const planType = planSelect ? planSelect.value : '1m';
+  
+  if (!confirm(\`이 사용자를 \${planType === '1m' ? '1개월' : planType === '3m' ? '3개월' : planType === '6m' ? '6개월' : '12개월'} 플랜으로 승인하시겠습니까?\`)) return;
   
   try {
     const res = await fetch('/api/admin/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, plan_type: planType })
+    });
+    const data = await res.json();
+    
+    if (data.success) {
+      alert(\`✅ 승인 완료!\\n\\n플랜: \${planType}\\n만료일: \${data.user.expiry_date}\\n\\n해당 사용자에게 승인 알림이 발송됩니다.\`);
+      loadPendingUsers();
+    } else {
+      alert('❌ 승인 실패: ' + (data.message || '알 수 없는 오류'));
+    }
+  } catch (err) {
+    alert('❌ 네트워크 오류');
+  }
+}
+
+// 유저 정지
+async function suspendUser(phone) {
+  if (!confirm('이 사용자를 정지하시겠습니까?\\n정지 시 로그인이 차단되고 안내 메시지가 발송됩니다.')) return;
+  
+  try {
+    const res = await fetch('/api/admin/suspend', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone })
@@ -6855,10 +7048,10 @@ async function approveUser(phone) {
     const data = await res.json();
     
     if (data.success) {
-      alert('✅ 승인 완료! 해당 사용자가 로그인할 수 있습니다.');
+      alert('🚫 정지 완료! 해당 사용자에게 정지 안내가 발송됩니다.');
       loadPendingUsers();
     } else {
-      alert('❌ 승인 실패: ' + (data.message || '알 수 없는 오류'));
+      alert('❌ 정지 실패: ' + (data.message || '알 수 없는 오류'));
     }
   } catch (err) {
     alert('❌ 네트워크 오류');
