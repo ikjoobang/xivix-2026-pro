@@ -5091,8 +5091,13 @@ async function generateMarketingImage() {
       // 미들웨어가 is_fallback, is_sample, fallback 플래그를 반환하거나
       // URL에 /sample/, /fallback/, /default/ 포함 시 감지
       // ============================================
+      // V2026.37.18 - FALLBACK_TRANSPARENCY: 더 정확한 샘플 이미지 감지
+      // 미들웨어 응답 플래그 + URL 패턴 + 텍스트 오버레이만 있는 이미지 감지
       const isFallback = result.data?.is_fallback || result.data?.is_sample || result.data?.fallback || 
-                         imageUrl.includes('/sample/') || imageUrl.includes('/fallback/') || imageUrl.includes('/default/');
+                         result.data?.source === 'fallback' || result.data?.source === 'sample' ||
+                         imageUrl.includes('/sample/') || imageUrl.includes('/fallback/') || imageUrl.includes('/default/') ||
+                         imageUrl.includes('l_text:') || // Cloudinary 텍스트 오버레이 감지 (가짜 이미지)
+                         (imageUrl.includes('cloudinary') && !imageUrl.includes('/xivix/raw/'));
       
       let fallbackNotice = document.getElementById('fallbackNotice');
       if (!fallbackNotice) {
@@ -5103,9 +5108,10 @@ async function generateMarketingImage() {
       }
       
       if (isFallback) {
-        fallbackNotice.innerHTML = '<i class="fas fa-info-circle"></i> 실시간 수집에 실패하여 샘플 이미지를 보여드립니다.';
-        fallbackNotice.style.display = 'block';
-        console.log('[XIVIX] 폴백 이미지 사용됨');
+        // V2026.37.18 - SAMPLE_BADGE_ADD: 이미지 상단에 경고 문구 강조 표시
+        fallbackNotice.innerHTML = '<i class="fas fa-exclamation-triangle"></i> <strong>※ 실시간 검색 실패로 인한 샘플 이미지입니다</strong><br><span style="font-size:10px;opacity:0.8">실제 보험사 설계안이 아닙니다. 다른 키워드로 다시 시도해 주세요.</span>';
+        fallbackNotice.style.cssText = 'margin-top:8px;padding:10px 14px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);border-radius:8px;font-size:12px;color:#ef4444;display:block;';
+        console.warn('[XIVIX] ⚠️ 폴백/샘플 이미지 감지됨 - 실제 수집 실패');
       } else {
         fallbackNotice.style.display = 'none';
       }
