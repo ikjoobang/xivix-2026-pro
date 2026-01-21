@@ -2045,7 +2045,7 @@ async function sendSolapiMessage(phone: string, message: string, type: 'approval
       body: JSON.stringify({
         message: {
           to: phone.replace(/-/g, ''), // 하이픈 제거
-          from: '01048453065', // 방대표님 발신번호
+          from: '01039880124', // 솔라피 등록 발신번호 (인증완료)
           text: message,
           type: 'SMS' // 알림톡 템플릿 승인 후 'ATA'로 변경
         }
