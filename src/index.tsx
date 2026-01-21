@@ -3571,6 +3571,7 @@ body{
     linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
   background-size:60px 60px;
   opacity:0.5;
+  pointer-events:none;
 }
 .landing-content{
   position:relative;
