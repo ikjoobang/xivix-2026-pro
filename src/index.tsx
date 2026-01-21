@@ -3840,6 +3840,14 @@ body{
   z-index:99999 !important;
   position:relative !important;
 }
+/* V2026.37.28 - 배경 요소 클릭 완전 차단 */
+.landing-bg,
+.landing-grid,
+.landing-particles,
+.landing-scroll-hint,
+.landing-footer{
+  pointer-events:none !important;
+}
 
 /* 로그인 모달 */
 .login-modal{
