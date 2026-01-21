@@ -1717,16 +1717,33 @@ app.post('/api/login', async (c) => {
       return c.json({ success: false, message: '휴대폰 번호와 비밀번호를 입력해 주세요.' }, 400)
     }
     
+    // ============================================
+    // ✅ V2026.37.40 - CEO 지시 (v4.95): 전화번호 정규화
+    // 하이픈 없이 숫자만 입력해도 로그인 가능하도록 처리
+    // 01048453065 → 010-4845-3065 형식으로 자동 변환
+    // ============================================
+    const normalizePhone = (p: string): string => {
+      const digits = p.replace(/\D/g, ''); // 숫자만 추출
+      if (digits.length === 11) {
+        return digits.slice(0,3) + '-' + digits.slice(3,7) + '-' + digits.slice(7);
+      } else if (digits.length === 10) {
+        return digits.slice(0,3) + '-' + digits.slice(3,6) + '-' + digits.slice(6);
+      }
+      return p; // 원본 반환
+    };
+    const normalizedPhone = normalizePhone(phone);
+    console.log('[XIVIX] 로그인 시도 - 입력:', phone, '→ 정규화:', normalizedPhone);
+    
     let user: any = null;
     
-    // D1에서 사용자 조회
+    // D1에서 사용자 조회 (정규화된 번호로)
     if (c.env?.DB) {
       user = await c.env.DB.prepare(
         'SELECT * FROM membership_users WHERE phone = ?'
-      ).bind(phone).first();
+      ).bind(normalizedPhone).first();
     } else {
-      // D1 없으면 메모리에서 조회
-      user = pendingUsers.find(u => u.phone === phone);
+      // D1 없으면 메모리에서 조회 (정규화된 번호로)
+      user = pendingUsers.find(u => u.phone === normalizedPhone);
     }
     
     if (user) {
@@ -5563,6 +5580,36 @@ function closeLoginModal() {
   document.getElementById('loginResult').className = 'login-result';
   document.getElementById('loginResult').innerHTML = '';
 }
+
+// ============================================
+// ✅ V2026.37.40 - CEO 지시 (v4.95): Auto-masking
+// 전화번호 입력 시 실시간 하이픈 자동 삽입
+// 01048453065 → 010-4845-3065
+// ============================================
+function autoMaskPhone(input) {
+  let value = input.value.replace(/\D/g, ''); // 숫자만 추출
+  if (value.length > 11) value = value.slice(0, 11);
+  
+  let formatted = '';
+  if (value.length <= 3) {
+    formatted = value;
+  } else if (value.length <= 7) {
+    formatted = value.slice(0,3) + '-' + value.slice(3);
+  } else {
+    formatted = value.slice(0,3) + '-' + value.slice(3,7) + '-' + value.slice(7);
+  }
+  
+  input.value = formatted;
+}
+
+// Auto-masking 이벤트 바인딩 (페이지 로드 시)
+document.addEventListener('DOMContentLoaded', function() {
+  const phoneInputs = document.querySelectorAll('#loginPhone, #regPhone');
+  phoneInputs.forEach(function(input) {
+    input.addEventListener('input', function() { autoMaskPhone(this); });
+  });
+  console.log('[XIVIX] V2026.37.40 - Auto-masking 활성화');
+});
 
 async function handleLogin(e) {
   e.preventDefault();
