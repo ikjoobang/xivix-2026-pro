@@ -3740,6 +3740,7 @@ body{
   background:linear-gradient(45deg,transparent,rgba(255,255,255,0.1),transparent);
   transform:rotate(45deg);
   animation:btn-shine 3s ease-in-out infinite;
+  pointer-events:none;
 }
 @keyframes btn-shine{
   0%{transform:translateX(-100%) rotate(45deg)}
