@@ -1802,8 +1802,15 @@ app.post('/api/registration', async (c) => {
       
       console.log('[XIVIX] ✅ D1 저장 완료:', phone);
       
-      // 관리자 알림 Webhook 전송
-      await sendAdminNotification(name, phone, created_at);
+      // 관리자 알림 Webhook 전송 (네이버 톡톡)
+      const notificationSent = await sendAdminNotification(name, phone, created_at);
+      
+      // 알림 발송 상태 업데이트
+      if (notificationSent) {
+        await c.env.DB.prepare(
+          'UPDATE membership_users SET notification_sent = 1 WHERE phone = ?'
+        ).bind(phone).run();
+      }
     } else {
       // D1 없으면 메모리에 저장 (폴백)
       const existingIndex = pendingUsers.findIndex(u => u.phone === phone);
@@ -1966,28 +1973,85 @@ app.get('/api/admin/stats', (c) => c.json({
 // 메모리 폴백 저장소 (D1 없을 때만 사용)
 const pendingUsers: any[] = [];
 
-// 관리자 알림 Webhook 함수
+// ============================================
+// V2026.37.34 - 네이버 톡톡 알림 API 연동 (CEO 지시)
+// ============================================
+const TALKTALK_CONFIG = {
+  accessToken: 'llRrAbROYpx6g3Ed-GGDY2wcsqm3WPMJAAAAAQoXEi0AAAGb4LLw4M2yTeNnt1bO',
+  targetId: 'w45btu',
+  apiUrl: 'https://gw.talk.naver.com/chatbot/v1/event'
+};
+
+// 네이버 톡톡으로 관리자 알림 발송
 async function sendAdminNotification(name: string, phone: string, time: string) {
   try {
-    // 네이버 톡톡 또는 SMS Webhook URL (CEO가 설정 필요)
-    // 현재는 콘솔 로그로 대체
-    const message = `[XIVIX 신청 알림] ${name} / ${phone} / ${time} - 입금 확인 요망`;
-    console.log('[XIVIX] 📢 관리자 알림:', message);
+    const message = `[XIVIX 가입 신청 알림]\n성함: ${name}\n연락처: ${phone}\n상태: 입금 확인 대기 중\n\n관리자 페이지에서 확인 후 승인해 주세요.`;
     
-    // TODO: 실제 Webhook URL 설정 시 아래 코드 활성화
-    // const webhookUrl = 'https://your-webhook-url.com/notify';
-    // await fetch(webhookUrl, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ message, name, phone, time })
-    // });
+    console.log('[XIVIX] 📢 톡톡 알림 발송 시도:', name, phone);
     
-    return true;
+    // 네이버 톡톡 API 호출
+    const response = await fetch(TALKTALK_CONFIG.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json;charset=UTF-8',
+        'Authorization': `Bearer ${TALKTALK_CONFIG.accessToken}`
+      },
+      body: JSON.stringify({
+        event: 'send',
+        user: TALKTALK_CONFIG.targetId,
+        textContent: {
+          text: message
+        }
+      })
+    });
+    
+    if (response.ok) {
+      console.log('[XIVIX] ✅ 톡톡 알림 발송 성공:', name);
+      return true;
+    } else {
+      const errorText = await response.text();
+      console.error('[XIVIX] ❌ 톡톡 알림 발송 실패:', response.status, errorText);
+      return false;
+    }
   } catch (err) {
-    console.error('[XIVIX] 알림 전송 실패:', err);
+    console.error('[XIVIX] ❌ 톡톡 알림 전송 오류:', err);
     return false;
   }
 }
+
+// 네이버 톡톡 Webhook 수신 엔드포인트 (파트너센터 등록용)
+app.post('/api/webhook/talktalk', async (c) => {
+  try {
+    const body = await c.req.json();
+    console.log('[XIVIX] 톡톡 Webhook 수신:', JSON.stringify(body));
+    
+    // 톡톡에서 보내는 이벤트 처리
+    if (body.event === 'open') {
+      // 사용자가 채팅방 열었을 때
+      return c.json({
+        event: 'send',
+        textContent: {
+          text: '안녕하세요! XIVIX 2026 PRO입니다.\n가입 신청 알림을 실시간으로 받으실 수 있습니다.'
+        }
+      });
+    }
+    
+    // 기본 응답
+    return c.json({ success: true, message: 'Webhook received' });
+  } catch (err) {
+    console.error('[XIVIX] 톡톡 Webhook 오류:', err);
+    return c.json({ success: false }, 500);
+  }
+});
+
+// 톡톡 Webhook GET (파트너센터 검증용)
+app.get('/api/webhook/talktalk', (c) => {
+  return c.json({ 
+    success: true, 
+    message: 'XIVIX TalkTalk Webhook Endpoint',
+    version: 'V2026.37.34'
+  });
+})
 
 // 승인 대기 유저 목록 조회 (D1 연동)
 app.get('/api/admin/pending-users', async (c) => {
