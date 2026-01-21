@@ -1984,27 +1984,39 @@ const SOLAPI_CONFIG = {
   templateId: '' // 알림톡 템플릿 ID (승인 후 설정)
 };
 
-// 솔라피 API 인증 시그니처 생성
-function generateSolapiSignature(apiKey: string, apiSecret: string, timestamp: string, salt: string): string {
-  const message = timestamp + salt;
-  // HMAC-SHA256 (Web Crypto API 사용)
+// 솔라피 API 인증 시그니처 생성 (HMAC-SHA256 with Web Crypto API)
+async function generateSolapiSignature(apiSecret: string, date: string, salt: string): Promise<string> {
+  const message = date + salt;
   const encoder = new TextEncoder();
-  const keyData = encoder.encode(apiSecret);
-  const msgData = encoder.encode(message);
   
-  // 간단한 HMAC 구현 (Cloudflare Workers 호환)
-  let signature = '';
-  for (let i = 0; i < msgData.length; i++) {
-    signature += (msgData[i] ^ keyData[i % keyData.length]).toString(16).padStart(2, '0');
-  }
-  return signature;
+  // Import key for HMAC
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(apiSecret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  // Sign the message
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    encoder.encode(message)
+  );
+  
+  // Convert to hex string
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 // 솔라피 메시지 발송 함수 (카카오 알림톡 + SMS Fallback)
 async function sendSolapiMessage(phone: string, message: string, type: 'approval' | 'expiry' | 'suspension') {
   try {
-    const timestamp = new Date().toISOString();
-    const salt = Math.random().toString(36).substring(2, 15);
+    const date = new Date().toISOString();
+    const salt = crypto.randomUUID();
+    const signature = await generateSolapiSignature(SOLAPI_CONFIG.apiSecret, date, salt);
     
     console.log(`[XIVIX] 📱 솔라피 메시지 발송 시도 (${type}):`, phone);
     
@@ -2013,12 +2025,12 @@ async function sendSolapiMessage(phone: string, message: string, type: 'approval
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `HMAC-SHA256 apiKey=${SOLAPI_CONFIG.apiKey}, date=${timestamp}, salt=${salt}, signature=${generateSolapiSignature(SOLAPI_CONFIG.apiKey, SOLAPI_CONFIG.apiSecret, timestamp, salt)}`
+        'Authorization': `HMAC-SHA256 apiKey=${SOLAPI_CONFIG.apiKey}, date=${date}, salt=${salt}, signature=${signature}`
       },
       body: JSON.stringify({
         message: {
           to: phone.replace(/-/g, ''), // 하이픈 제거
-          from: '01000000000', // 발신번호 (등록 필요)
+          from: '01048453065', // 방대표님 발신번호
           text: message,
           type: 'SMS' // 알림톡 템플릿 승인 후 'ATA'로 변경
         }
@@ -2276,6 +2288,103 @@ app.post('/api/admin/suspend', async (c) => {
   } catch (err) {
     console.error('[XIVIX] 정지 처리 오류:', err);
     return c.json({ success: false, message: '정지 처리 중 오류가 발생했습니다.' });
+  }
+});
+
+// ============================================
+// V2026.37.36 - 솔라피 테스트 발송 API (대표님 휴대폰으로 테스트)
+// ============================================
+app.post('/api/admin/test-sms', async (c) => {
+  try {
+    const { phone, message } = await c.req.json();
+    const targetPhone = phone || '01048453065'; // 기본: 대표님 번호
+    const testMessage = message || '[XIVIX 테스트] 솔라피 연동 테스트 메시지입니다. 정상 수신 확인 부탁드립니다.';
+    
+    console.log('[XIVIX] 📱 테스트 SMS 발송:', targetPhone);
+    
+    const result = await sendSolapiMessage(targetPhone, testMessage, 'approval');
+    
+    return c.json({
+      success: result.success,
+      message: result.success ? '테스트 메시지 발송 완료' : '발송 실패',
+      targetPhone,
+      result
+    });
+  } catch (err: any) {
+    console.error('[XIVIX] 테스트 SMS 오류:', err);
+    return c.json({ success: false, error: err?.message || 'Unknown error' });
+  }
+});
+
+// ============================================
+// V2026.37.36 - 만료 예정자 조회 API (오후 2시 스케줄러용)
+// ============================================
+app.get('/api/admin/expiring-users', async (c) => {
+  try {
+    if (!c.env?.DB) {
+      return c.json({ success: false, message: 'D1 연결 필요', users: [] });
+    }
+    
+    // 내일 만료되는 유저 조회 (오후 2시 알림 대상)
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    
+    const result = await c.env.DB.prepare(
+      'SELECT * FROM membership_users WHERE expiry_date = ? AND status = ? AND is_suspended = 0'
+    ).bind(tomorrowStr, 'APPROVED').all();
+    
+    console.log('[XIVIX] 📅 만료 예정자 조회 (', tomorrowStr, '):', result.results?.length || 0, '명');
+    
+    return c.json({
+      success: true,
+      target_date: tomorrowStr,
+      users: result.results || [],
+      total: result.results?.length || 0,
+      scheduler_time: '매일 오후 2시 (14:00 KST)'
+    });
+  } catch (err: any) {
+    console.error('[XIVIX] 만료 예정자 조회 오류:', err);
+    return c.json({ success: false, error: err?.message, users: [] });
+  }
+});
+
+// V2026.37.36 - 만료 예정자 일괄 알림 발송 API (오후 2시 스케줄러가 호출)
+app.post('/api/admin/send-expiry-reminders', async (c) => {
+  try {
+    if (!c.env?.DB) {
+      return c.json({ success: false, message: 'D1 연결 필요' });
+    }
+    
+    // 내일 만료되는 유저 조회
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    
+    const result = await c.env.DB.prepare(
+      'SELECT * FROM membership_users WHERE expiry_date = ? AND status = ? AND is_suspended = 0'
+    ).bind(tomorrowStr, 'APPROVED').all();
+    
+    const users: any[] = result.results || [];
+    const sentResults: any[] = [];
+    
+    for (const user of users) {
+      const reminderMessage = getExpiryReminderMessage(user.name, user.expiry_date);
+      const sendResult = await sendSolapiMessage(user.phone, reminderMessage, 'expiry');
+      sentResults.push({ phone: user.phone, name: user.name, success: sendResult.success });
+    }
+    
+    console.log('[XIVIX] 📢 만료 예정 알림 발송 완료:', sentResults.length, '명');
+    
+    return c.json({
+      success: true,
+      message: `${sentResults.length}명에게 만료 예정 알림 발송 완료`,
+      target_date: tomorrowStr,
+      results: sentResults
+    });
+  } catch (err: any) {
+    console.error('[XIVIX] 만료 알림 발송 오류:', err);
+    return c.json({ success: false, error: err?.message });
   }
 });
 
