@@ -4301,6 +4301,13 @@ const DEFAULT_OPTIONS = {
 // 글자수 카운트 + V2026.37.19 LocalStorage 실시간 미러링
 const STATE_KEY = 'xivix_user_state';
 
+// V2026.37.23 - uploadedImages 변수 선언 (누락 수정)
+var uploadedImages = [];
+function renderImagePreviews() {
+  // placeholder - 이미지 미리보기 렌더링
+  console.log('[XIVIX] 이미지 미리보기:', uploadedImages.length + '개');
+}
+
 function saveUserState() {
   const state = {
     searchText: searchEl.value,
