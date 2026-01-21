@@ -4565,7 +4565,7 @@ body{
     <form onsubmit="handleLogin(event)">
       <div class="login-field">
         <label>휴대폰 번호</label>
-        <input type="tel" id="loginPhone" placeholder="010-0000-0000" required>
+        <input type="tel" id="loginPhone" placeholder="휴대폰 번호 (숫자만 입력)" required>
       </div>
       <div class="login-field">
         <label>비밀번호</label>
@@ -4671,7 +4671,7 @@ body{
         </div>
         <div class="reg-field">
           <label><i class="fas fa-phone"></i> 휴대폰 번호</label>
-          <input type="tel" id="regPhone" placeholder="010-0000-0000" required>
+          <input type="tel" id="regPhone" placeholder="휴대폰 번호 (숫자만 입력)" required>
         </div>
         <div class="reg-field">
           <label><i class="fas fa-lock"></i> 사용할 비밀번호</label>
@@ -5685,33 +5685,32 @@ function closeLoginModal() {
 }
 
 // ============================================
-// ✅ V2026.37.40 - CEO 지시 (v4.95): Auto-masking
-// 전화번호 입력 시 실시간 하이픈 자동 삽입
-// 01048453065 → 010-4845-3065
 // ============================================
-function autoMaskPhone(input) {
+// ✅ V2026.37.42 - CEO 지시 (v5.3): Zero-Touch 입력
+// 고정 마스킹 폐기 → 자유 입력 → blur 시에만 포맷팅
+// 01048453065 또는 010-4845-3065 둘 다 OK
+// ============================================
+function formatPhoneOnBlur(input) {
   let value = input.value.replace(/\D/g, ''); // 숫자만 추출
   if (value.length > 11) value = value.slice(0, 11);
   
-  let formatted = '';
-  if (value.length <= 3) {
-    formatted = value;
-  } else if (value.length <= 7) {
-    formatted = value.slice(0,3) + '-' + value.slice(3);
-  } else {
-    formatted = value.slice(0,3) + '-' + value.slice(3,7) + '-' + value.slice(7);
+  // blur 시에만 예쁘게 포맷팅 (입력 중에는 자유롭게)
+  if (value.length === 11) {
+    input.value = value.slice(0,3) + '-' + value.slice(3,7) + '-' + value.slice(7);
+  } else if (value.length === 10) {
+    input.value = value.slice(0,3) + '-' + value.slice(3,6) + '-' + value.slice(6);
   }
-  
-  input.value = formatted;
+  // 그 외에는 입력 그대로 유지
 }
 
-// Auto-masking 이벤트 바인딩 (페이지 로드 시)
+// Zero-Touch 이벤트 바인딩 (blur 시에만 포맷팅)
 document.addEventListener('DOMContentLoaded', function() {
   const phoneInputs = document.querySelectorAll('#loginPhone, #regPhone');
   phoneInputs.forEach(function(input) {
-    input.addEventListener('input', function() { autoMaskPhone(this); });
+    // blur 시에만 포맷팅 (입력 중 방해 X)
+    input.addEventListener('blur', function() { formatPhoneOnBlur(this); });
   });
-  console.log('[XIVIX] V2026.37.40 - Auto-masking 활성화');
+  console.log('[XIVIX] V2026.37.42 - Zero-Touch 입력 활성화');
 });
 
 async function handleLogin(e) {
