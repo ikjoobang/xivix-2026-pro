@@ -2053,6 +2053,22 @@ async function generateSolapiSignature(apiSecret: string, date: string, salt: st
 // env 파라미터로 환경 변수 전달 필수
 async function sendSolapiMessage(phone: string, message: string, type: 'approval' | 'expiry' | 'suspension', env?: any) {
   try {
+    // ============================================
+    // V2026.37.45 - SMS Mock Mode (CEO 지시: 개발환경 비용 절감)
+    // 조건: SMS_MOCK_MODE가 'true'이면 실제 발송 안하고 로그만 출력
+    // ============================================
+    const mockMode = env?.SMS_MOCK_MODE === 'true' || env?.SMS_MOCK_MODE === true;
+    
+    if (mockMode) {
+      console.log(`[MOCK_SMS] ========================================`);
+      console.log(`[MOCK_SMS] To: ${phone}`);
+      console.log(`[MOCK_SMS] Type: ${type}`);
+      console.log(`[MOCK_SMS] Message: ${message}`);
+      console.log(`[MOCK_SMS] ========================================`);
+      return { success: true, mock: true, message: 'SMS Mock Mode - 실제 발송 안함' };
+    }
+    // ============================================
+    
     const { apiKey, apiSecret } = getSolapiCredentials(env);
     
     if (!apiKey || !apiSecret) {

@@ -12,5 +12,11 @@
       "database_name": "xivix-production",
       "database_id": "cc1216aa-39ea-47d7-9489-4c2eceb678a2"
     }
-  ]
+  ],
+  // V2026.37.45 - SMS Mock Mode 설정
+  // 개발/테스트: "true" → 실제 SMS 발송 안함, 로그만 출력
+  // 프로덕션: "false" 또는 삭제 → 실제 SMS 발송
+  "vars": {
+    "SMS_MOCK_MODE": "true"
+  }
 }
