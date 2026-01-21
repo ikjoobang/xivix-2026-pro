@@ -2324,6 +2324,109 @@ app.post('/api/admin/suspend', async (c) => {
 });
 
 // ============================================
+// V2026.37.41 - 유저 기간 연장 API (CEO 지시 v5.0)
+// 입금 확인 후 유저의 이용 기간을 즉시 연장
+// ============================================
+app.post('/api/admin/extend', async (c) => {
+  try {
+    const { phone, days } = await c.req.json();
+    
+    if (!phone || !days) {
+      return c.json({ success: false, message: '전화번호와 연장 일수를 입력해 주세요.' }, 400);
+    }
+    
+    const extendDays = parseInt(days);
+    if (![30, 90, 180, 365].includes(extendDays)) {
+      return c.json({ success: false, message: '유효한 연장 기간이 아닙니다. (30/90/180/365일)' }, 400);
+    }
+    
+    if (c.env?.DB) {
+      const user: any = await c.env.DB.prepare(
+        'SELECT * FROM membership_users WHERE phone = ?'
+      ).bind(phone).first();
+      
+      if (!user) {
+        return c.json({ success: false, message: '해당 사용자를 찾을 수 없습니다.' });
+      }
+      
+      // 현재 만료일 기준으로 연장 (없으면 오늘부터)
+      const currentExpiry = user.expiry_date ? new Date(user.expiry_date) : new Date();
+      const newExpiry = new Date(currentExpiry);
+      newExpiry.setDate(newExpiry.getDate() + extendDays);
+      const newExpiryStr = newExpiry.toISOString().split('T')[0];
+      
+      // DB 업데이트
+      await c.env.DB.prepare(
+        'UPDATE membership_users SET expiry_date = ?, status = ? WHERE phone = ?'
+      ).bind(newExpiryStr, 'APPROVED', phone).run();
+      
+      console.log('[XIVIX] ✅ 기간 연장:', phone, '+' + extendDays + '일 →', newExpiryStr);
+      
+      // 솔라피 연장 알림 발송
+      const extendMessage = `[XIVIX] ${user.name}님, 멤버십이 ${extendDays}일 연장되었습니다.\n만료일: ${newExpiryStr}\n감사합니다.`;
+      await sendSolapiMessage(phone, extendMessage, 'extend', c.env);
+      
+      return c.json({
+        success: true,
+        message: `${extendDays}일 연장이 완료되었습니다.`,
+        user: { ...user, expiry_date: newExpiryStr, status: 'APPROVED' },
+        newExpiryDate: newExpiryStr
+      });
+    } else {
+      return c.json({ success: false, message: 'D1 데이터베이스 연결 필요' });
+    }
+  } catch (err) {
+    console.error('[XIVIX] 기간 연장 오류:', err);
+    return c.json({ success: false, message: '기간 연장 중 오류가 발생했습니다.' });
+  }
+});
+
+// ============================================
+// V2026.37.41 - 글로벌 설정 조회/수정 API (CEO 지시 v5.0)
+// ============================================
+const GLOBAL_SETTINGS_DEFAULT = {
+  pricing: {
+    '1m': { price: 30000, discount: 0 },
+    '3m': { price: 80000, discount: 10 },
+    '6m': { price: 150000, discount: 17 },
+    '12m': { price: 280000, discount: 22 }
+  },
+  notification: {
+    approvalTemplate: '[XIVIX] {name}님, 멤버십 승인이 완료되었습니다!\n만료일: {expiry_date}',
+    expiryReminderTemplate: '[XIVIX] {name}님, 멤버십이 내일 만료됩니다.\n연장 문의: 010-4845-3065',
+    suspensionTemplate: '[XIVIX] {name}님, 멤버십이 정지되었습니다.\n문의: 010-4845-3065'
+  },
+  scheduler: {
+    enabled: true,
+    sendTime: '14:00',
+    timezone: 'Asia/Seoul'
+  },
+  r2: {
+    goldenSamplesUrl: 'https://pub-xivix-golden-samples.r2.dev',
+    enabled: false
+  }
+};
+
+// 메모리 설정 저장 (D1 KV 대용)
+let globalSettings = { ...GLOBAL_SETTINGS_DEFAULT };
+
+app.get('/api/admin/settings', (c) => {
+  return c.json({ success: true, settings: globalSettings });
+});
+
+app.post('/api/admin/settings', async (c) => {
+  try {
+    const updates = await c.req.json();
+    globalSettings = { ...globalSettings, ...updates };
+    console.log('[XIVIX] ⚙️ 설정 업데이트:', JSON.stringify(updates));
+    return c.json({ success: true, message: '설정이 저장되었습니다.', settings: globalSettings });
+  } catch (err) {
+    console.error('[XIVIX] 설정 저장 오류:', err);
+    return c.json({ success: false, message: '설정 저장 중 오류가 발생했습니다.' });
+  }
+});
+
+// ============================================
 // V2026.37.36 - 솔라피 테스트 발송 API (대표님 휴대폰으로 테스트)
 // ============================================
 app.post('/api/admin/test-sms', async (c) => {
@@ -7241,6 +7344,73 @@ body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',sans-serif;padding:24p
 .empty-msg{text-align:center;padding:40px;color:rgba(255,255,255,0.5)}
 .refresh-btn{background:rgba(0,255,0,0.1);border:1px solid rgba(0,255,0,0.3);color:#00ff00;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px}
 .refresh-btn:hover{background:rgba(0,255,0,0.2)}
+
+/* V2026.37.41 - CEO 지시 v5.0: 연장 버튼 */
+.btn-extend{background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;transition:all 0.3s;margin-left:8px}
+.btn-extend:hover{transform:scale(1.05);box-shadow:0 0 15px rgba(59,130,246,0.5)}
+
+/* V2026.37.41 - CEO 지시 v5.0: 설정 탭 */
+.tabs{display:flex;gap:8px;margin-bottom:24px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px}
+.tab{padding:10px 20px;border-radius:8px 8px 0 0;cursor:pointer;font-size:14px;font-weight:600;transition:all 0.3s;background:rgba(255,255,255,0.03);color:rgba(255,255,255,0.6);border:1px solid transparent}
+.tab.active{background:rgba(0,255,0,0.1);color:#00ff00;border:1px solid rgba(0,255,0,0.3);border-bottom:none}
+.tab:hover{color:#fff}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.settings-section{background:rgba(255,255,255,0.02);border:1px solid rgba(0,255,0,0.2);border-radius:16px;padding:20px;margin-bottom:16px}
+.settings-title{font-size:16px;font-weight:700;color:#00ff00;margin-bottom:12px}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+.settings-row:last-child{border-bottom:none}
+.settings-label{font-size:14px;color:rgba(255,255,255,0.8)}
+.settings-input{background:#1a1a1a;color:#fff;border:1px solid rgba(0,255,0,0.3);padding:8px 12px;border-radius:6px;font-size:13px;width:150px}
+.settings-toggle{position:relative;width:50px;height:26px;background:#333;border-radius:13px;cursor:pointer;transition:all 0.3s}
+.settings-toggle.active{background:#00ff00}
+.settings-toggle::after{content:'';position:absolute;width:22px;height:22px;background:#fff;border-radius:50%;top:2px;left:2px;transition:all 0.3s}
+.settings-toggle.active::after{left:26px}
+.btn-save{background:linear-gradient(135deg,#00ff00,#00cc00);color:#000;border:none;padding:12px 24px;border-radius:8px;font-weight:700;cursor:pointer;margin-top:16px}
+
+/* V2026.37.41 - CEO 지시 v5.1: 연장 모달 */
+.extend-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:10000;align-items:center;justify-content:center}
+.extend-modal.show{display:flex}
+.extend-modal-content{background:#1a1a1a;border:1px solid rgba(0,255,0,0.3);border-radius:16px;padding:24px;max-width:400px;width:90%}
+.extend-modal-title{font-size:18px;font-weight:700;color:#00ff00;margin-bottom:16px}
+.extend-options{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px}
+.extend-option{padding:16px;border:2px solid rgba(0,255,0,0.3);border-radius:12px;text-align:center;cursor:pointer;transition:all 0.3s}
+.extend-option:hover,.extend-option.selected{background:rgba(0,255,0,0.1);border-color:#00ff00}
+.extend-option-days{font-size:24px;font-weight:900;color:#00ff00}
+.extend-option-label{font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px}
+.extend-modal-btns{display:flex;gap:12px;justify-content:flex-end}
+.btn-cancel{background:rgba(255,255,255,0.1);color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer}
+
+/* V2026.37.41 - CEO 지시 v5.1: 모바일 카드 UI (768px 이하) */
+@media screen and (max-width:768px){
+  body{padding:12px}
+  .wrap{max-width:100%}
+  .header{flex-direction:column;text-align:center}
+  .cards{grid-template-columns:repeat(3,1fr);gap:8px}
+  .card{padding:12px}
+  .card-value{font-size:20px}
+  .links{flex-direction:column}
+  .tabs{flex-wrap:wrap}
+  .tab{flex:1;text-align:center;font-size:12px;padding:8px 12px}
+  
+  /* 테이블 → 카드 전환 */
+  .pending-table{display:none}
+  .mobile-cards{display:block}
+  .mobile-card{background:rgba(255,255,255,0.03);border:1px solid rgba(0,255,0,0.2);border-radius:12px;padding:16px;margin-bottom:12px}
+  .mobile-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1)}
+  .mobile-card-name{font-size:16px;font-weight:700}
+  .mobile-card-time{font-size:11px;color:rgba(255,255,255,0.5)}
+  .mobile-card-body{margin-bottom:12px}
+  .mobile-card-phone{font-size:14px;color:#00ff00;margin-bottom:8px}
+  .mobile-card-phone a{color:#00ff00;text-decoration:none}
+  .mobile-card-status{display:flex;align-items:center;gap:8px}
+  .mobile-card-footer{display:flex;gap:8px;flex-wrap:wrap}
+  .mobile-card-footer .btn-approve,.mobile-card-footer .btn-suspend,.mobile-card-footer .btn-extend{flex:1;min-height:44px;font-size:14px}
+  .mobile-card-footer .plan-select{width:100%;margin-bottom:8px;min-height:44px}
+}
+@media screen and (min-width:769px){
+  .mobile-cards{display:none}
+}
 </style>
 </head>
 <body>
@@ -7249,14 +7419,14 @@ body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',sans-serif;padding:24p
     <div class="icon">X</div>
     <div>
       <div style="font-size:20px;font-weight:800">XIVIX Admin Dashboard</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.5)">v2026.37.35 - 관리자 전용 (솔라피 연동)</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.5)">v2026.37.41 - 관리자 전용 (연장/설정/모바일UI)</div>
     </div>
   </div>
   
   <div class="cards">
     <div class="card"><div id="keys" class="card-value">-</div><div class="card-label"><i class="fas fa-key"></i> API Keys</div></div>
     <div class="card"><div id="pendingCount" class="card-value" style="color:#F59E0B">-</div><div class="card-label"><i class="fas fa-clock"></i> 승인 대기</div></div>
-    <div class="card"><div class="card-value" style="color:#00ff00">v37.35</div><div class="card-label"><i class="fas fa-code-branch"></i> Version</div></div>
+    <div class="card"><div class="card-value" style="color:#00ff00">v37.41</div><div class="card-label"><i class="fas fa-code-branch"></i> Version</div></div>
   </div>
   
   <div class="links">
@@ -7265,7 +7435,13 @@ body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',sans-serif;padding:24p
     <a href="/api/docs"><i class="fas fa-book"></i> Docs</a>
   </div>
   
-  <!-- 승인 대기 명단 섹션 -->
+  <!-- V2026.37.41 - CEO 지시 v5.0: 탭 네비게이션 -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('users')"><i class="fas fa-users"></i> 회원 관리</div>
+    <div class="tab" onclick="switchTab('settings')"><i class="fas fa-cog"></i> 설정</div>
+  </div>
+  
+  <!-- 회원 관리 탭 -->
   <div class="pending-section">
     <div class="pending-title">
       <i class="fas fa-user-clock"></i> 가입 승인 대기 명단
@@ -7286,6 +7462,53 @@ body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',sans-serif;padding:24p
         <tr><td colspan="5" class="empty-msg"><i class="fas fa-inbox"></i> 로딩 중...</td></tr>
       </tbody>
     </table>
+    
+    <!-- V2026.37.41 - CEO 지시 v5.1: 모바일 카드 UI -->
+    <div class="mobile-cards" id="mobileCardList"></div>
+  </div>
+  
+  <!-- V2026.37.41 - CEO 지시 v5.0: 설정 탭 -->
+  <div class="tab-content" id="settingsTab">
+    <div class="settings-section">
+      <div class="settings-title"><i class="fas fa-won-sign"></i> 멤버십 가격 관리</div>
+      <div class="settings-row"><span class="settings-label">1개월</span><input type="number" class="settings-input" id="price1m" value="30000">원</div>
+      <div class="settings-row"><span class="settings-label">3개월</span><input type="number" class="settings-input" id="price3m" value="80000">원 <small style="color:#10B981">(10% 할인)</small></div>
+      <div class="settings-row"><span class="settings-label">6개월</span><input type="number" class="settings-input" id="price6m" value="150000">원 <small style="color:#10B981">(17% 할인)</small></div>
+      <div class="settings-row"><span class="settings-label">12개월</span><input type="number" class="settings-input" id="price12m" value="280000">원 <small style="color:#10B981">(22% 할인)</small></div>
+    </div>
+    
+    <div class="settings-section">
+      <div class="settings-title"><i class="fas fa-bell"></i> 알림 발송 설정</div>
+      <div class="settings-row"><span class="settings-label">자동 알림 활성화</span><div class="settings-toggle active" id="toggleNotification" onclick="toggleSetting(this)"></div></div>
+      <div class="settings-row"><span class="settings-label">발송 시간</span><input type="time" class="settings-input" id="sendTime" value="14:00"></div>
+      <div class="settings-row"><span class="settings-label">만료 알림 문구</span><input type="text" class="settings-input" style="width:300px" id="expiryTemplate" value="멤버십이 내일 만료됩니다."></div>
+    </div>
+    
+    <div class="settings-section">
+      <div class="settings-title"><i class="fas fa-images"></i> R2 골든 샘플 설정</div>
+      <div class="settings-row"><span class="settings-label">R2 Fallback 활성화</span><div class="settings-toggle" id="toggleR2" onclick="toggleSetting(this)"></div></div>
+      <div class="settings-row"><span class="settings-label">R2 URL</span><input type="text" class="settings-input" style="width:300px" id="r2Url" value="https://pub-xivix-golden-samples.r2.dev"></div>
+    </div>
+    
+    <button class="btn-save" onclick="saveSettings()"><i class="fas fa-save"></i> 설정 저장</button>
+  </div>
+</div>
+
+<!-- V2026.37.41 - CEO 지시 v5.0: 연장 모달 -->
+<div class="extend-modal" id="extendModal">
+  <div class="extend-modal-content">
+    <div class="extend-modal-title"><i class="fas fa-calendar-plus"></i> 기간 연장</div>
+    <div style="margin-bottom:12px;color:rgba(255,255,255,0.7)">연장 대상: <strong id="extendTargetName">-</strong></div>
+    <div class="extend-options">
+      <div class="extend-option" onclick="selectExtendDays(30)"><div class="extend-option-days">30</div><div class="extend-option-label">일 (1개월)</div></div>
+      <div class="extend-option" onclick="selectExtendDays(90)"><div class="extend-option-days">90</div><div class="extend-option-label">일 (3개월)</div></div>
+      <div class="extend-option" onclick="selectExtendDays(180)"><div class="extend-option-days">180</div><div class="extend-option-label">일 (6개월)</div></div>
+      <div class="extend-option" onclick="selectExtendDays(365)"><div class="extend-option-days">365</div><div class="extend-option-label">일 (12개월)</div></div>
+    </div>
+    <div class="extend-modal-btns">
+      <button class="btn-cancel" onclick="closeExtendModal()">취소</button>
+      <button class="btn-approve" id="confirmExtendBtn" onclick="confirmExtend()"><i class="fas fa-check"></i> 연장 확정</button>
+    </div>
   </div>
 </div>
 
@@ -7331,17 +7554,52 @@ async function loadPendingUsers() {
                 <button class="btn-approve" onclick="approveUser('\${user.phone}')"><i class="fas fa-check"></i> 승인</button>\`
               : (user.is_suspended 
                 ? '<span class="suspended-badge">정지됨</span>'
-                : \`<button class="btn-suspend" onclick="suspendUser('\${user.phone}')"><i class="fas fa-ban"></i> 정지</button>\`)
+                : \`<button class="btn-extend" onclick="openExtendModal('\${user.phone}', '\${user.name}')"><i class="fas fa-calendar-plus"></i> 연장</button><button class="btn-suspend" onclick="suspendUser('\${user.phone}')"><i class="fas fa-ban"></i> 정지</button>\`)
             }
           </td>
         </tr>\`;
       }).join('');
+      // V2026.37.41 - 모바일 카드 UI 렌더링
+      document.getElementById('mobileCardList').innerHTML = data.users.map(user => {
+        const expiryDate = user.expiry_date ? new Date(user.expiry_date) : null;
+        const today = new Date();
+        const daysLeft = expiryDate ? Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24)) : null;
+        const statusText = user.is_suspended ? '🚫 정지됨' : (user.status === 'PENDING' ? '⏳ 대기중' : '✅ 승인됨');
+        
+        return \`
+        <div class="mobile-card">
+          <div class="mobile-card-header">
+            <div class="mobile-card-name">\${user.name}</div>
+            <div class="mobile-card-time">\${new Date(user.created_at).toLocaleString('ko-KR')}</div>
+          </div>
+          <div class="mobile-card-body">
+            <div class="mobile-card-phone"><a href="tel:\${user.phone.replace(/-/g, '')}"><i class="fas fa-phone"></i> \${user.phone}</a></div>
+            <div class="mobile-card-status">
+              <span>\${statusText}</span>
+              \${user.expiry_date ? \`<span class="expiry-badge">\${daysLeft > 0 ? daysLeft + '일 남음' : '만료됨'}</span>\` : ''}
+            </div>
+          </div>
+          <div class="mobile-card-footer">
+            \${user.status === 'PENDING' 
+              ? \`<select class="plan-select" id="mplan-\${user.phone.replace(/-/g, '')}">
+                  <option value="1m">1개월</option><option value="3m">3개월</option><option value="6m">6개월</option><option value="12m">12개월</option>
+                </select>
+                <button class="btn-approve" onclick="approveUser('\${user.phone}')"><i class="fas fa-check"></i> 승인</button>\`
+              : (user.is_suspended 
+                ? '<span class="suspended-badge" style="flex:1;text-align:center;padding:12px">정지됨</span>'
+                : \`<button class="btn-extend" onclick="openExtendModal('\${user.phone}', '\${user.name}')"><i class="fas fa-calendar-plus"></i> 연장</button><button class="btn-suspend" onclick="suspendUser('\${user.phone}')"><i class="fas fa-ban"></i> 정지</button>\`)
+            }
+          </div>
+        </div>\`;
+      }).join('');
     } else {
       document.getElementById('pendingCount').textContent = '0';
       tbody.innerHTML = '<tr><td colspan="6" class="empty-msg"><i class="fas fa-inbox"></i> 승인 대기 중인 신청이 없습니다.</td></tr>';
+      document.getElementById('mobileCardList').innerHTML = '<div class="empty-msg"><i class="fas fa-inbox"></i> 승인 대기 중인 신청이 없습니다.</div>';
     }
   } catch (err) {
     tbody.innerHTML = '<tr><td colspan="6" class="empty-msg" style="color:#ff6b6b"><i class="fas fa-exclamation-triangle"></i> 데이터 로드 실패</td></tr>';
+    document.getElementById('mobileCardList').innerHTML = '<div class="empty-msg" style="color:#ff6b6b"><i class="fas fa-exclamation-triangle"></i> 데이터 로드 실패</div>';
   }
 }
 
@@ -7388,6 +7646,127 @@ async function suspendUser(phone) {
       loadPendingUsers();
     } else {
       alert('❌ 정지 실패: ' + (data.message || '알 수 없는 오류'));
+    }
+  } catch (err) {
+    alert('❌ 네트워크 오류');
+  }
+}
+
+// V2026.37.41 - 탭 전환 기능
+function switchTab(tabName) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  
+  if (tabName === 'users') {
+    document.querySelector('.tab:nth-child(1)').classList.add('active');
+    document.querySelector('.pending-section').style.display = 'block';
+    document.getElementById('settingsTab').classList.remove('active');
+  } else if (tabName === 'settings') {
+    document.querySelector('.tab:nth-child(2)').classList.add('active');
+    document.querySelector('.pending-section').style.display = 'none';
+    document.getElementById('settingsTab').classList.add('active');
+    loadSettings();
+  }
+}
+
+// V2026.37.41 - 설정 토글
+function toggleSetting(el) {
+  el.classList.toggle('active');
+}
+
+// V2026.37.41 - 설정 로드
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/admin/settings');
+    const data = await res.json();
+    if (data.settings) {
+      document.getElementById('price1m').value = data.settings.pricing?.['1m']?.price || 30000;
+      document.getElementById('price3m').value = data.settings.pricing?.['3m']?.price || 80000;
+      document.getElementById('price6m').value = data.settings.pricing?.['6m']?.price || 150000;
+      document.getElementById('price12m').value = data.settings.pricing?.['12m']?.price || 280000;
+      document.getElementById('sendTime').value = data.settings.scheduler?.sendTime || '14:00';
+      if (data.settings.scheduler?.enabled) document.getElementById('toggleNotification').classList.add('active');
+      if (data.settings.r2?.enabled) document.getElementById('toggleR2').classList.add('active');
+      document.getElementById('r2Url').value = data.settings.r2?.goldenSamplesUrl || '';
+    }
+  } catch (err) { console.error('설정 로드 실패:', err); }
+}
+
+// V2026.37.41 - 설정 저장
+async function saveSettings() {
+  const settings = {
+    pricing: {
+      '1m': { price: parseInt(document.getElementById('price1m').value), discount: 0 },
+      '3m': { price: parseInt(document.getElementById('price3m').value), discount: 10 },
+      '6m': { price: parseInt(document.getElementById('price6m').value), discount: 17 },
+      '12m': { price: parseInt(document.getElementById('price12m').value), discount: 22 }
+    },
+    scheduler: {
+      enabled: document.getElementById('toggleNotification').classList.contains('active'),
+      sendTime: document.getElementById('sendTime').value
+    },
+    r2: {
+      enabled: document.getElementById('toggleR2').classList.contains('active'),
+      goldenSamplesUrl: document.getElementById('r2Url').value
+    }
+  };
+  
+  try {
+    const res = await fetch('/api/admin/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+    const data = await res.json();
+    if (data.success) alert('✅ 설정이 저장되었습니다.');
+    else alert('❌ 저장 실패: ' + data.message);
+  } catch (err) { alert('❌ 네트워크 오류'); }
+}
+
+// V2026.37.41 - 연장 모달 기능
+let extendTargetPhone = '';
+let selectedExtendDays = 0;
+
+function openExtendModal(phone, name) {
+  extendTargetPhone = phone;
+  selectedExtendDays = 0;
+  document.getElementById('extendTargetName').textContent = name + ' (' + phone + ')';
+  document.querySelectorAll('.extend-option').forEach(o => o.classList.remove('selected'));
+  document.getElementById('extendModal').classList.add('show');
+}
+
+function closeExtendModal() {
+  document.getElementById('extendModal').classList.remove('show');
+  extendTargetPhone = '';
+  selectedExtendDays = 0;
+}
+
+function selectExtendDays(days) {
+  selectedExtendDays = days;
+  document.querySelectorAll('.extend-option').forEach(o => o.classList.remove('selected'));
+  event.target.closest('.extend-option').classList.add('selected');
+}
+
+async function confirmExtend() {
+  if (!extendTargetPhone || !selectedExtendDays) {
+    alert('연장할 기간을 선택해 주세요.');
+    return;
+  }
+  
+  try {
+    const res = await fetch('/api/admin/extend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: extendTargetPhone, days: selectedExtendDays })
+    });
+    const data = await res.json();
+    
+    if (data.success) {
+      alert(\`✅ 연장 완료!\\n\\n+\${selectedExtendDays}일 연장\\n새 만료일: \${data.newExpiryDate}\\n\\n해당 사용자에게 연장 알림이 발송됩니다.\`);
+      closeExtendModal();
+      loadPendingUsers();
+    } else {
+      alert('❌ 연장 실패: ' + (data.message || '알 수 없는 오류'));
     }
   } catch (err) {
     alert('❌ 네트워크 오류');
