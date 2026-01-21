@@ -1792,49 +1792,63 @@ app.post('/api/registration', async (c) => {
       return c.json({ success: false, message: '모든 항목을 입력해 주세요.' }, 400)
     }
     
+    // ✅ V2026.37.43 - CEO 지시 (v5.4): 전화번호 정규화
+    // 사용자가 뭘 입력하든 숫자만 추출 → 하이픈 형식으로 저장
+    const normalizePhone = (p: string): string => {
+      const digits = p.replace(/\D/g, '');
+      if (digits.length === 11) {
+        return digits.slice(0,3) + '-' + digits.slice(3,7) + '-' + digits.slice(7);
+      } else if (digits.length === 10) {
+        return digits.slice(0,3) + '-' + digits.slice(3,6) + '-' + digits.slice(6);
+      }
+      return p;
+    };
+    const normalizedPhone = normalizePhone(phone);
+    console.log('[XIVIX] 가입 전화번호 정규화:', phone, '→', normalizedPhone);
+    
     const password_hash = btoa(password);
     const ip = c.req.header('CF-Connecting-IP') || 'unknown';
     const created_at = new Date().toISOString();
     
-    console.log('[XIVIX] 🆕 가입 신청:', name, phone)
+    console.log('[XIVIX] 🆕 가입 신청:', name, normalizedPhone)
     
     // D1 데이터베이스에 저장
     if (c.env?.DB) {
-      // 중복 체크
+      // 중복 체크 (정규화된 번호로)
       const existing = await c.env.DB.prepare(
         'SELECT * FROM membership_users WHERE phone = ?'
-      ).bind(phone).first();
+      ).bind(normalizedPhone).first();
       
       if (existing) {
         // 이미 신청한 경우 업데이트
         await c.env.DB.prepare(
           'UPDATE membership_users SET name = ?, password_hash = ?, ip = ? WHERE phone = ?'
-        ).bind(name, password_hash, ip, phone).run();
+        ).bind(name, password_hash, ip, normalizedPhone).run();
       } else {
         // 새로 추가
         await c.env.DB.prepare(
           'INSERT INTO membership_users (name, phone, password_hash, status, created_at, ip) VALUES (?, ?, ?, ?, ?, ?)'
-        ).bind(name, phone, password_hash, 'PENDING', created_at, ip).run();
+        ).bind(name, normalizedPhone, password_hash, 'PENDING', created_at, ip).run();
       }
       
-      console.log('[XIVIX] ✅ D1 저장 완료:', phone);
+      console.log('[XIVIX] ✅ D1 저장 완료:', normalizedPhone);
       
       // 관리자 알림 Webhook 전송 (네이버 톡톡)
-      const notificationSent = await sendAdminNotification(name, phone, created_at);
+      const notificationSent = await sendAdminNotification(name, normalizedPhone, created_at);
       
       // 알림 발송 상태 업데이트
       if (notificationSent) {
         await c.env.DB.prepare(
           'UPDATE membership_users SET notification_sent = 1 WHERE phone = ?'
-        ).bind(phone).run();
+        ).bind(normalizedPhone).run();
       }
     } else {
       // D1 없으면 메모리에 저장 (폴백)
-      const existingIndex = pendingUsers.findIndex(u => u.phone === phone);
+      const existingIndex = pendingUsers.findIndex(u => u.phone === normalizedPhone);
       if (existingIndex !== -1) {
-        pendingUsers[existingIndex] = { name, phone, password_hash, status: 'PENDING', created_at, ip };
+        pendingUsers[existingIndex] = { name, phone: normalizedPhone, password_hash, status: 'PENDING', created_at, ip };
       } else {
-        pendingUsers.push({ name, phone, password_hash, status: 'PENDING', created_at, ip });
+        pendingUsers.push({ name, phone: normalizedPhone, password_hash, status: 'PENDING', created_at, ip });
       }
       console.log('[XIVIX] ⚠️ D1 없음, 메모리 저장');
     }
@@ -5685,33 +5699,11 @@ function closeLoginModal() {
 }
 
 // ============================================
+// ✅ V2026.37.43 - CEO 지시 (v5.4): 입력 마스크 영구 제거
+// 프론트엔드 간섭 완전 제거 - 백엔드에서만 정규화
+// 사용자가 뭘 치든 그대로 두고, 서버에서 숫자만 추출
 // ============================================
-// ✅ V2026.37.42 - CEO 지시 (v5.3): Zero-Touch 입력
-// 고정 마스킹 폐기 → 자유 입력 → blur 시에만 포맷팅
-// 01048453065 또는 010-4845-3065 둘 다 OK
-// ============================================
-function formatPhoneOnBlur(input) {
-  let value = input.value.replace(/\D/g, ''); // 숫자만 추출
-  if (value.length > 11) value = value.slice(0, 11);
-  
-  // blur 시에만 예쁘게 포맷팅 (입력 중에는 자유롭게)
-  if (value.length === 11) {
-    input.value = value.slice(0,3) + '-' + value.slice(3,7) + '-' + value.slice(7);
-  } else if (value.length === 10) {
-    input.value = value.slice(0,3) + '-' + value.slice(3,6) + '-' + value.slice(6);
-  }
-  // 그 외에는 입력 그대로 유지
-}
-
-// Zero-Touch 이벤트 바인딩 (blur 시에만 포맷팅)
-document.addEventListener('DOMContentLoaded', function() {
-  const phoneInputs = document.querySelectorAll('#loginPhone, #regPhone');
-  phoneInputs.forEach(function(input) {
-    // blur 시에만 포맷팅 (입력 중 방해 X)
-    input.addEventListener('blur', function() { formatPhoneOnBlur(this); });
-  });
-  console.log('[XIVIX] V2026.37.42 - Zero-Touch 입력 활성화');
-});
+// (프론트엔드 포맷팅 함수 완전 삭제됨 - 백엔드 normalizePhone()에서 처리)
 
 async function handleLogin(e) {
   e.preventDefault();
