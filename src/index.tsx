@@ -3820,6 +3820,27 @@ body{
   50%{transform:translateY(5px)}
 }
 
+/* V2026.37.27 - 버튼 클릭 최종 수정: z-index 강제 오버라이드 */
+.landing-btn{
+  z-index:99999 !important;
+  position:relative !important;
+  pointer-events:auto !important;
+  cursor:pointer !important;
+}
+.landing-btn-primary,
+.landing-btn-secondary{
+  z-index:99999 !important;
+  pointer-events:auto !important;
+}
+.landing-buttons{
+  z-index:99999 !important;
+  position:relative !important;
+}
+.landing-content{
+  z-index:99999 !important;
+  position:relative !important;
+}
+
 /* 로그인 모달 */
 .login-modal{
   display:none;
