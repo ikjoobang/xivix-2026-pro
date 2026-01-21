@@ -8,6 +8,7 @@ type Bindings = {
   GEMINI_API_KEY_FLASH?: string;
   NAVER_CLIENT_ID?: string;
   NAVER_CLIENT_SECRET?: string;
+  DB?: D1Database; // V2026.37.33 - D1 데이터베이스 바인딩
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -1705,7 +1706,7 @@ JSON 형식으로만 응답:
 })
 
 // ============================================
-// V2026.37.32 - 로그인 API (pendingUsers 배열 연동)
+// V2026.37.33 - 로그인 API (D1 데이터베이스 연동)
 // 승인 상태 확인 후 로그인 처리
 // ============================================
 app.post('/api/login', async (c) => {
@@ -1716,8 +1717,17 @@ app.post('/api/login', async (c) => {
       return c.json({ success: false, message: '휴대폰 번호와 비밀번호를 입력해 주세요.' }, 400)
     }
     
-    // pendingUsers 배열에서 사용자 조회
-    const user = pendingUsers.find(u => u.phone === phone);
+    let user: any = null;
+    
+    // D1에서 사용자 조회
+    if (c.env?.DB) {
+      user = await c.env.DB.prepare(
+        'SELECT * FROM membership_users WHERE phone = ?'
+      ).bind(phone).first();
+    } else {
+      // D1 없으면 메모리에서 조회
+      user = pendingUsers.find(u => u.phone === phone);
+    }
     
     if (user) {
       // 등록된 사용자 확인 (비밀번호 체크)
@@ -1755,8 +1765,7 @@ app.post('/api/login', async (c) => {
 })
 
 // ============================================
-// V2026.37.19 - 가입 신청 API
-// 신청 데이터를 KV 또는 D1에 저장 (현재는 로그만)
+// V2026.37.33 - 가입 신청 API (D1 데이터베이스 연동)
 // ============================================
 app.post('/api/registration', async (c) => {
   try {
@@ -1766,26 +1775,44 @@ app.post('/api/registration', async (c) => {
       return c.json({ success: false, message: '모든 항목을 입력해 주세요.' }, 400)
     }
     
-    // 신청 데이터 로깅 (관리자 확인용)
-    const registrationData = {
-      name,
-      phone,
-      password_hash: btoa(password), // 간단한 인코딩 (실제 운영 시 bcrypt 등 사용)
-      status: 'PENDING',
-      created_at: new Date().toISOString(),
-      ip: c.req.header('CF-Connecting-IP') || 'unknown'
-    }
+    const password_hash = btoa(password);
+    const ip = c.req.header('CF-Connecting-IP') || 'unknown';
+    const created_at = new Date().toISOString();
     
-    console.log('[XIVIX] 🆕 가입 신청:', JSON.stringify(registrationData))
+    console.log('[XIVIX] 🆕 가입 신청:', name, phone)
     
-    // V2026.37.32 - 메모리 저장소에 추가 (어드민에서 조회 가능)
-    // 중복 체크
-    const existingIndex = pendingUsers.findIndex(u => u.phone === phone);
-    if (existingIndex !== -1) {
-      // 이미 신청한 경우 업데이트
-      pendingUsers[existingIndex] = registrationData;
+    // D1 데이터베이스에 저장
+    if (c.env?.DB) {
+      // 중복 체크
+      const existing = await c.env.DB.prepare(
+        'SELECT * FROM membership_users WHERE phone = ?'
+      ).bind(phone).first();
+      
+      if (existing) {
+        // 이미 신청한 경우 업데이트
+        await c.env.DB.prepare(
+          'UPDATE membership_users SET name = ?, password_hash = ?, ip = ? WHERE phone = ?'
+        ).bind(name, password_hash, ip, phone).run();
+      } else {
+        // 새로 추가
+        await c.env.DB.prepare(
+          'INSERT INTO membership_users (name, phone, password_hash, status, created_at, ip) VALUES (?, ?, ?, ?, ?, ?)'
+        ).bind(name, phone, password_hash, 'PENDING', created_at, ip).run();
+      }
+      
+      console.log('[XIVIX] ✅ D1 저장 완료:', phone);
+      
+      // 관리자 알림 Webhook 전송
+      await sendAdminNotification(name, phone, created_at);
     } else {
-      pendingUsers.push(registrationData);
+      // D1 없으면 메모리에 저장 (폴백)
+      const existingIndex = pendingUsers.findIndex(u => u.phone === phone);
+      if (existingIndex !== -1) {
+        pendingUsers[existingIndex] = { name, phone, password_hash, status: 'PENDING', created_at, ip };
+      } else {
+        pendingUsers.push({ name, phone, password_hash, status: 'PENDING', created_at, ip });
+      }
+      console.log('[XIVIX] ⚠️ D1 없음, 메모리 저장');
     }
     
     return c.json({ 
@@ -1934,41 +1961,111 @@ app.get('/api/admin/stats', (c) => c.json({
 }))
 
 // ============================================
-// V2026.37.32 - 관리자 API (승인 대기 명단, 승인 처리)
+// V2026.37.33 - 관리자 API (D1 데이터베이스 연동)
 // ============================================
-// 임시 메모리 저장소 (실제 운영 시 D1/KV로 교체 필요)
+// 메모리 폴백 저장소 (D1 없을 때만 사용)
 const pendingUsers: any[] = [];
 
-// 승인 대기 유저 목록 조회
-app.get('/api/admin/pending-users', (c) => {
-  return c.json({
-    success: true,
-    users: pendingUsers,
-    total: pendingUsers.length
-  });
+// 관리자 알림 Webhook 함수
+async function sendAdminNotification(name: string, phone: string, time: string) {
+  try {
+    // 네이버 톡톡 또는 SMS Webhook URL (CEO가 설정 필요)
+    // 현재는 콘솔 로그로 대체
+    const message = `[XIVIX 신청 알림] ${name} / ${phone} / ${time} - 입금 확인 요망`;
+    console.log('[XIVIX] 📢 관리자 알림:', message);
+    
+    // TODO: 실제 Webhook URL 설정 시 아래 코드 활성화
+    // const webhookUrl = 'https://your-webhook-url.com/notify';
+    // await fetch(webhookUrl, {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ message, name, phone, time })
+    // });
+    
+    return true;
+  } catch (err) {
+    console.error('[XIVIX] 알림 전송 실패:', err);
+    return false;
+  }
+}
+
+// 승인 대기 유저 목록 조회 (D1 연동)
+app.get('/api/admin/pending-users', async (c) => {
+  try {
+    if (c.env?.DB) {
+      const result = await c.env.DB.prepare(
+        'SELECT * FROM membership_users ORDER BY created_at DESC'
+      ).all();
+      
+      return c.json({
+        success: true,
+        users: result.results || [],
+        total: result.results?.length || 0,
+        source: 'D1'
+      });
+    } else {
+      // D1 없으면 메모리에서 조회
+      return c.json({
+        success: true,
+        users: pendingUsers,
+        total: pendingUsers.length,
+        source: 'memory'
+      });
+    }
+  } catch (err: any) {
+    console.error('[XIVIX] pending-users 조회 오류:', err);
+    return c.json({ success: false, users: [], total: 0, error: err?.message || 'Unknown error' });
+  }
 });
 
-// 유저 승인 처리
+// 유저 승인 처리 (D1 연동)
 app.post('/api/admin/approve', async (c) => {
   try {
     const { phone } = await c.req.json();
+    const approved_at = new Date().toISOString();
     
-    const userIndex = pendingUsers.findIndex(u => u.phone === phone);
-    if (userIndex === -1) {
-      return c.json({ success: false, message: '해당 사용자를 찾을 수 없습니다.' });
+    if (c.env?.DB) {
+      // D1에서 유저 확인
+      const user = await c.env.DB.prepare(
+        'SELECT * FROM membership_users WHERE phone = ?'
+      ).bind(phone).first();
+      
+      if (!user) {
+        return c.json({ success: false, message: '해당 사용자를 찾을 수 없습니다.' });
+      }
+      
+      // 승인 처리
+      await c.env.DB.prepare(
+        'UPDATE membership_users SET status = ?, approved_at = ? WHERE phone = ?'
+      ).bind('APPROVED', approved_at, phone).run();
+      
+      console.log('[XIVIX] ✅ D1 유저 승인 완료:', phone);
+      
+      return c.json({
+        success: true,
+        message: '승인이 완료되었습니다.',
+        user: { ...user, status: 'APPROVED', approved_at }
+      });
+    } else {
+      // D1 없으면 메모리에서 처리
+      const userIndex = pendingUsers.findIndex(u => u.phone === phone);
+      if (userIndex === -1) {
+        return c.json({ success: false, message: '해당 사용자를 찾을 수 없습니다.' });
+      }
+      
+      pendingUsers[userIndex].status = 'APPROVED';
+      pendingUsers[userIndex].approved_at = approved_at;
+      
+      console.log('[XIVIX] ✅ 메모리 유저 승인 완료:', phone);
+      
+      return c.json({
+        success: true,
+        message: '승인이 완료되었습니다.',
+        user: pendingUsers[userIndex]
+      });
     }
-    
-    pendingUsers[userIndex].status = 'APPROVED';
-    pendingUsers[userIndex].approved_at = new Date().toISOString();
-    
-    console.log('[XIVIX] ✅ 유저 승인 완료:', phone);
-    
-    return c.json({
-      success: true,
-      message: '승인이 완료되었습니다.',
-      user: pendingUsers[userIndex]
-    });
   } catch (err) {
+    console.error('[XIVIX] 승인 처리 오류:', err);
     return c.json({ success: false, message: '승인 처리 중 오류가 발생했습니다.' });
   }
 });
