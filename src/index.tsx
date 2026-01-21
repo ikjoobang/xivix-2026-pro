@@ -2338,6 +2338,44 @@ app.post('/api/admin/suspend', async (c) => {
 });
 
 // ============================================
+// V2026.37.44 - 유저 거절(삭제) API (CEO 지시)
+// 가입 신청을 거절하고 DB에서 삭제
+// ============================================
+app.post('/api/admin/reject', async (c) => {
+  try {
+    const { phone } = await c.req.json();
+    
+    if (c.env?.DB) {
+      const user: any = await c.env.DB.prepare(
+        'SELECT * FROM membership_users WHERE phone = ?'
+      ).bind(phone).first();
+      
+      if (!user) {
+        return c.json({ success: false, message: '해당 사용자를 찾을 수 없습니다.' });
+      }
+      
+      // DB에서 삭제
+      await c.env.DB.prepare(
+        'DELETE FROM membership_users WHERE phone = ?'
+      ).bind(phone).run();
+      
+      console.log('[XIVIX] ❌ 가입 거절 (삭제):', phone, user.name);
+      
+      return c.json({
+        success: true,
+        message: '가입 신청이 거절되었습니다.',
+        deletedUser: { name: user.name, phone: user.phone }
+      });
+    } else {
+      return c.json({ success: false, message: 'D1 데이터베이스 연결 필요' });
+    }
+  } catch (err) {
+    console.error('[XIVIX] 거절 처리 오류:', err);
+    return c.json({ success: false, message: '거절 처리 중 오류가 발생했습니다.' });
+  }
+});
+
+// ============================================
 // V2026.37.41 - 유저 기간 연장 API (CEO 지시 v5.0)
 // 입금 확인 후 유저의 이용 기간을 즉시 연장
 // ============================================
@@ -4510,6 +4548,22 @@ body{
 .login-field input:focus{
   outline:none;
   border-color:var(--primary);
+}
+/* V2026.37.44 - Layout Shift 방지 (CEO 지시) */
+.login-modal-content{
+  position:relative;
+  transform:translateZ(0);
+  will-change:transform;
+}
+.login-field input{
+  -webkit-appearance:none;
+  appearance:none;
+  font-size:16px !important; /* iOS 확대 방지 */
+}
+@supports (-webkit-touch-callout: none) {
+  .login-modal{
+    min-height:-webkit-fill-available;
+  }
 }
 .login-submit{
   width:100%;
@@ -7329,6 +7383,9 @@ body{background:#0a0a0a;color:#fff;font-family:'Segoe UI',sans-serif;padding:24p
 .btn-approve:disabled{background:#666;cursor:not-allowed}
 .btn-suspend{background:#ff4444;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;transition:all 0.3s;margin-left:8px}
 .btn-suspend:hover{transform:scale(1.05);box-shadow:0 0 15px rgba(255,68,68,0.5)}
+/* V2026.37.44 - 거절 버튼 */
+.btn-reject{background:#666;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;transition:all 0.3s;margin-left:8px}
+.btn-reject:hover{background:#888;transform:scale(1.05)}
 .plan-select{background:#1a1a1a;color:#fff;border:1px solid rgba(0,255,0,0.3);padding:6px 12px;border-radius:6px;font-size:12px;margin-right:8px}
 .expiry-badge{background:rgba(16,185,129,0.2);color:#10B981;padding:4px 8px;border-radius:6px;font-size:11px;margin-left:8px}
 .suspended-badge{background:rgba(255,68,68,0.2);color:#ff4444;padding:4px 8px;border-radius:6px;font-size:11px}
@@ -7542,7 +7599,7 @@ async function loadPendingUsers() {
                   <option value="6m">6개월</option>
                   <option value="12m">12개월</option>
                 </select>
-                <button class="btn-approve" onclick="approveUser('\${user.phone}')"><i class="fas fa-check"></i> 승인</button>\`
+                <button class="btn-approve" onclick="approveUser('\${user.phone}')"><i class="fas fa-check"></i> 승인</button><button class="btn-reject" onclick="rejectUser('\${user.phone}', '\${user.name}')"><i class="fas fa-times"></i> 거절</button>\`
               : (user.is_suspended 
                 ? '<span class="suspended-badge">정지됨</span>'
                 : \`<button class="btn-extend" onclick="openExtendModal('\${user.phone}', '\${user.name}')"><i class="fas fa-calendar-plus"></i> 연장</button><button class="btn-suspend" onclick="suspendUser('\${user.phone}')"><i class="fas fa-ban"></i> 정지</button>\`)
@@ -7575,7 +7632,7 @@ async function loadPendingUsers() {
               ? \`<select class="plan-select" id="mplan-\${user.phone.replace(/-/g, '')}">
                   <option value="1m">1개월</option><option value="3m">3개월</option><option value="6m">6개월</option><option value="12m">12개월</option>
                 </select>
-                <button class="btn-approve" onclick="approveUser('\${user.phone}')"><i class="fas fa-check"></i> 승인</button>\`
+                <button class="btn-approve" onclick="approveUser('\${user.phone}')"><i class="fas fa-check"></i> 승인</button><button class="btn-reject" onclick="rejectUser('\${user.phone}', '\${user.name}')"><i class="fas fa-times"></i> 거절</button>\`
               : (user.is_suspended 
                 ? '<span class="suspended-badge" style="flex:1;text-align:center;padding:12px">정지됨</span>'
                 : \`<button class="btn-extend" onclick="openExtendModal('\${user.phone}', '\${user.name}')"><i class="fas fa-calendar-plus"></i> 연장</button><button class="btn-suspend" onclick="suspendUser('\${user.phone}')"><i class="fas fa-ban"></i> 정지</button>\`)
@@ -7637,6 +7694,29 @@ async function suspendUser(phone) {
       loadPendingUsers();
     } else {
       alert('❌ 정지 실패: ' + (data.message || '알 수 없는 오류'));
+    }
+  } catch (err) {
+    alert('❌ 네트워크 오류');
+  }
+}
+
+// V2026.37.44 - 거절 처리 (CEO 지시)
+async function rejectUser(phone, name) {
+  if (!confirm(\`"\${name}" 님의 가입 신청을 거절하시겠습니까?\\n\\n⚠️ 거절 시 데이터가 삭제되며 복구할 수 없습니다.\`)) return;
+  
+  try {
+    const res = await fetch('/api/admin/reject', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone })
+    });
+    const data = await res.json();
+    
+    if (data.success) {
+      alert('❌ 가입이 거절되었습니다.');
+      loadPendingUsers();
+    } else {
+      alert('❌ 거절 실패: ' + (data.message || '알 수 없는 오류'));
     }
   } catch (err) {
     alert('❌ 네트워크 오류');
