@@ -3540,13 +3540,14 @@ body{
 .reg-result.error{display:block;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444}
 
 /* ============================================
-   V2026.37.20 - Luxury Landing Page
-   Beyond Reality / High-end Professional
+   V2026.37.22 - Beyond Reality Style Landing Page
+   Reference: https://beyond-reality.pages.dev/
+   Neon Green (#00ff00) + Deep Black (#0a0a0a)
    ============================================ */
 .landing-page{
   position:fixed;
   inset:0;
-  background:linear-gradient(180deg, #0a0a0f 0%, #12121a 50%, #0d0d14 100%);
+  background:#0a0a0a;
   z-index:10000;
   display:flex;
   flex-direction:column;
@@ -3559,125 +3560,159 @@ body{
   position:absolute;
   inset:0;
   background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(79,140,255,0.15) 0%, transparent 50%),
-    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(124,92,255,0.1) 0%, transparent 40%);
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0,255,0,0.08) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(0,255,0,0.05) 0%, transparent 40%);
   pointer-events:none;
 }
 .landing-grid{
   position:absolute;
   inset:0;
   background-image:
-    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-  background-size:60px 60px;
-  opacity:0.5;
+    linear-gradient(rgba(0,255,0,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,0,0.03) 1px, transparent 1px);
+  background-size:80px 80px;
+  opacity:0.4;
   pointer-events:none;
 }
 .landing-content{
   position:relative;
-  z-index:1;
+  z-index:10;
   text-align:center;
-  max-width:600px;
+  max-width:700px;
   padding:40px;
 }
 .landing-badge{
   display:inline-flex;
   align-items:center;
   gap:8px;
-  background:rgba(79,140,255,0.1);
-  border:1px solid rgba(79,140,255,0.3);
-  padding:8px 16px;
-  border-radius:20px;
+  background:rgba(0,255,0,0.08);
+  border:1px solid rgba(0,255,0,0.3);
+  padding:10px 20px;
+  border-radius:25px;
   font-size:11px;
   font-weight:600;
-  color:var(--primary);
+  color:#00ff00;
   text-transform:uppercase;
-  letter-spacing:1.5px;
-  margin-bottom:32px;
+  letter-spacing:2px;
+  margin-bottom:40px;
+  animation:pulse-glow 2s ease-in-out infinite;
 }
-.landing-badge i{font-size:10px}
+@keyframes pulse-glow{
+  0%,100%{box-shadow:0 0 20px rgba(0,255,0,0.2)}
+  50%{box-shadow:0 0 40px rgba(0,255,0,0.4)}
+}
+.landing-badge i{font-size:10px;color:#00ff00}
 .landing-logo{
-  width:80px;
-  height:80px;
-  background:linear-gradient(135deg, var(--primary), var(--accent));
-  border-radius:24px;
+  width:100px;
+  height:100px;
+  background:transparent;
+  border:2px solid #00ff00;
+  border-radius:20px;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:36px;
+  font-size:48px;
   font-weight:900;
-  color:#fff;
-  margin:0 auto 24px;
-  box-shadow:0 20px 60px rgba(79,140,255,0.3);
+  color:#00ff00;
+  margin:0 auto 32px;
+  box-shadow:0 0 60px rgba(0,255,0,0.3);
+  text-shadow:0 0 30px rgba(0,255,0,0.8);
 }
 .landing-title{
-  font-size:clamp(28px, 5vw, 42px);
+  font-size:clamp(32px, 6vw, 56px);
   font-weight:900;
   color:#fff;
-  line-height:1.2;
-  margin-bottom:16px;
-  letter-spacing:-0.5px;
+  line-height:1.1;
+  margin-bottom:20px;
+  letter-spacing:-1px;
 }
 .landing-title span{
-  background:linear-gradient(135deg, var(--primary), var(--accent));
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  background-clip:text;
+  color:#00ff00;
+  text-shadow:0 0 30px rgba(0,255,0,0.5);
 }
 .landing-subtitle{
-  font-size:clamp(14px, 2vw, 16px);
-  color:var(--text-muted);
-  line-height:1.7;
-  margin-bottom:40px;
-  max-width:480px;
+  font-size:clamp(15px, 2.5vw, 18px);
+  color:rgba(255,255,255,0.6);
+  line-height:1.8;
+  margin-bottom:48px;
+  max-width:500px;
   margin-left:auto;
   margin-right:auto;
+}
+.landing-subtitle strong{
+  color:#00ff00;
+  font-weight:600;
 }
 .landing-buttons{
   display:flex;
   flex-direction:column;
-  gap:12px;
-  max-width:320px;
+  gap:16px;
+  max-width:360px;
   margin:0 auto;
+  position:relative;
+  z-index:100;
 }
 .landing-btn{
-  padding:16px 32px;
-  border-radius:12px;
-  font-size:15px;
+  padding:18px 40px;
+  border-radius:8px;
+  font-size:16px;
   font-weight:700;
   cursor:pointer;
-  transition:all 0.3s;
+  transition:all 0.3s ease;
   display:flex;
   align-items:center;
   justify-content:center;
-  gap:10px;
+  gap:12px;
   text-decoration:none;
+  position:relative;
+  z-index:100;
 }
 .landing-btn-primary{
-  background:linear-gradient(135deg, var(--primary), var(--accent));
+  background:#00ff00;
   border:none;
-  color:#fff;
-  box-shadow:0 8px 30px rgba(79,140,255,0.4);
+  color:#0a0a0a;
+  box-shadow:0 0 30px rgba(0,255,0,0.4);
 }
 .landing-btn-primary:hover{
   transform:translateY(-3px);
-  box-shadow:0 12px 40px rgba(79,140,255,0.5);
+  box-shadow:0 0 50px rgba(0,255,0,0.6);
+  background:#00ff00;
+}
+.landing-btn-primary:active{
+  transform:translateY(0);
 }
 .landing-btn-secondary{
   background:transparent;
-  border:1px solid rgba(255,255,255,0.2);
-  color:var(--text);
+  border:1px solid rgba(0,255,0,0.5);
+  color:#00ff00;
 }
 .landing-btn-secondary:hover{
-  background:rgba(255,255,255,0.05);
-  border-color:rgba(255,255,255,0.3);
+  background:rgba(0,255,0,0.1);
+  border-color:#00ff00;
+  box-shadow:0 0 30px rgba(0,255,0,0.3);
+}
+.landing-btn-secondary:active{
+  transform:scale(0.98);
 }
 .landing-footer{
   position:absolute;
-  bottom:24px;
-  font-size:11px;
-  color:rgba(255,255,255,0.3);
-  letter-spacing:0.5px;
+  bottom:30px;
+  font-size:12px;
+  color:rgba(255,255,255,0.25);
+  letter-spacing:1px;
+}
+.landing-scroll{
+  position:absolute;
+  bottom:80px;
+  color:rgba(0,255,0,0.5);
+  font-size:12px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  animation:bounce 2s ease-in-out infinite;
+}
+@keyframes bounce{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(10px)}
 }
 
 /* 로그인 모달 */
@@ -3774,20 +3809,21 @@ body{
 </head>
 <body>
 
-<!-- V2026.37.20 - Luxury Landing Page -->
+<!-- V2026.37.22 - Beyond Reality Style Landing Page -->
 <div class="landing-page" id="landingPage">
   <div class="landing-bg"></div>
   <div class="landing-grid"></div>
   <div class="landing-content">
-    <div class="landing-badge"><i class="fas fa-crown"></i> Premium Membership Only</div>
+    <div class="landing-badge"><i class="fas fa-bolt"></i> Premium Membership Only</div>
     <div class="landing-logo">X</div>
     <h1 class="landing-title"><span>XIVIX 2026 PRO</span><br>상위 1% 보험 전문가 전용</h1>
-    <p class="landing-subtitle">본 서비스는 멤버십 승인 후 이용 가능한<br><strong>유료 전문가 전용</strong> AI 콘텐츠 생성 웹입니다.</p>
+    <p class="landing-subtitle">본 서비스는 멤버십 승인 후 이용 가능한<br><strong>유료 전문가 전용</strong> AI 콘텐츠 생성 엔진입니다.</p>
     <div class="landing-buttons">
-      <button class="landing-btn landing-btn-primary" onclick="openLoginModal()"><i class="fas fa-sign-in-alt"></i> 로그인</button>
-      <button class="landing-btn landing-btn-secondary" onclick="openRegistrationModal()"><i class="fas fa-user-plus"></i> 멤버십 가입 신청</button>
+      <button type="button" class="landing-btn landing-btn-primary" id="btnLogin"><i class="fas fa-sign-in-alt"></i> 로그인</button>
+      <button type="button" class="landing-btn landing-btn-secondary" id="btnRegister"><i class="fas fa-user-plus"></i> 멤버십 가입 신청</button>
     </div>
   </div>
+  <div class="landing-scroll"><i class="fas fa-chevron-down"></i></div>
   <div class="landing-footer">© 2026 XIVIX Insurance Technology. All rights reserved.</div>
 </div>
 
@@ -5001,6 +5037,33 @@ window.addEventListener('storage', function(e) {
       showLanding();
       console.log('[XIVIX] ⚠️ 스토리지 조작 감지 - 랜딩 페이지로 복귀');
     }
+  }
+});
+
+// ============================================
+// V2026.37.22 - 랜딩 페이지 버튼 이벤트 리스너 (Beyond Reality Style)
+// onclick 대신 addEventListener 사용으로 클릭 문제 완전 해결
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+  const btnLogin = document.getElementById('btnLogin');
+  const btnRegister = document.getElementById('btnRegister');
+  
+  if (btnLogin) {
+    btnLogin.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[XIVIX] 🔐 로그인 버튼 클릭');
+      openLoginModal();
+    });
+  }
+  
+  if (btnRegister) {
+    btnRegister.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[XIVIX] 📝 멤버십 가입 신청 버튼 클릭');
+      openRegistrationModal();
+    });
   }
 });
 
