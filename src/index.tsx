@@ -2622,6 +2622,29 @@ const mainPageHtml = `<!DOCTYPE html>
 html{scroll-behavior:smooth}
 html,body{height:100%;overflow-x:hidden}
 
+/* V2026.37.47 - 모바일 흔들림 및 가로 스크롤 방지 (CEO 지시) */
+html, body { 
+  overflow-x: hidden !important; 
+  position: relative; 
+  width: 100%; 
+  max-width: 100vw;
+  height: -webkit-fill-available; 
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+/* 모바일에서 불필요한 와이드 레이아웃 강제 해제 */
+@media (max-width: 768px) {
+  .main-container { 
+    display: block !important; 
+    padding: 10px !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+  .card { width: 100% !important; margin-bottom: 20px; }
+  * { max-width: 100vw; }
+}
+
 body{
   background: var(--bg-dark);
   color: var(--text);
@@ -4615,6 +4638,9 @@ body{
   cursor:pointer;
 }
 </style>
+
+<!-- V2026.37.47 - 카카오 SDK (CEO 지시: 프리징 해결) -->
+<script src="https://t1.kakaocdn.net/kakao_js_sdk/2.6.0/kakao.min.js" integrity="sha384-6MFdIr0zOira1CHQkedUqJVql0YtcZA1P0nbPrQYJXVJZUkTk/oX4U9GhMkgV+IQ" crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -4656,6 +4682,30 @@ body{
       </div>
       <button type="submit" class="login-submit" id="loginSubmitBtn"><i class="fas fa-sign-in-alt"></i> 로그인</button>
     </form>
+    
+    <!-- V2026.37.47 - 카카오 Sync 로그인 버튼 (CEO 지시: 프리징 해결) -->
+    <div style="margin-top:16px;text-align:center">
+      <div style="color:var(--text-muted);font-size:12px;margin-bottom:10px">또는</div>
+      <button type="button" id="kakaoSyncBtn" onclick="kakaoSync()" style="
+        width:100%;
+        padding:14px;
+        background:#FEE500;
+        color:#000000;
+        border:none;
+        border-radius:12px;
+        font-size:15px;
+        font-weight:700;
+        cursor:pointer;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap:8px;
+      ">
+        <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#000" d="M12 3C6.5 3 2 6.58 2 11c0 2.84 1.87 5.33 4.67 6.75l-.92 3.42c-.08.29.25.54.52.38l4.03-2.67c.55.07 1.11.12 1.7.12 5.5 0 10-3.58 10-8s-4.5-8-10-8z"/></svg>
+        카카오 간편 로그인
+      </button>
+    </div>
+    
     <div class="login-result" id="loginResult"></div>
   </div>
 </div>
@@ -5765,6 +5815,44 @@ function closeLoginModal() {
   document.getElementById('loginModal').classList.remove('show');
   document.getElementById('loginResult').className = 'login-result';
   document.getElementById('loginResult').innerHTML = '';
+}
+
+// ============================================
+// V2026.37.47 - 카카오 Sync 로그인 (CEO 지시: 프리징 해결)
+// 버튼 클릭 후 멈추는 현상 방지 - 강제 페이지 이동 실행
+// ============================================
+function kakaoSync() {
+  const btn = document.getElementById('kakaoSyncBtn');
+  btn.disabled = true;
+  btn.innerText = '접속 중...';
+  
+  // 카카오 SDK 초기화 (JavaScript 키)
+  if (typeof Kakao !== 'undefined' && !Kakao.isInitialized()) {
+    // 카카오 JavaScript 키 (앱 설정에서 발급)
+    Kakao.init('YOUR_KAKAO_JAVASCRIPT_KEY'); // TODO: 실제 키로 교체 필요
+  }
+  
+  if (typeof Kakao === 'undefined') {
+    alert('카카오 SDK 로드 실패. 일반 로그인을 이용해주세요.');
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#000" d="M12 3C6.5 3 2 6.58 2 11c0 2.84 1.87 5.33 4.67 6.75l-.92 3.42c-.08.29.25.54.52.38l4.03-2.67c.55.07 1.11.12 1.7.12 5.5 0 10-3.58 10-8s-4.5-8-10-8z"/></svg> 카카오 간편 로그인';
+    return;
+  }
+  
+  Kakao.Auth.login({
+    scope: 'profile_nickname,account_email',
+    success: function(authObj) {
+      console.log('[XIVIX] 카카오 로그인 성공:', authObj);
+      // [핵심] 멈춤 현상 방지 - 강제 페이지 새로고침
+      window.location.replace(window.location.origin + window.location.pathname);
+    },
+    fail: function(err) {
+      console.error('[XIVIX] 카카오 로그인 실패:', err);
+      alert('카카오 로그인 처리 중 오류가 발생했습니다.');
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#000" d="M12 3C6.5 3 2 6.58 2 11c0 2.84 1.87 5.33 4.67 6.75l-.92 3.42c-.08.29.25.54.52.38l4.03-2.67c.55.07 1.11.12 1.7.12 5.5 0 10-3.58 10-8s-4.5-8-10-8z"/></svg> 카카오 간편 로그인';
+    }
+  });
 }
 
 // ============================================
