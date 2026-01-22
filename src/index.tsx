@@ -7959,6 +7959,10 @@ setInterval(loadPendingUsers, 30000);
 const setSecurityHeaders = (c: any) => {
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('X-Frame-Options', 'SAMEORIGIN');
+  // V2026.37.47 - 강력한 캐시 삭제 (CEO 지시: 모바일 프리징 방지)
+  c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+  c.header('Pragma', 'no-cache');
+  c.header('Expires', '0');
 };
 
 app.get('/', (c) => {
