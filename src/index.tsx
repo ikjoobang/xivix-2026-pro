@@ -2645,6 +2645,66 @@ html, body {
   * { max-width: 100vw; }
 }
 
+/* V2026.37.48 - CEO 지시: 모바일 완벽 고정 레이아웃 */
+/* 1. 박스 모델 통일 - 모든 요소 border-box 강제 */
+*, *::before, *::after {
+  box-sizing: border-box !important;
+}
+
+/* 2. 좌우 흔들림 원천 차단 */
+html {
+  touch-action: pan-y !important;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 3. 상하단 고정, 중앙 가변 레이아웃 (Viewport Fit) */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+}
+.app-header {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.app-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.app-footer {
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+}
+
+/* 4. 모바일 전용 강화 */
+@media (max-width: 768px) {
+  html, body {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    touch-action: pan-y !important;
+  }
+  
+  /* 입력창/버튼 최소 터치 영역 */
+  input, button, select, textarea {
+    min-height: 44px;
+    font-size: 16px !important; /* iOS 확대 방지 */
+  }
+  
+  /* 모든 컨테이너 너비 고정 */
+  .container, .main-container, .content-wrapper, section, article, div {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+}
+
 body{
   background: var(--bg-dark);
   color: var(--text);
