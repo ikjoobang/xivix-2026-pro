@@ -1528,42 +1528,41 @@ ${ocrDataBinding}
 ■ ${style} 스타일로 작성
 ■ 줄바꿈으로 가독성 확보
 
-🔴🔴🔴 [절대 강제] 기호 사용 규칙 - 하나라도 누락 시 실격! 🔴🔴🔴
-■ 모든 본문은 반드시 ❶ ❷ ❸ 기호를 "순차적으로 3개 모두" 사용할 것
-■ ❶ 으로 시작 → ❷ 로 이어짐 → ❸ 으로 마무리 (이 순서 필수!)
-■ 첫째/둘째/셋째 텍스트 사용 절대 금지! 오직 ❶ ❷ ❸ 기호만!
-■ 기호로 단락 구분, ✔️ 기호로 체크리스트 사용
-■ 기호 하나라도 빠지면 XIVIX 급이 아님 - 반드시 3개 전부 포함!
+[필수] 네이버 C-Rank 최적화 포맷팅 규칙
+■ 모든 본문은 반드시 1. 2. 3. 숫자 리스트를 "순차적으로 3개 모두" 사용할 것
+■ 1. 으로 시작하고 2. 로 이어지고 3. 으로 마무리 (이 순서 필수!)
+■ 특수기호(❶❷❸) 사용 절대 금지! 오직 1. 2. 3. 숫자만!
+■ 숫자로 단락 구분, 체크 항목은 - 기호로 정리
+■ 자연스러운 스토리텔링 형식으로 작성 (네이버 D.I.A. 최적화)
 
 ${expertKnowledge}
 
-📌 [${style} 작성 필수 구조 - ❶❷❸ 순차 사용 강제!]
+[${style} 작성 구조 - 네이버 SEO 최적화]
 ${style === '공감형' ? `
-■ 반드시 아래 3단계 구조로 작성 (❶❷❸ 기호 3개 전부 필수!):
+■ 반드시 아래 3단계 구조로 자연스럽게 작성:
 
-❶ [첫 번째 단락] 공감으로 시작 - "저도 같은 고민 했어요"
+1. [공감] 독자의 고민에 공감하며 시작 - "저도 같은 고민 했어요"
 
-❷ [두 번째 단락] 핵심 정보 2~3가지를 ■ 기호와 ✔️로 정리
-   ↳ 반드시 "❷"로 시작하는 문단이 있어야 함!
+2. [정보] 핵심 정보 2~3가지를 깔끔하게 정리
+   - 체크 항목은 대시(-)로 나열
 
-❸ [세 번째 단락] 따뜻한 마무리 - "함께 고민해드릴게요"
+3. [마무리] 따뜻한 마무리 - "함께 고민해드릴게요"
 
-🚨 공감형도 ❶❷❸ 3개 기호 전부 텍스트에 포함되어야 합격!
-🚨 ■ 기호만 쓰고 ❷를 빼먹으면 불합격! ❷ 반드시 포함!
+※ 1. 2. 3. 숫자 리스트로 단락 구분 필수!
 ` : style === '팩트형' ? `
 ■ 반드시 아래 3단계 구조로 작성:
-❶ [팩트 시작] 숫자와 통계로 시작 (예: 40대 남성 암 발병률 3.1배)
-❷ [함정 폭로] 약관 함정과 주의사항을 ✔️ 체크리스트로 정리
-❸ [결론 한 줄] 핵심 결론 명확하게 마무리
+1. [팩트] 숫자와 통계로 시작 (예: 40대 남성 암 발병률 3.1배)
+2. [분석] 약관 함정과 주의사항을 체크리스트로 정리
+3. [결론] 핵심 결론 명확하게 마무리
 
-⚠️ ❶→❷→❸ 순서로 3개 모두 반드시 포함! 하나라도 누락 시 불합격!
+※ 1. 2. 3. 순서로 3개 모두 반드시 포함!
 ` : `
 ■ 반드시 아래 3단계 구조로 작성:
-❶ [트리거 시작] 심리적 트리거 - 손실 회피, 긴급성으로 주의 환기
-❷ [긴박감 조성] "지금 확인 안 하면..." 위기감 부여
-❸ [CTA 마무리] "무료 진단 신청하세요" - 명확한 행동 유도
+1. [트리거] 심리적 트리거 - 손실 회피, 긴급성으로 주의 환기
+2. [긴박감] "지금 확인 안 하면..." 위기감 부여
+3. [CTA] "무료 진단 신청하세요" - 명확한 행동 유도
 
-⚠️ ❶→❷→❸ 순서로 3개 모두 반드시 포함! 하나라도 누락 시 불합격!
+※ 1. 2. 3. 순서로 3개 모두 반드시 포함!
 `}
 
 반드시 아래 JSON 형식으로만 응답:
@@ -4870,51 +4869,51 @@ body{
            출력 순서: 제목 → 질문 → 키워드 → 답변 → 댓글
            ============================================ -->
       
-      <!-- ❶ 제목 섹션 -->
+      <!-- 1. 제목 섹션 -->
       <div class="sequential-section" id="section-titles">
         <div class="section-header">
           <i class="fas fa-heading"></i>
-          <span>❶ 제목 선택</span>
+          <span>1. 제목 선택</span>
           <span class="badge" id="titleCount">5</span>
         </div>
         <div class="section-content" id="tab-titles"></div>
       </div>
       
-      <!-- ❷ SEO 키워드 섹션 -->
+      <!-- 2. SEO 키워드 섹션 -->
       <div class="sequential-section" id="section-keywords">
         <div class="section-header">
           <i class="fas fa-tags"></i>
-          <span>❷ SEO 키워드</span>
+          <span>2. SEO 키워드</span>
           <span class="badge">5</span>
         </div>
         <div class="section-content" id="seoKeywords"></div>
       </div>
       
-      <!-- ❷-2 해시태그 섹션 (CEO 지시 2026.01.20 추가) -->
+      <!-- 2-2. 해시태그 섹션 (CEO 지시 2026.01.20 추가) -->
       <div class="sequential-section" id="section-hashtags">
         <div class="section-header">
           <i class="fas fa-hashtag"></i>
-          <span>❷ 해시태그</span>
+          <span>2-2. 해시태그</span>
           <span class="badge">5</span>
         </div>
         <div class="section-content" id="hashtagsContent"></div>
       </div>
       
-      <!-- ❸ 전문가 답변 섹션 -->
+      <!-- 3. 전문가 답변 섹션 -->
       <div class="sequential-section" id="section-contents">
         <div class="section-header">
           <i class="fas fa-file-alt"></i>
-          <span>❸ 전문가 답변</span>
+          <span>3. 전문가 답변</span>
           <span class="badge" id="contentCount">3</span>
         </div>
         <div class="section-content" id="tab-contents"></div>
       </div>
       
-      <!-- ❹ 댓글 군단 섹션 -->
+      <!-- 4. 댓글 군단 섹션 -->
       <div class="sequential-section" id="section-comments">
         <div class="section-header">
           <i class="fas fa-comments"></i>
-          <span>❹ 댓글 군단</span>
+          <span>4. 댓글 군단</span>
           <span class="badge" id="commentCount">5</span>
         </div>
         <div class="section-content" id="tab-extras"></div>
