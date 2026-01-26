@@ -5947,9 +5947,9 @@ async function handleLogin(e) {
         status: 'APPROVED',
         expires: Date.now() + (24 * 60 * 60 * 1000) // 24시간
       }));
-      closeLoginModal();
-      hideLanding();
       console.log('[XIVIX] ✅ 로그인 성공');
+      // V2026.37.49 - CEO 지시: F5 없이 즉시 접속 (강제 새로고침)
+      window.location.reload();
     } else if (result.status === 'PENDING') {
       resultEl.className = 'login-result pending';
       resultEl.innerHTML = '<i class="fas fa-clock"></i> 승인 대기 중입니다.<br><small>입금 확인 후 1시간 내 승인됩니다.</small>';
