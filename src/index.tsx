@@ -1124,7 +1124,7 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         expert: ENGINE.PRO,
         comments: ENGINE.FLASH
       },
-      version: '2026.18.0',
+      version: '2026.37.51',
       changelog: 'v4: 스트리밍 대응, 제목 25자, 본문 1,000자, Context Switching'
     })
     
@@ -1695,7 +1695,7 @@ JSON 형식으로만 응답:
           titles, viral_questions: viralQuestions, contents, comments, report_data: reportData,
           seoKeywords, hashtags
         },
-        version: '2026.18.0'
+        version: '2026.37.51'
       }) + '\n')
       
     } catch (error) {
@@ -1868,7 +1868,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '2026.18.0',
+    version: '2026.37.51',
     project: 'XIVIX_Insurance_King_2026 (MASTER-1)',
     masterInstruction: MASTER_INSTRUCTION_V3,
     engines: {
@@ -5126,6 +5126,16 @@ function renderImagePreviews() {
   console.log('[XIVIX] 이미지 미리보기:', uploadedImages.length + '개');
 }
 
+// ============================================
+// V2026.37.51 - 모바일 세션 유지 강화 (CEO 지시 v5.0)
+// 전화 받고 돌아와도 모든 데이터 유지
+// - 입력 텍스트
+// - 업로드된 이미지
+// - 생성된 결과 데이터 (resultData)
+// - 선택된 제목/본문 인덱스
+// ============================================
+const RESULT_KEY = 'xivix_result_data';  // 결과 데이터 별도 저장
+
 function saveUserState() {
   const state = {
     searchText: searchEl.value,
@@ -5134,8 +5144,38 @@ function saveUserState() {
   };
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify(state));
+    console.log('[XIVIX] 💾 사용자 상태 저장됨');
   } catch (e) {
     console.warn('[XIVIX] LocalStorage 저장 실패:', e);
+  }
+}
+
+// V2026.37.51 - 결과 데이터 별도 저장 (용량 문제 방지)
+function saveResultData() {
+  if (!resultData) return;
+  try {
+    const data = {
+      resultData: resultData,
+      selectedTitle: selectedTitle,
+      selectedContent: selectedContent,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(RESULT_KEY, JSON.stringify(data));
+    console.log('[XIVIX] 💾 결과 데이터 저장됨');
+  } catch (e) {
+    console.warn('[XIVIX] 결과 데이터 저장 실패:', e);
+    // 용량 초과 시 이전 데이터 삭제 후 재시도
+    try {
+      localStorage.removeItem(RESULT_KEY);
+      localStorage.setItem(RESULT_KEY, JSON.stringify({
+        resultData: resultData,
+        selectedTitle: selectedTitle,
+        selectedContent: selectedContent,
+        timestamp: Date.now()
+      }));
+    } catch (e2) {
+      console.error('[XIVIX] 결과 데이터 저장 완전 실패:', e2);
+    }
   }
 }
 
@@ -5162,15 +5202,90 @@ function loadUserState() {
   }
 }
 
+// V2026.37.51 - 결과 데이터 복원
+function loadResultData() {
+  try {
+    const saved = localStorage.getItem(RESULT_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      // 2시간 이내 데이터만 복원 (결과 데이터는 유효기간 짧게)
+      if (Date.now() - data.timestamp < 2 * 60 * 60 * 1000) {
+        if (data.resultData) {
+          resultData = data.resultData;
+          selectedTitle = data.selectedTitle || 0;
+          selectedContent = data.selectedContent || 0;
+          
+          // UI 복원
+          setTimeout(() => {
+            try {
+              renderSeoAudit(resultData.seo_audit || { score: 95, grade: 'S+', rank_prediction: '1-3위' });
+              renderReportData(resultData.report_data);
+              renderViralQuestions(resultData.viral_questions);
+              renderTitles(resultData.titles || []);
+              renderContents(resultData.contents || []);
+              renderCommentsAndKeywords(resultData.comments || [], resultData.seoKeywords || []);
+              
+              // 출력 영역 표시
+              const output = document.getElementById('output');
+              if (output) output.classList.add('show');
+              
+              console.log('[XIVIX] ✅ 결과 데이터 복원됨 (전화 후 복귀)');
+              
+              // 사용자에게 알림
+              const toast = document.createElement('div');
+              toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#10b981;color:white;padding:12px 24px;border-radius:8px;z-index:99999;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+              toast.innerHTML = '<i class="fas fa-check-circle"></i> 이전 결과가 복원되었습니다';
+              document.body.appendChild(toast);
+              setTimeout(() => toast.remove(), 3000);
+            } catch (renderError) {
+              console.warn('[XIVIX] UI 복원 중 오류:', renderError);
+            }
+          }, 500);
+        }
+      } else {
+        // 오래된 데이터 삭제
+        localStorage.removeItem(RESULT_KEY);
+      }
+    }
+  } catch (e) {
+    console.warn('[XIVIX] 결과 데이터 복원 실패:', e);
+  }
+}
+
 // 페이지 로드 시 상태 복원
 loadUserState();
+loadResultData();  // V2026.37.51 추가
 
 // 페이지 벗어나기 전 저장
-window.addEventListener('beforeunload', saveUserState);
+window.addEventListener('beforeunload', () => {
+  saveUserState();
+  saveResultData();  // V2026.37.51 추가
+});
+
 // visibility 변경 시 저장 (전화 수신, 앱 전환 등)
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
     saveUserState();
+    saveResultData();  // V2026.37.51 추가
+    console.log('[XIVIX] 📱 앱 전환 감지 - 데이터 저장됨');
+  } else if (document.visibilityState === 'visible') {
+    // 앱으로 복귀 시 상태 체크
+    console.log('[XIVIX] 📱 앱 복귀 감지');
+  }
+});
+
+// V2026.37.51 - 모바일 페이지 캐시 이벤트 (Safari/iOS)
+window.addEventListener('pagehide', () => {
+  saveUserState();
+  saveResultData();
+});
+
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    // 캐시에서 복원된 페이지
+    console.log('[XIVIX] 📱 캐시에서 복원됨');
+    loadUserState();
+    loadResultData();
   }
 });
 
@@ -6562,12 +6677,37 @@ function copyAllContent() {
 }
 
 // ============================================
-// V2026.37.20 - 1일 2회 API 호출 제한 로직 (CEO 지시 v3.8)
-// LocalStorage에 날짜별 호출 횟수 저장
-// 정책 변경: 데이터 가치 보존 및 멤버십 희소성 강화
+// V2026.37.51 - API 호출 제한 로직 (CEO 지시 v5.0)
+// 방익주/김미경 로그인 사용자: 무제한
+// 일반 사용자: 1일 2회 제한
 // ============================================
 const API_LIMIT_KEY = 'xivix_api_usage';
 const DAILY_API_LIMIT = 2;
+
+// ✅ V2026.37.51 - VIP 사용자 (API 무제한)
+const VIP_PHONES = [
+  '010-4845-3065',  // 방익주 대표
+  '010-3159-3697'   // 김미경 지사장
+];
+
+// 현재 로그인 사용자가 VIP인지 확인
+function isVipUser() {
+  try {
+    const session = JSON.parse(localStorage.getItem(AUTH_KEY) || '{}');
+    if (session.phone) {
+      // 전화번호 정규화 (010-xxxx-xxxx 형태로)
+      const normalizedPhone = session.phone.replace(/[^0-9]/g, '').replace(/^(\d{3})(\d{4})(\d{4})$/, '$1-$2-$3');
+      const isVip = VIP_PHONES.includes(normalizedPhone);
+      if (isVip) {
+        console.log('[XIVIX] ✅ VIP 사용자 확인:', normalizedPhone);
+      }
+      return isVip;
+    }
+  } catch (e) {
+    console.warn('[XIVIX] VIP 체크 실패:', e);
+  }
+  return false;
+}
 
 function getApiUsage() {
   try {
@@ -6584,6 +6724,11 @@ function getApiUsage() {
 }
 
 function incrementApiUsage() {
+  // VIP는 카운트 안함
+  if (isVipUser()) {
+    console.log('[XIVIX] VIP 사용자 - 사용량 카운트 스킵');
+    return { date: new Date().toISOString().split('T')[0], count: 0, isVip: true };
+  }
   const usage = getApiUsage();
   usage.count += 1;
   localStorage.setItem(API_LIMIT_KEY, JSON.stringify(usage));
@@ -6591,6 +6736,12 @@ function incrementApiUsage() {
 }
 
 function checkApiLimit() {
+  // ✅ VIP 사용자는 무제한
+  if (isVipUser()) {
+    console.log('[XIVIX] ✅ VIP 사용자 - API 무제한');
+    return true;
+  }
+  
   const usage = getApiUsage();
   if (usage.count >= DAILY_API_LIMIT) {
     alert('⚠️ 오늘의 API 호출 한도(2회)를 초과했습니다.\\n\\n자정 이후 다시 시도해 주세요.\\n\\n현재: ' + usage.count + '/' + DAILY_API_LIMIT + '회 사용');
@@ -6600,6 +6751,10 @@ function checkApiLimit() {
 }
 
 function getRemainingApiCalls() {
+  // VIP는 무제한 표시
+  if (isVipUser()) {
+    return '∞';
+  }
   const usage = getApiUsage();
   return Math.max(0, DAILY_API_LIMIT - usage.count);
 }
@@ -6833,6 +6988,9 @@ async function goGenerateStream() {
               resultData = event.package;
               selectedTitle = 0;
               selectedContent = 0;
+              
+              // V2026.37.51 - 결과 데이터 LocalStorage 저장 (모바일 세션 유지)
+              saveResultData();
               
               // 최종 렌더링
               renderSeoAudit(resultData.seo_audit || { score: 95, grade: 'S+', rank_prediction: '1-3위' });
