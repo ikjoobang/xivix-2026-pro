@@ -7141,10 +7141,11 @@ async function generateMarketingImage() {
     return;
   }
   
-  // 키워드 구성: 보험사명 + 담보내용 + 설계안
+  // V2026.37.50 - CEO 지시: 선택한 제목 기반 동적 키워드 생성
   const company = resultData.company || '삼성생명';
   const insurance = resultData.insurance || '종합보험';
-  const keyword = company + ' ' + insurance + ' 설계안';
+  const selectedTitleText = resultData.titles?.[selectedTitle]?.text || resultData.titles?.[selectedTitle] || '';
+  const keyword = selectedTitleText + ' ' + company + ' 설계안';
   
   // ✅ CEO 지시 (2026.01.19) - source_url 직접 입력 지원
   const sourceUrlInput = document.getElementById('sourceUrlInput');
@@ -7220,11 +7221,13 @@ async function generateMarketingImage() {
       body: JSON.stringify({
         api_key: XIIM_API_KEY,  // ❗ 최상위에 위치 필수
         request_info: {
-          keyword: keyword,                    // ❗ 필수
+          keyword: keyword,                    // ❗ 필수 (선택한 제목 + 보험사 + 설계안)
           user_id: XIIM_USER_ID,  // ❗ 필수 (운영용 ID)
           target_company: targetCompany,       // 선택
           source_url: hasDirectUrl ? directSourceUrl : window.location.href,  // ✅ 직접 입력 URL 우선
-          skip_verification: hasDirectUrl      // ✅ 직접 URL 입력 시 검증 스킵 요청
+          skip_verification: hasDirectUrl,     // ✅ 직접 URL 입력 시 검증 스킵 요청
+          // V2026.37.50 - CEO 지시: 제목 정보 추가 전송
+          title: selectedTitleText             // 사용자가 선택한 제목
         }
       })
     });
