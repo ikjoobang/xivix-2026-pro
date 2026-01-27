@@ -310,3 +310,38 @@ c.header('Expires', '0');
 - 자동 이미지 생성: `src/index.tsx` 라인 ~7045 (SSE complete 핸들러)
 - 보험사 추출: `src/index.tsx` 라인 ~7340 (generateMarketingImage 함수)
 - 백엔드 company 필드: `src/index.tsx` 라인 ~1111, ~1708
+
+## V2026.37.54 변경 사항 (2026-01-27)
+
+### XIIM 미들웨어 V2.4 대응 - Rate Limit & 재시도 로직
+
+**XIIM 측 수정 완료 사항:**
+- Subrequest 최적화: ~50+ → ~10개로 감소
+- Rate Limiting: 분당 10회 제한, Retry-After 헤더
+- 캐싱: KV 기반 5분 TTL
+- 자동 재시도: 지수 백오프
+
+**XIVIX 측 대응 완료:**
+
+1. **HTTP 429 Rate Limit 처리**
+   ```javascript
+   if (response.status === 429) {
+     const retryAfter = parseInt(response.headers.get('Retry-After') || '5', 10);
+     await new Promise(r => setTimeout(r, retryAfter * 1000));
+     // 재시도...
+   }
+   ```
+
+2. **지수 백오프 재시도**
+   - 최대 3회 시도
+   - 대기 시간: 1초 → 2초 → 4초
+   - UI에 재시도 진행 상황 표시
+
+3. **캐시/Rate Limit 로깅**
+   ```
+   X-Cache: HIT/MISS
+   X-RateLimit-Remaining: 남은 요청 수
+   ```
+
+**핵심 코드 위치:**
+- 재시도 로직: `src/index.tsx` 라인 ~7440 (generateMarketingImage 함수 내)
