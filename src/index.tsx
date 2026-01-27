@@ -1124,7 +1124,7 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         expert: ENGINE.PRO,
         comments: ENGINE.FLASH
       },
-      version: '2026.37.51',
+      version: '2026.37.52',
       changelog: 'v4: 스트리밍 대응, 제목 25자, 본문 1,000자, Context Switching'
     })
     
@@ -1695,7 +1695,7 @@ JSON 형식으로만 응답:
           titles, viral_questions: viralQuestions, contents, comments, report_data: reportData,
           seoKeywords, hashtags
         },
-        version: '2026.37.51'
+        version: '2026.37.52'
       }) + '\n')
       
     } catch (error) {
@@ -1868,7 +1868,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '2026.37.51',
+    version: '2026.37.52',
     project: 'XIVIX_Insurance_King_2026 (MASTER-1)',
     masterInstruction: MASTER_INSTRUCTION_V3,
     engines: {
@@ -7299,11 +7299,14 @@ async function generateMarketingImage() {
     return;
   }
   
-  // V2026.37.50 - CEO 지시: 선택한 제목 기반 동적 키워드 생성
+  // V2026.37.52 - XIIM API V2.2 규격에 맞춘 keyword 생성
+  // 공식: {보험사 한글명} {상품유형} {설계안/설계서}
   const company = resultData.company || '삼성생명';
   const insurance = resultData.insurance || '종합보험';
   const selectedTitleText = resultData.titles?.[selectedTitle]?.text || resultData.titles?.[selectedTitle] || '';
-  const keyword = selectedTitleText + ' ' + company + ' 설계안';
+  
+  // ✅ XIIM API V2.2 규격: keyword = 보험사 + 상품유형 + 설계안
+  const keyword = company + ' ' + insurance + ' 설계안';
   
   // ✅ CEO 지시 (2026.01.19) - source_url 직접 입력 지원
   const sourceUrlInput = document.getElementById('sourceUrlInput');
@@ -7370,22 +7373,25 @@ async function generateMarketingImage() {
     // api_key: 최상위에 위치 (필수)
     // request_info: keyword, user_id 필수
     // source_url: 직접 입력 시 해당 URL 사용, 없으면 현재 페이지 URL
+    // ✅ V2026.37.52 - XIIM API V2.2/V2.3 규격 적용
+    // 1. Referer 헤더 필수
+    // 2. keyword = 보험사 + 상품유형 + 설계안
+    // 3. target_company와 keyword 일치 필수
     const response = await fetch('https://xivix-xiim.pages.dev/api/process', {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'Origin': 'https://xivix-2026-pro.pages.dev'  // ✅ CORS 통과 필수 (V2026.01 규격)
+        'Referer': 'https://xivix-2026-pro.pages.dev/'  // ✅ XIIM V2.2 필수!
       },
       body: JSON.stringify({
         api_key: XIIM_API_KEY,  // ❗ 최상위에 위치 필수
         request_info: {
-          keyword: keyword,                    // ❗ 필수 (선택한 제목 + 보험사 + 설계안)
-          user_id: XIIM_USER_ID,  // ❗ 필수 (운영용 ID)
-          target_company: targetCompany,       // 선택
-          source_url: hasDirectUrl ? directSourceUrl : window.location.href,  // ✅ 직접 입력 URL 우선
-          skip_verification: hasDirectUrl,     // ✅ 직접 URL 입력 시 검증 스킵 요청
-          // V2026.37.50 - CEO 지시: 제목 정보 추가 전송
-          title: selectedTitleText             // 사용자가 선택한 제목
+          user_id: XIIM_USER_ID,              // ❗ 필수 (설계사 고유 ID)
+          keyword: keyword,                    // ❗ 필수: 보험사 + 상품유형 + 설계안
+          target_company: targetCompany,       // ❗ 필수: keyword와 일치해야 함!
+          title: selectedTitleText,            // 선택: 검색 정확도 향상
+          source_url: hasDirectUrl ? directSourceUrl : undefined,  // 직접 URL 입력 시에만
+          skip_verification: hasDirectUrl      // 직접 URL 입력 시 검증 스킵
         }
       })
     });
