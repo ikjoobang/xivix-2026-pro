@@ -281,3 +281,32 @@ c.header('Expires', '0');
 - **프로젝트 오너**: 방익주 대표 (010-4845-3065)
 - **GitHub**: https://github.com/ikjoobang/xivix-2026-pro
 
+
+## V2026.37.53 변경 사항 (2026-01-27)
+
+### CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
+
+**문제점:**
+- 기존: 콘텐츠 생성 완료 후 사용자가 "마케팅 이미지 생성" 버튼을 수동 클릭해야 함
+- 사장님 요청: 텍스트 입력/이미지 업로드 → Gemini 분석 → 정리 → 이미지 생성까지 한 번에 자동 완료
+
+**수정 내용:**
+
+1. **자동 이미지 생성 흐름**
+   - SSE 스트리밍 완료 후 1.5초 뒤 `generateMarketingImage()` 자동 호출
+   - 토스트 알림: "AI가 마케팅 이미지를 자동 생성합니다..."
+   - `resultData.insurance`만 있으면 자동 시작 (company는 topic에서 추출 가능)
+
+2. **보험사명 추출 로직 개선**
+   - 우선순위: 이미지 OCR → topic 텍스트 → 기본값 '삼성생명'
+   - 28개 보험사 목록에서 자동 매칭
+
+3. **백엔드 응답 필드 추가**
+   - `company`: 이미지 분석에서 추출한 보험사명
+   - `productName`: 이미지 분석에서 추출한 상품명
+   - 스트리밍 API + Full Package API 모두 적용
+
+**핵심 코드 위치:**
+- 자동 이미지 생성: `src/index.tsx` 라인 ~7045 (SSE complete 핸들러)
+- 보험사 추출: `src/index.tsx` 라인 ~7340 (generateMarketingImage 함수)
+- 백엔드 company 필드: `src/index.tsx` 라인 ~1111, ~1708
