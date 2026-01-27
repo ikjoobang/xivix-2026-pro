@@ -921,6 +921,10 @@ app.post('/api/generate/full-package', async (c) => {
           
           // 전체 분석 결과 저장
           imageAnalysis = `📋 ${parsed.imageType || '문서'} 분석\n🏢 ${parsed.company || ''} - ${parsed.productName || ''}\n\n${parsed.summary || ''}\n\n⚠️ 주의사항:\n${(parsed.warnings || []).map((w: string) => '• ' + w).join('\n')}\n\n💡 전문가 조언:\n${parsed.advice || ''}`
+          
+          // V2026.37.53 - 이미지에서 추출한 보험사명 저장 (자동 이미지 생성용)
+          imageAnalysisResult.company = parsed.company || null
+          imageAnalysisResult.productName = parsed.productName || null
         } catch (e) {
           console.error('Vision JSON Parse Error:', e)
           imageAnalysis = rawText
@@ -1104,6 +1108,9 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         context_priority: '이미지 > 입력 텍스트 > 트렌드',
         target: targetAudience,
         insurance: insuranceProduct,
+        // V2026.37.53 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
+        company: imageAnalysisResult?.company || null,
+        productName: imageAnalysisResult?.productName || null,
         seo_audit: expertData.seo_audit || { score: 95, grade: 'S+', rank_prediction: '1-3위', analysis: 'SEO 최적화 완료' },
         imageAnalysis: imageAnalysis || null,
         image_detected_keyword: imageAnalysisResult?.detected_keyword || null,
@@ -1124,7 +1131,7 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         expert: ENGINE.PRO,
         comments: ENGINE.FLASH
       },
-      version: '2026.37.52',
+      version: '2026.37.53',
       changelog: 'v4: 스트리밍 대응, 제목 25자, 본문 1,000자, Context Switching'
     })
     
@@ -1158,6 +1165,9 @@ app.post('/api/generate/full-package-stream', async (c) => {
       let imageAnalysis = requestImageAnalysis // API 요청에서 전달된 분석 데이터 우선 사용
       let reportData: any[] = []
       let imageDetectedKeyword = ''
+      // V2026.37.53 - 이미지에서 추출한 보험사/상품명 (자동 이미지 생성용)
+      let detectedCompany: string | null = null
+      let detectedProductName: string | null = null
       
       // V39: API 요청에서 OCR 데이터가 전달된 경우 바로 바인딩
       if (requestOcrData) {
@@ -1256,6 +1266,10 @@ app.post('/api/generate/full-package-stream', async (c) => {
               topic = userContextAngle ? `${userContextAngle} (${parsed.detected_keyword})` : parsed.detected_keyword
               imageDetectedKeyword = parsed.detected_keyword
             }
+            // V2026.37.53 - 보험사명 저장 (자동 이미지 생성용)
+            detectedCompany = parsed.company || null
+            detectedProductName = parsed.productName || parsed.detected_keyword || null
+            
             imageAnalysis = JSON.stringify({
               company: parsed.company,
               premium: parsed.monthly_premium,
@@ -1691,11 +1705,14 @@ JSON 형식으로만 응답:
         type: 'complete',
         package: {
           topic, context_source: contextSource, insurance: insuranceProduct, target: targetAudience,
+          // V2026.37.53 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
+          company: detectedCompany,
+          productName: detectedProductName,
           image_detected_keyword: imageDetectedKeyword || null,
           titles, viral_questions: viralQuestions, contents, comments, report_data: reportData,
           seoKeywords, hashtags
         },
-        version: '2026.37.52'
+        version: '2026.37.53'
       }) + '\n')
       
     } catch (error) {
@@ -1868,7 +1885,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '2026.37.52',
+    version: '2026.37.53',
     project: 'XIVIX_Insurance_King_2026 (MASTER-1)',
     masterInstruction: MASTER_INSTRUCTION_V3,
     engines: {
@@ -7024,6 +7041,23 @@ async function goGenerateStream() {
                   cdEl.style.background = 'linear-gradient(135deg, var(--green), #10b981)';
                   setTimeout(() => { cdEl.style.display = 'none'; }, 3000);
                 }
+                
+                // V2026.37.53 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
+                // 보험 정보가 감지된 경우 자동으로 마케팅 이미지 생성 (company는 topic에서 추출 가능)
+                if (resultData && resultData.insurance) {
+                  console.log('[XIVIX] V2026.37.53 자동 이미지 생성 시작:', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
+                  // 토스트 알림
+                  const autoToast = document.createElement('div');
+                  autoToast.innerHTML = '<i class="fas fa-magic"></i> AI가 마케팅 이미지를 자동 생성합니다...';
+                  autoToast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;padding:12px 24px;border-radius:25px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(99,102,241,0.4);animation:fadeInUp 0.3s ease';
+                  document.body.appendChild(autoToast);
+                  setTimeout(() => autoToast.remove(), 3000);
+                  
+                  // 1.5초 후 자동 이미지 생성 시작
+                  setTimeout(() => {
+                    generateMarketingImage();
+                  }, 1500);
+                }
               }, 1200);
               break;
               
@@ -7057,6 +7091,9 @@ async function goGenerateStream() {
           progressFill.style.width = '100%';
           progressPct.textContent = '100%';
           progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ SSE 스트리밍 완료! (v' + event.version + ')';
+          // V2026.37.51 - 결과 데이터 LocalStorage 저장
+          saveResultData();
+          
           setTimeout(() => {
             progressBox.style.display = 'none';
             // V39: 탭 제거됨 - 모든 섹션이 이미 순차적으로 표시됨
@@ -7064,6 +7101,14 @@ async function goGenerateStream() {
             resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             // ✅ 이미지 생성 섹션 표시
             document.getElementById('imageGenSection').classList.add('show');
+            
+            // V2026.37.53 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
+            if (resultData && resultData.insurance) {
+              console.log('[XIVIX] V2026.37.53 자동 이미지 생성 (버퍼):', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
+              setTimeout(() => {
+                generateMarketingImage();
+              }, 1500);
+            }
           }, 1200);
         }
       } catch (e) {
@@ -7299,9 +7344,32 @@ async function generateMarketingImage() {
     return;
   }
   
-  // V2026.37.52 - XIIM API V2.2 규격에 맞춘 keyword 생성
+  // V2026.37.53 - XIIM API V2.2 규격에 맞춘 keyword 생성
   // 공식: {보험사 한글명} {상품유형} {설계안/설계서}
-  const company = resultData.company || '삼성생명';
+  
+  // V2026.37.53 - 보험사명 추출 우선순위:
+  // 1. 이미지 분석에서 추출한 company
+  // 2. topic에서 보험사명 추출
+  // 3. 기본값 '삼성생명'
+  let company = resultData.company;
+  if (!company) {
+    // topic에서 보험사명 추출 시도
+    const companyList = ['삼성생명', '한화생명', '교보생명', '신한라이프', 'NH농협생명', 'KB라이프', 
+                         '미래에셋생명', '메트라이프', '푸르덴셜', 'AIA', '삼성화재', '현대해상', 
+                         'DB손해보험', 'KB손해보험', '메리츠화재', 'ABL생명', 'IBK연금보험', 
+                         'KDB생명', '라이나생명', '농협손해보험', '신한라이프손해보험', '우체국보험',
+                         '처브라이프', '하나생명', '흥국생명', '동양생명', '오렌지라이프', '카카오페이손해보험'];
+    const topicLower = (resultData.topic || '').toLowerCase();
+    for (const c of companyList) {
+      if (topicLower.includes(c.toLowerCase()) || topicLower.includes(c.replace('생명', '').replace('손해보험', '').replace('화재', ''))) {
+        company = c;
+        console.log('[XIVIX] V2026.37.53 topic에서 보험사 추출:', company);
+        break;
+      }
+    }
+    if (!company) company = '삼성생명';
+  }
+  
   const insurance = resultData.insurance || '종합보험';
   const selectedTitleText = resultData.titles?.[selectedTitle]?.text || resultData.titles?.[selectedTitle] || '';
   
@@ -7373,7 +7441,7 @@ async function generateMarketingImage() {
     // api_key: 최상위에 위치 (필수)
     // request_info: keyword, user_id 필수
     // source_url: 직접 입력 시 해당 URL 사용, 없으면 현재 페이지 URL
-    // ✅ V2026.37.52 - XIIM API V2.2/V2.3 규격 적용
+    // ✅ V2026.37.53 - XIIM API V2.2/V2.3 규격 적용
     // 1. Referer 헤더 필수
     // 2. keyword = 보험사 + 상품유형 + 설계안
     // 3. target_company와 keyword 일치 필수
