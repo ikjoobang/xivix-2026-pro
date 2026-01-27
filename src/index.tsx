@@ -7796,24 +7796,36 @@ async function generateMarketingImage() {
 // ============================================
 let excludedImageUrls = []; // 제외할 이미지 URL 목록
 
+// ============================================
+// ✅ V2026.37.55 - 이미지 재생성 기능
+// 1차: /api/regenerate (exclude_urls 지원)
+// 2차: /api/process (폴백, 다른 키워드로 재검색)
+// ============================================
+let regenerateAttempts = 0;
+
 async function regenerateMarketingImage() {
   const btn = document.getElementById('imageRegenerateBtn');
   const statusEl = document.getElementById('regenerateStatus');
   
-  if (!generatedImageUrl) {
-    alert('재생성할 이미지가 없습니다.');
+  if (!resultData?.insurance) {
+    alert('먼저 콘텐츠를 생성해 주세요.');
     return;
   }
   
   // 현재 이미지를 제외 목록에 추가
-  excludedImageUrls.push(generatedImageUrl);
-  console.log('[XIVIX] 재생성 요청 - 제외 URL:', excludedImageUrls);
+  if (generatedImageUrl) {
+    excludedImageUrls.push(generatedImageUrl);
+  }
+  regenerateAttempts++;
+  
+  console.log('[XIVIX] 재생성 요청 #' + regenerateAttempts, '- 제외:', excludedImageUrls.length + '개');
   
   // UI 업데이트
   btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 재생성 중...';
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 다른 이미지 검색 중...';
   statusEl.style.display = 'block';
-  statusEl.textContent = '이전 이미지를 제외하고 새로운 설계서를 찾고 있습니다...';
+  statusEl.style.color = '#fbbf24';
+  statusEl.textContent = '🔍 새로운 설계서 이미지를 찾고 있습니다... (시도 ' + regenerateAttempts + ')';
   
   try {
     // 보험사/상품 정보 추출
@@ -7833,7 +7845,17 @@ async function regenerateMarketingImage() {
     }
     
     const insurance = resultData?.insurance || '종합보험';
-    const keyword = company + ' ' + insurance + ' 설계안';
+    const selectedTitleText = resultData.titles?.[selectedTitle]?.text || resultData.titles?.[selectedTitle] || '';
+    
+    // 키워드 변형 (재시도 횟수에 따라)
+    let keyword = company + ' ' + insurance + ' 설계안';
+    if (regenerateAttempts === 2) {
+      keyword = company + ' ' + insurance + ' 가입설계서';
+    } else if (regenerateAttempts === 3) {
+      keyword = company + ' ' + insurance + ' 보험료 담보';
+    } else if (regenerateAttempts >= 4) {
+      keyword = insurance + ' 가입제안서 보험료';
+    }
     
     const companyCodeMap = {
       '삼성생명': 'SAMSUNG_LIFE', '한화생명': 'HANWHA_LIFE', '교보생명': 'KYOBO_LIFE',
@@ -7844,10 +7866,50 @@ async function regenerateMarketingImage() {
     };
     const targetCompany = companyCodeMap[company] || 'SAMSUNG_LIFE';
     
-    console.log('[XIVIX] 재생성 API 호출:', { keyword, targetCompany, excludeCount: excludedImageUrls.length });
+    console.log('[XIVIX] 재생성 키워드:', keyword);
     
-    // XIIM API V2.3 /api/regenerate 호출
-    const response = await fetch('https://xivix-xiim.pages.dev/api/regenerate', {
+    // 1차: /api/regenerate 시도
+    let result = null;
+    let useRegenerateApi = regenerateAttempts <= 2;
+    
+    if (useRegenerateApi) {
+      statusEl.textContent = '🔍 이전 이미지를 제외하고 검색 중...';
+      
+      const regenResponse = await fetch('https://xivix-xiim.pages.dev/api/regenerate', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Referer': 'https://xivix-2026-pro.pages.dev/'
+        },
+        body: JSON.stringify({
+          api_key: XIIM_API_KEY,
+          keyword: keyword,
+          target_company: targetCompany,
+          exclude_urls: excludedImageUrls,
+          reason: 'user_requested_different_image'
+        })
+      });
+      
+      result = await regenResponse.json();
+      console.log('[XIVIX] /api/regenerate 응답:', result);
+      
+      // regenerate 성공 시
+      if (result.success && (result.data?.final_url || result.sourceUrl)) {
+        const newImageUrl = result.data?.final_url || result.sourceUrl;
+        generatedImageUrl = newImageUrl;
+        document.getElementById('imageGenPreview').src = newImageUrl;
+        
+        statusEl.style.color = '#10b981';
+        statusEl.textContent = '✅ 새 이미지를 찾았습니다!';
+        setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+        return;
+      }
+    }
+    
+    // 2차: /api/process로 폴백 (키워드 변형하여 재검색)
+    statusEl.textContent = '🔄 다른 키워드로 재검색 중...';
+    
+    const processResponse = await fetch('https://xivix-xiim.pages.dev/api/process', {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -7855,48 +7917,49 @@ async function regenerateMarketingImage() {
       },
       body: JSON.stringify({
         api_key: XIIM_API_KEY,
-        keyword: keyword,
-        target_company: targetCompany,
-        exclude_urls: excludedImageUrls,
-        reason: 'user_requested_different_image'
+        request_info: {
+          user_id: XIIM_USER_ID,
+          keyword: keyword,
+          target_company: targetCompany,
+          title: selectedTitleText
+        }
       })
     });
     
-    const result = await response.json();
-    console.log('[XIVIX] 재생성 응답:', result);
+    result = await processResponse.json();
+    console.log('[XIVIX] /api/process 폴백 응답:', result);
     
-    if (result.success && result.sourceUrl) {
-      // 새 이미지로 교체
-      generatedImageUrl = result.data?.final_url || result.sourceUrl;
-      document.getElementById('imageGenPreview').src = generatedImageUrl;
+    if (result.status === 'success' && result.data?.final_url) {
+      const newImageUrl = result.data.final_url;
       
-      statusEl.style.color = '#10b981';
-      statusEl.textContent = '✅ 새로운 설계서 이미지를 찾았습니다! (제외: ' + excludedImageUrls.length + '개)';
-      
-      // 검증 결과 표시
-      if (result.verification) {
-        const v = result.verification;
-        if (v.is_design_document === false) {
-          statusEl.style.color = '#f59e0b';
-          statusEl.textContent = '⚠️ 이 이미지도 설계서가 아닐 수 있습니다. 다시 시도해 주세요.';
-        } else if (v.detected_company && v.detected_company !== company) {
-          statusEl.textContent += ' (감지된 보험사: ' + v.detected_company + ')';
-        }
+      // 이전과 같은 이미지인지 확인
+      if (excludedImageUrls.includes(newImageUrl)) {
+        statusEl.style.color = '#f59e0b';
+        statusEl.textContent = '⚠️ 동일한 이미지입니다. 다시 시도해 주세요.';
+      } else {
+        generatedImageUrl = newImageUrl;
+        document.getElementById('imageGenPreview').src = newImageUrl;
+        
+        statusEl.style.color = '#10b981';
+        statusEl.textContent = '✅ 새 이미지를 찾았습니다! (키워드: ' + keyword + ')';
+        setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
       }
-      
-      setTimeout(() => { statusEl.style.display = 'none'; }, 5000);
-      
     } else {
-      // 재생성 실패
+      // 완전 실패
       statusEl.style.color = '#ef4444';
-      statusEl.textContent = '❌ 더 이상 찾을 수 있는 이미지가 없습니다. 직접 URL을 입력해 주세요.';
-      console.warn('[XIVIX] 재생성 실패:', result.error || result.message);
+      if (regenerateAttempts >= 5) {
+        statusEl.innerHTML = '❌ 더 이상 이미지를 찾을 수 없습니다.<br><span style="font-size:11px">직접 URL을 입력하거나 다른 보험 상품으로 시도해 주세요.</span>';
+        regenerateAttempts = 0; // 리셋
+        excludedImageUrls = []; // 리셋
+      } else {
+        statusEl.textContent = '⚠️ 이미지를 찾지 못했습니다. 다시 시도해 주세요. (' + (result.error || result.suggestion || '') + ')';
+      }
     }
     
   } catch (error) {
     console.error('[XIVIX] 재생성 오류:', error);
     statusEl.style.color = '#ef4444';
-    statusEl.textContent = '❌ 재생성 중 오류: ' + error.message;
+    statusEl.textContent = '❌ 오류: ' + error.message;
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-sync-alt"></i> 이미지가 달라요';
