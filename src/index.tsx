@@ -922,7 +922,7 @@ app.post('/api/generate/full-package', async (c) => {
           // 전체 분석 결과 저장
           imageAnalysis = `📋 ${parsed.imageType || '문서'} 분석\n🏢 ${parsed.company || ''} - ${parsed.productName || ''}\n\n${parsed.summary || ''}\n\n⚠️ 주의사항:\n${(parsed.warnings || []).map((w: string) => '• ' + w).join('\n')}\n\n💡 전문가 조언:\n${parsed.advice || ''}`
           
-          // V2026.37.53 - 이미지에서 추출한 보험사명 저장 (자동 이미지 생성용)
+          // V2026.37.54 - 이미지에서 추출한 보험사명 저장 (자동 이미지 생성용)
           imageAnalysisResult.company = parsed.company || null
           imageAnalysisResult.productName = parsed.productName || null
         } catch (e) {
@@ -1108,7 +1108,7 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         context_priority: '이미지 > 입력 텍스트 > 트렌드',
         target: targetAudience,
         insurance: insuranceProduct,
-        // V2026.37.53 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
+        // V2026.37.54 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
         company: imageAnalysisResult?.company || null,
         productName: imageAnalysisResult?.productName || null,
         seo_audit: expertData.seo_audit || { score: 95, grade: 'S+', rank_prediction: '1-3위', analysis: 'SEO 최적화 완료' },
@@ -1131,7 +1131,7 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         expert: ENGINE.PRO,
         comments: ENGINE.FLASH
       },
-      version: '2026.37.53',
+      version: '2026.37.54',
       changelog: 'v4: 스트리밍 대응, 제목 25자, 본문 1,000자, Context Switching'
     })
     
@@ -1165,7 +1165,7 @@ app.post('/api/generate/full-package-stream', async (c) => {
       let imageAnalysis = requestImageAnalysis // API 요청에서 전달된 분석 데이터 우선 사용
       let reportData: any[] = []
       let imageDetectedKeyword = ''
-      // V2026.37.53 - 이미지에서 추출한 보험사/상품명 (자동 이미지 생성용)
+      // V2026.37.54 - 이미지에서 추출한 보험사/상품명 (자동 이미지 생성용)
       let detectedCompany: string | null = null
       let detectedProductName: string | null = null
       
@@ -1266,7 +1266,7 @@ app.post('/api/generate/full-package-stream', async (c) => {
               topic = userContextAngle ? `${userContextAngle} (${parsed.detected_keyword})` : parsed.detected_keyword
               imageDetectedKeyword = parsed.detected_keyword
             }
-            // V2026.37.53 - 보험사명 저장 (자동 이미지 생성용)
+            // V2026.37.54 - 보험사명 저장 (자동 이미지 생성용)
             detectedCompany = parsed.company || null
             detectedProductName = parsed.productName || parsed.detected_keyword || null
             
@@ -1705,14 +1705,14 @@ JSON 형식으로만 응답:
         type: 'complete',
         package: {
           topic, context_source: contextSource, insurance: insuranceProduct, target: targetAudience,
-          // V2026.37.53 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
+          // V2026.37.54 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
           company: detectedCompany,
           productName: detectedProductName,
           image_detected_keyword: imageDetectedKeyword || null,
           titles, viral_questions: viralQuestions, contents, comments, report_data: reportData,
           seoKeywords, hashtags
         },
-        version: '2026.37.53'
+        version: '2026.37.54'
       }) + '\n')
       
     } catch (error) {
@@ -1885,7 +1885,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '2026.37.53',
+    version: '2026.37.54',
     project: 'XIVIX_Insurance_King_2026 (MASTER-1)',
     masterInstruction: MASTER_INSTRUCTION_V3,
     engines: {
@@ -7042,10 +7042,10 @@ async function goGenerateStream() {
                   setTimeout(() => { cdEl.style.display = 'none'; }, 3000);
                 }
                 
-                // V2026.37.53 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
+                // V2026.37.54 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
                 // 보험 정보가 감지된 경우 자동으로 마케팅 이미지 생성 (company는 topic에서 추출 가능)
                 if (resultData && resultData.insurance) {
-                  console.log('[XIVIX] V2026.37.53 자동 이미지 생성 시작:', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
+                  console.log('[XIVIX] V2026.37.54 자동 이미지 생성 시작:', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
                   // 토스트 알림
                   const autoToast = document.createElement('div');
                   autoToast.innerHTML = '<i class="fas fa-magic"></i> AI가 마케팅 이미지를 자동 생성합니다...';
@@ -7102,9 +7102,9 @@ async function goGenerateStream() {
             // ✅ 이미지 생성 섹션 표시
             document.getElementById('imageGenSection').classList.add('show');
             
-            // V2026.37.53 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
+            // V2026.37.54 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
             if (resultData && resultData.insurance) {
-              console.log('[XIVIX] V2026.37.53 자동 이미지 생성 (버퍼):', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
+              console.log('[XIVIX] V2026.37.54 자동 이미지 생성 (버퍼):', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
               setTimeout(() => {
                 generateMarketingImage();
               }, 1500);
@@ -7344,10 +7344,10 @@ async function generateMarketingImage() {
     return;
   }
   
-  // V2026.37.53 - XIIM API V2.2 규격에 맞춘 keyword 생성
+  // V2026.37.54 - XIIM API V2.2 규격에 맞춘 keyword 생성
   // 공식: {보험사 한글명} {상품유형} {설계안/설계서}
   
-  // V2026.37.53 - 보험사명 추출 우선순위:
+  // V2026.37.54 - 보험사명 추출 우선순위:
   // 1. 이미지 분석에서 추출한 company
   // 2. topic에서 보험사명 추출
   // 3. 기본값 '삼성생명'
@@ -7363,7 +7363,7 @@ async function generateMarketingImage() {
     for (const c of companyList) {
       if (topicLower.includes(c.toLowerCase()) || topicLower.includes(c.replace('생명', '').replace('손해보험', '').replace('화재', ''))) {
         company = c;
-        console.log('[XIVIX] V2026.37.53 topic에서 보험사 추출:', company);
+        console.log('[XIVIX] V2026.37.54 topic에서 보험사 추출:', company);
         break;
       }
     }
@@ -7437,38 +7437,87 @@ async function generateMarketingImage() {
   try {
     console.log('[XIVIX] 이미지 생성 요청:', { keyword, targetCompany, hasDirectUrl, directSourceUrl });
     
-    // ✅ 미들웨어 API 규격에 맞춘 요청 구조
-    // api_key: 최상위에 위치 (필수)
-    // request_info: keyword, user_id 필수
-    // source_url: 직접 입력 시 해당 URL 사용, 없으면 현재 페이지 URL
-    // ✅ V2026.37.53 - XIIM API V2.2/V2.3 규격 적용
-    // 1. Referer 헤더 필수
-    // 2. keyword = 보험사 + 상품유형 + 설계안
-    // 3. target_company와 keyword 일치 필수
-    const response = await fetch('https://xivix-xiim.pages.dev/api/process', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Referer': 'https://xivix-2026-pro.pages.dev/'  // ✅ XIIM V2.2 필수!
-      },
-      body: JSON.stringify({
-        api_key: XIIM_API_KEY,  // ❗ 최상위에 위치 필수
-        request_info: {
-          user_id: XIIM_USER_ID,              // ❗ 필수 (설계사 고유 ID)
-          keyword: keyword,                    // ❗ 필수: 보험사 + 상품유형 + 설계안
-          target_company: targetCompany,       // ❗ 필수: keyword와 일치해야 함!
-          title: selectedTitleText,            // 선택: 검색 정확도 향상
-          source_url: hasDirectUrl ? directSourceUrl : undefined,  // 직접 URL 입력 시에만
-          skip_verification: hasDirectUrl      // 직접 URL 입력 시 검증 스킵
-        }
-      })
-    });
+    // ============================================
+    // ✅ V2026.37.54 - XIIM API V2.4 재시도 로직 (미들웨어 수정 완료 대응)
+    // - Rate Limit (HTTP 429) → Retry-After 대기 후 재시도
+    // - Subrequest 에러 → 지수 백오프 재시도
+    // - 최대 3회 시도
+    // ============================================
+    const maxRetries = 3;
+    let lastError = null;
+    let response = null;
     
-    // ============================================
-    // ✅ CEO 최종 지시 (2026.01.19) - 응답 처리 로직 확정
-    // 서버 응답 구조: { "status": "success", "data": { "final_url": "..." } }
-    // 반드시 result.data.final_url 경로로 읽어야 함
-    // ============================================
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log('[XIVIX] XIIM API 호출 시도 ' + attempt + '/' + maxRetries);
+        
+        response = await fetch('https://xivix-xiim.pages.dev/api/process', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Referer': 'https://xivix-2026-pro.pages.dev/'  // ✅ XIIM V2.2 필수!
+          },
+          body: JSON.stringify({
+            api_key: XIIM_API_KEY,  // ❗ 최상위에 위치 필수
+            request_info: {
+              user_id: XIIM_USER_ID,              // ❗ 필수 (설계사 고유 ID)
+              keyword: keyword,                    // ❗ 필수: 보험사 + 상품유형 + 설계안
+              target_company: targetCompany,       // ❗ 필수: keyword와 일치해야 함!
+              title: selectedTitleText,            // 선택: 검색 정확도 향상
+              source_url: hasDirectUrl ? directSourceUrl : undefined,  // 직접 URL 입력 시에만
+              skip_verification: hasDirectUrl      // 직접 URL 입력 시 검증 스킵
+            }
+          })
+        });
+        
+        // ✅ V2026.37.54 - Rate Limit 처리 (HTTP 429)
+        if (response.status === 429) {
+          const retryAfter = parseInt(response.headers.get('Retry-After') || '5', 10);
+          const remaining = response.headers.get('X-RateLimit-Remaining') || '0';
+          console.warn('[XIVIX] Rate Limited! 대기 시간:', retryAfter, '초 / 남은 요청:', remaining);
+          
+          // UI 업데이트: 대기 중 메시지
+          if (loadingText) loadingText.textContent = '⏳ 요청이 많습니다. ' + retryAfter + '초 후 재시도...';
+          if (loadingSub) loadingSub.textContent = '미들웨어 Rate Limit 대기 중 (시도 ' + attempt + '/' + maxRetries + ')';
+          
+          if (attempt < maxRetries) {
+            await new Promise(r => setTimeout(r, retryAfter * 1000));
+            continue;
+          } else {
+            throw new Error('RATE_LIMITED: 요청이 너무 빈번합니다. 잠시 후 다시 시도해 주세요.');
+          }
+        }
+        
+        // 성공 또는 다른 에러 - 루프 탈출
+        break;
+        
+      } catch (fetchError) {
+        lastError = fetchError;
+        console.error('[XIVIX] XIIM 호출 실패 (시도 ' + attempt + '):', fetchError.message);
+        
+        // Subrequest 에러 또는 네트워크 에러 → 지수 백오프 재시도
+        if (attempt < maxRetries) {
+          const backoffDelay = 1000 * Math.pow(2, attempt - 1); // 1초, 2초, 4초
+          console.log('[XIVIX] 지수 백오프 대기:', backoffDelay, 'ms');
+          
+          if (loadingText) loadingText.textContent = '🔄 재시도 중... (' + attempt + '/' + maxRetries + ')';
+          if (loadingSub) loadingSub.textContent = '일시적 오류 발생, ' + (backoffDelay/1000) + '초 후 재시도';
+          
+          await new Promise(r => setTimeout(r, backoffDelay));
+        } else {
+          throw lastError;
+        }
+      }
+    }
+    
+    if (!response) {
+      throw lastError || new Error('XIIM API 호출 실패');
+    }
+    
+    // ✅ V2026.37.54 - 캐시 상태 로깅
+    const cacheStatus = response.headers.get('X-Cache') || 'UNKNOWN';
+    const rateLimitRemaining = response.headers.get('X-RateLimit-Remaining') || '-';
+    console.log('[XIVIX] XIIM 캐시:', cacheStatus, '/ 남은 요청:', rateLimitRemaining);
     
     // ✅ CEO 지시 (2026.01.20) - 디버깅: 응답 헤더 및 본문 로깅
     const responseContentType = response.headers.get('Content-Type') || '';
