@@ -1131,7 +1131,7 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         expert: ENGINE.PRO,
         comments: ENGINE.FLASH
       },
-      version: '2026.37.58',
+      version: '2026.37.59',
       changelog: 'v4: 스트리밍 대응, 제목 25자, 본문 1,000자, Context Switching'
     })
     
@@ -1712,7 +1712,7 @@ JSON 형식으로만 응답:
           titles, viral_questions: viralQuestions, contents, comments, report_data: reportData,
           seoKeywords, hashtags
         },
-        version: '2026.37.58'
+        version: '2026.37.59'
       }) + '\n')
       
     } catch (error) {
@@ -1885,7 +1885,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '2026.37.58',
+    version: '2026.37.59',
     project: 'XIVIX_Insurance_King_2026 (MASTER-1)',
     masterInstruction: MASTER_INSTRUCTION_V3,
     engines: {
@@ -7459,12 +7459,16 @@ async function generateMarketingImage() {
     let finalIsSample = false;
     let finalVerification = {};
     
-    // 키워드 변형 전략 (재시도 시마다 다른 키워드 사용)
+    // ============================================
+    // ✅ V2026.37.59 - CEO 긴급 지시: 키워드 전략 강화
+    // 문제: "삼성금융 Open Collaboration" 홍보 포스터 반환됨
+    // 해결: 보험 설계서/제안서 특화 키워드 사용
+    // ============================================
     const keywordVariations = [
-      company + ' ' + insurance + ' 설계안',
-      company + ' ' + insurance + ' 가입설계서 보험료',
-      company + ' ' + insurance + ' 보장분석표 담보',
-      insurance + ' 가입제안서 월보험료'
+      company + ' ' + insurance + ' 가입설계서 월보험료 담보내역',  // 1차: 설계서 필수 요소 명시
+      company + ' ' + insurance + ' 보험제안서 가입제안서 보장내용',  // 2차: 제안서 키워드
+      company + ' ' + insurance + ' 설계안 피보험자 보험료 표',      // 3차: 표 형식 강조
+      insurance + ' 가입설계서 보장분석표 월납보험료 담보'           // 4차: 보험사 제외 일반 검색
     ];
     
     while (!validImageFound && autoRetryCount < MAX_AUTO_RETRY) {
@@ -7605,10 +7609,15 @@ async function generateMarketingImage() {
     // "삼성금융 Open Collaboration", 홍보 포스터, 광고 이미지 등 필터링
     // 이 패턴이 감지되면 자동으로 재생성 시도
     // ============================================
+    // ============================================
+    // ✅ V2026.37.59 - CEO 긴급 지시: 홍보물/광고 이미지 필터 강화
+    // "삼성금융 Open Collaboration" 같은 홍보 이미지 차단
+    // ============================================
     const INVALID_IMAGE_PATTERNS = [
-      // URL에서 감지할 패턴
+      // URL에서 감지할 패턴 (Cloudinary 변환 URL에서 원본 이름 추출)
       'open.*collaboration',
       'samsung.*financial',
+      'samsung.*group',
       'poster',
       'banner',
       'advertisement',
@@ -7619,7 +7628,15 @@ async function generateMarketingImage() {
       'brand.*image',
       'pr_image',
       'news_',
-      'article_'
+      'article_',
+      'logo_',
+      'marketing_',
+      'infographic',
+      'brochure',
+      'leaflet',
+      'flyer',
+      'ci_guide',
+      'official.*statement'
     ];
     
     const urlLower = imageUrl.toLowerCase();
