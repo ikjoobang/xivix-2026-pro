@@ -948,7 +948,7 @@ app.post('/api/generate/full-package', async (c) => {
           // 전체 분석 결과 저장
           imageAnalysis = `📋 ${parsed.imageType || '문서'} 분석\n🏢 ${parsed.company || ''} - ${parsed.productName || ''}\n\n${parsed.summary || ''}\n\n⚠️ 주의사항:\n${(parsed.warnings || []).map((w: string) => '• ' + w).join('\n')}\n\n💡 전문가 조언:\n${parsed.advice || ''}`
           
-          // V2026.37.60 - 이미지에서 추출한 보험사명 저장 (자동 이미지 생성용)
+          // V2026.37.61 - 이미지에서 추출한 보험사명 저장 (자동 이미지 생성용)
           imageAnalysisResult.company = parsed.company || null
           imageAnalysisResult.productName = parsed.productName || null
         } catch (e) {
@@ -972,7 +972,7 @@ app.post('/api/generate/full-package', async (c) => {
     ).join(', ')
     
     // ============================================
-    // 🚨 핵심 제약 조건 (프롬프트 최상단 배치) - V2026.37.60
+    // 🚨 핵심 제약 조건 (프롬프트 최상단 배치) - V2026.37.61
     // ============================================
     const fullPackagePrompt = `## XIVIX 2026 마케팅 콘텐츠 생성 (v5) ##
 
@@ -1145,7 +1145,7 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         context_priority: '이미지 > 입력 텍스트 > 트렌드',
         target: targetAudience,
         insurance: insuranceProduct,
-        // V2026.37.60 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
+        // V2026.37.61 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
         company: imageAnalysisResult?.company || null,
         productName: imageAnalysisResult?.productName || null,
         seo_audit: expertData.seo_audit || { score: 95, grade: 'S+', rank_prediction: '1-3위', analysis: 'SEO 최적화 완료' },
@@ -1168,7 +1168,7 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         expert: ENGINE.PRO,
         comments: ENGINE.FLASH
       },
-      version: '2026.37.60',
+      version: '2026.37.61',
       changelog: 'v4: 스트리밍 대응, 제목 25자, 본문 1,000자, Context Switching'
     })
     
@@ -1202,7 +1202,7 @@ app.post('/api/generate/full-package-stream', async (c) => {
       let imageAnalysis = requestImageAnalysis // API 요청에서 전달된 분석 데이터 우선 사용
       let reportData: any[] = []
       let imageDetectedKeyword = ''
-      // V2026.37.60 - 이미지에서 추출한 보험사/상품명 (자동 이미지 생성용)
+      // V2026.37.61 - 이미지에서 추출한 보험사/상품명 (자동 이미지 생성용)
       let detectedCompany: string | null = null
       let detectedProductName: string | null = null
       
@@ -1303,7 +1303,7 @@ app.post('/api/generate/full-package-stream', async (c) => {
               topic = userContextAngle ? `${userContextAngle} (${parsed.detected_keyword})` : parsed.detected_keyword
               imageDetectedKeyword = parsed.detected_keyword
             }
-            // V2026.37.60 - 보험사명 저장 (자동 이미지 생성용)
+            // V2026.37.61 - 보험사명 저장 (자동 이미지 생성용)
             detectedCompany = parsed.company || null
             detectedProductName = parsed.productName || parsed.detected_keyword || null
             
@@ -1386,7 +1386,7 @@ ${ocrPriorityBlock}
 - "${targetAge}살에 ${insuranceProduct} 안 들면 후회하는 이유"
 - "현직 설계사가 알려주는 보험 꿀팁"
 
-📌 [바이럴 질문 3개 생성 규칙 - V2026.37.60 수정]
+📌 [바이럴 질문 3개 생성 규칙 - V2026.37.61 수정]
 ■ 질문1: 150~250자 / 질문2: 250~350자 / 질문3: 350~450자
 ■ 🔴🔴🔴 [최우선 규칙] 🔴🔴🔴
   1. 모든 문장을 질문형으로 끝낼 것! ("~인가요?", "~될까요?", "~맞나요?", "~어떻게 해야 하나요?")
@@ -1575,6 +1575,12 @@ ${ocrDataBinding}
 
 🚨🚨🚨 [XIVIX 김미경 지사장급 품질 기준 - 위반 시 출력 금지] 🚨🚨🚨
 
+🔴🔴🔴 [CEO 최우선 지시 - SEO 필수 규칙] 🔴🔴🔴
+■ "${insuranceProduct}" 키워드를 본문에 최소 3회 이상 자연스럽게 포함!
+■ 반드시 포함할 표현: "보험상담", "보험리모델링", "보험상담이 필요하신 분"
+■ 긍정적/희망적 톤 유지! 부정적 분위기 절대 금지!
+■ "이렇게 하면 안심할 수 있어요", "좋은 방법이 있어요" 같은 희망적 마무리!
+
 ⏰ [기준 시점 강제] 현재는 2026년입니다!
 ■ 모든 통계/법률/트렌드는 "2026년 현재" 또는 "올해(2026년)" 기준으로 작성!
 ■ "2023년", "2024년", "2025년"은 과거 사례로만 언급 (현재 기준 아님!)
@@ -1740,22 +1746,50 @@ JSON 형식으로만 응답:
       await stream.write(JSON.stringify({ type: 'comments', data: comments }) + '\n')
       console.log('[XIVIX] 댓글 전송 완료:', comments.length, '개')
       
-      // Final - CEO 지시 (2026.01.20): seoKeywords + hashtags 추가
-      const seoKeywords = [insuranceProduct, targetAudience, topic.split(' ')[0], '보험상담', '보험리모델링'].filter(Boolean).slice(0, 5)
+      // ============================================
+      // 🔥 V2026.37.61 - CEO 긴급 지시: SEO 키워드 다양성 + 고정 키워드
+      // 1. 필수 고정 키워드: 보험상담, 보험리모델링, 보험상담이필요하신분
+      // 2. 상품명 기반 다양한 키워드 생성
+      // 3. 매번 다른 조합으로 생성 (랜덤 요소)
+      // ============================================
+      const FIXED_KEYWORDS = ['보험상담', '보험리모델링', '보험상담이필요하신분']
+      
+      // 상품명 기반 추가 키워드 풀 (랜덤 선택용)
+      const productKeywordPool = [
+        insuranceProduct,
+        insuranceProduct + '추천',
+        insuranceProduct + '비교',
+        insuranceProduct + '리모델링',
+        insuranceProduct + '가입',
+        insuranceProduct + '상담',
+        insuranceProduct + '견적',
+        targetAudience + '보험',
+        targetAudience + insuranceProduct,
+        topic.split(' ')[0],
+        detectedCompany ? detectedCompany + '보험' : null,
+        detectedCompany ? detectedCompany + insuranceProduct : null
+      ].filter(Boolean)
+      
+      // 랜덤으로 2개 선택
+      const shuffled = productKeywordPool.sort(() => Math.random() - 0.5)
+      const selectedProducts = shuffled.slice(0, 2)
+      
+      // 최종 SEO 키워드: 고정 3개 + 랜덤 2개 = 5개
+      const seoKeywords = [...FIXED_KEYWORDS, ...selectedProducts].slice(0, 5)
       const hashtags = seoKeywords.map(k => '#' + String(k).replace(/\s+/g, ''))
       
       await stream.write(JSON.stringify({
         type: 'complete',
         package: {
           topic, context_source: contextSource, insurance: insuranceProduct, target: targetAudience,
-          // V2026.37.60 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
+          // V2026.37.61 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
           company: detectedCompany,
           productName: detectedProductName,
           image_detected_keyword: imageDetectedKeyword || null,
           titles, viral_questions: viralQuestions, contents, comments, report_data: reportData,
           seoKeywords, hashtags
         },
-        version: '2026.37.60'
+        version: '2026.37.61'
       }) + '\n')
       
     } catch (error) {
@@ -1928,7 +1962,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '2026.37.60',
+    version: '2026.37.61',
     project: 'XIVIX_Insurance_King_2026 (MASTER-1)',
     masterInstruction: MASTER_INSTRUCTION_V3,
     engines: {
@@ -6750,13 +6784,13 @@ function copyAllContent() {
 const API_LIMIT_KEY = 'xivix_api_usage';
 const DAILY_API_LIMIT = 2;
 
-// ✅ V2026.37.60 - VIP 사용자 (API 무제한)
+// ✅ V2026.37.61 - VIP 사용자 (API 무제한)
 const VIP_PHONES = [
   '010-4845-3065',  // 방익주 대표
   '010-3159-3697'   // 김미경 지사장
 ];
 
-// ✅ V2026.37.60 - VIP 토큰 (URL 파라미터로 무제한 해제)
+// ✅ V2026.37.61 - VIP 토큰 (URL 파라미터로 무제한 해제)
 // 사용법: https://xivix.ai.kr?vip=김미경 또는 ?vip=방익주
 const VIP_TOKENS = {
   '김미경': '010-3159-3697',
@@ -7136,10 +7170,10 @@ async function goGenerateStream() {
                   setTimeout(() => { cdEl.style.display = 'none'; }, 3000);
                 }
                 
-                // V2026.37.60 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
+                // V2026.37.61 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
                 // 보험 정보가 감지된 경우 자동으로 마케팅 이미지 생성 (company는 topic에서 추출 가능)
                 if (resultData && resultData.insurance) {
-                  console.log('[XIVIX] V2026.37.60 자동 이미지 생성 시작:', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
+                  console.log('[XIVIX] V2026.37.61 자동 이미지 생성 시작:', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
                   // 토스트 알림
                   const autoToast = document.createElement('div');
                   autoToast.innerHTML = '<i class="fas fa-magic"></i> AI가 마케팅 이미지를 자동 생성합니다...';
@@ -7196,9 +7230,9 @@ async function goGenerateStream() {
             // ✅ 이미지 생성 섹션 표시
             document.getElementById('imageGenSection').classList.add('show');
             
-            // V2026.37.60 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
+            // V2026.37.61 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
             if (resultData && resultData.insurance) {
-              console.log('[XIVIX] V2026.37.60 자동 이미지 생성 (버퍼):', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
+              console.log('[XIVIX] V2026.37.61 자동 이미지 생성 (버퍼):', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
               setTimeout(() => {
                 generateMarketingImage();
               }, 1500);
@@ -7439,7 +7473,7 @@ async function generateMarketingImage() {
   }
   
   // ============================================
-  // ✅ V2026.37.60 - CEO 긴급 지시: 자동 재검색 시스템
+  // ✅ V2026.37.61 - CEO 긴급 지시: 자동 재검색 시스템
   // 홍보물/광고 이미지 감지 시 최대 3회까지 자동 재검색
   // 각 시도마다 키워드 변형 적용
   // ============================================
@@ -7447,10 +7481,10 @@ async function generateMarketingImage() {
   let autoRetryCount = 0;
   let excludedUrls = [];
   
-  // V2026.37.60 - XIIM API V2.2 규격에 맞춘 keyword 생성
+  // V2026.37.61 - XIIM API V2.2 규격에 맞춘 keyword 생성
   // 공식: {보험사 한글명} {상품유형} {설계안/설계서}
   
-  // V2026.37.60 - 보험사명 추출 우선순위:
+  // V2026.37.61 - 보험사명 추출 우선순위:
   // 1. 이미지 분석에서 추출한 company
   // 2. topic에서 보험사명 추출
   // 3. 기본값 '삼성생명'
@@ -7466,7 +7500,7 @@ async function generateMarketingImage() {
     for (const c of companyList) {
       if (topicLower.includes(c.toLowerCase()) || topicLower.includes(c.replace('생명', '').replace('손해보험', '').replace('화재', ''))) {
         company = c;
-        console.log('[XIVIX] V2026.37.60 topic에서 보험사 추출:', company);
+        console.log('[XIVIX] V2026.37.61 topic에서 보험사 추출:', company);
         break;
       }
     }
@@ -7539,7 +7573,7 @@ async function generateMarketingImage() {
   
   try {
     // ============================================
-    // ✅ V2026.37.60 - 자동 재검색 루프 (홍보물/광고 감지 시)
+    // ✅ V2026.37.61 - 자동 재검색 루프 (홍보물/광고 감지 시)
     // ============================================
     let validImageFound = false;
     let finalImageUrl = null;
@@ -7548,7 +7582,7 @@ async function generateMarketingImage() {
     let finalVerification = {};
     
     // ============================================
-    // ✅ V2026.37.60 - CEO 긴급 지시: 키워드 전략 강화
+    // ✅ V2026.37.61 - CEO 긴급 지시: 키워드 전략 강화
     // 문제: "삼성금융 Open Collaboration" 홍보 포스터 반환됨
     // 해결: 보험 설계서/제안서 특화 키워드 사용
     // ============================================
@@ -7563,12 +7597,12 @@ async function generateMarketingImage() {
       autoRetryCount++;
       const currentKeyword = keywordVariations[Math.min(autoRetryCount - 1, keywordVariations.length - 1)];
       
-      console.log('[XIVIX] V2026.37.60 자동 검색 시도 ' + autoRetryCount + '/' + MAX_AUTO_RETRY + ' - 키워드: ' + currentKeyword);
+      console.log('[XIVIX] V2026.37.61 자동 검색 시도 ' + autoRetryCount + '/' + MAX_AUTO_RETRY + ' - 키워드: ' + currentKeyword);
       if (loadingText) loadingText.textContent = '🔍 설계서 검색 중... (시도 ' + autoRetryCount + '/' + MAX_AUTO_RETRY + ')';
       if (loadingSub) loadingSub.textContent = '키워드: ' + currentKeyword;
     
     // ============================================
-    // ✅ V2026.37.60 - XIIM API V2.4 재시도 로직 (미들웨어 수정 완료 대응)
+    // ✅ V2026.37.61 - XIIM API V2.4 재시도 로직 (미들웨어 수정 완료 대응)
     // - Rate Limit (HTTP 429) → Retry-After 대기 후 재시도
     // - Subrequest 에러 → 지수 백오프 재시도
     // - 최대 3회 시도
@@ -7591,17 +7625,17 @@ async function generateMarketingImage() {
             api_key: XIIM_API_KEY,  // ❗ 최상위에 위치 필수
             request_info: {
               user_id: XIIM_USER_ID,              // ❗ 필수 (설계사 고유 ID)
-              keyword: currentKeyword,             // ✅ V2026.37.60: 변형 키워드 사용
+              keyword: currentKeyword,             // ✅ V2026.37.61: 변형 키워드 사용
               target_company: targetCompany,       // ❗ 필수: keyword와 일치해야 함!
               title: selectedTitleText,            // 선택: 검색 정확도 향상
-              exclude_urls: excludedUrls.length > 0 ? excludedUrls : undefined, // ✅ V2026.37.60: 제외 URL
+              exclude_urls: excludedUrls.length > 0 ? excludedUrls : undefined, // ✅ V2026.37.61: 제외 URL
               source_url: hasDirectUrl ? directSourceUrl : undefined,  // 직접 URL 입력 시에만
               skip_verification: hasDirectUrl      // 직접 URL 입력 시 검증 스킵
             }
           })
         });
         
-        // ✅ V2026.37.60 - Rate Limit 처리 (HTTP 429)
+        // ✅ V2026.37.61 - Rate Limit 처리 (HTTP 429)
         if (response.status === 429) {
           const retryAfter = parseInt(response.headers.get('Retry-After') || '5', 10);
           const remaining = response.headers.get('X-RateLimit-Remaining') || '0';
@@ -7645,7 +7679,7 @@ async function generateMarketingImage() {
       throw lastError || new Error('XIIM API 호출 실패');
     }
     
-    // ✅ V2026.37.60 - 캐시 상태 로깅
+    // ✅ V2026.37.61 - 캐시 상태 로깅
     const cacheStatus = response.headers.get('X-Cache') || 'UNKNOWN';
     const rateLimitRemaining = response.headers.get('X-RateLimit-Remaining') || '-';
     console.log('[XIVIX] XIIM 캐시:', cacheStatus, '/ 남은 요청:', rateLimitRemaining);
@@ -7669,7 +7703,7 @@ async function generateMarketingImage() {
     console.log('[XIVIX] 미들웨어 응답:', result);
     
     // ============================================
-    // ✅ V2026.37.60 - XIIM V2.7 대응: success 필드 확인 강화
+    // ✅ V2026.37.61 - XIIM V2.7 대응: success 필드 확인 강화
     // XIIM 팀 권고: API 실패 시 캐시된 이전 이미지 표시 방지
     // ============================================
     
@@ -7693,12 +7727,12 @@ async function generateMarketingImage() {
     }
     
     // ============================================
-    // ✅ V2026.37.60 - CEO 긴급 지시: 잘못된 이미지 패턴 감지 및 자동 재검색
+    // ✅ V2026.37.61 - CEO 긴급 지시: 잘못된 이미지 패턴 감지 및 자동 재검색
     // "삼성금융 Open Collaboration", 홍보 포스터, 광고 이미지 등 필터링
     // 이 패턴이 감지되면 자동으로 재생성 시도
     // ============================================
     // ============================================
-    // ✅ V2026.37.60 - CEO 긴급 지시: 홍보물/광고 이미지 필터 강화
+    // ✅ V2026.37.61 - CEO 긴급 지시: 홍보물/광고 이미지 필터 강화
     // "삼성금융 Open Collaboration" 같은 홍보 이미지 차단
     // ============================================
     const INVALID_IMAGE_PATTERNS = [
@@ -7745,7 +7779,7 @@ async function generateMarketingImage() {
       // 잘못된 이미지 URL을 제외 목록에 추가
       excludedUrls.push(imageUrl);
       
-      // ✅ V2026.37.60: 자동 재시도 - throw 대신 continue
+      // ✅ V2026.37.61: 자동 재시도 - throw 대신 continue
       if (autoRetryCount < MAX_AUTO_RETRY) {
         console.log('[XIVIX] 🔄 자동 재검색 시도... (' + (autoRetryCount + 1) + '/' + MAX_AUTO_RETRY + ')');
         if (loadingText) loadingText.textContent = '🔄 홍보 이미지 감지됨, 설계서 재검색 중...';
@@ -7758,7 +7792,7 @@ async function generateMarketingImage() {
     }
     
     // ============================================
-    // ✅ V2026.37.60 - XIIM V2.8 대응: verification 필드 완전 활용
+    // ✅ V2026.37.61 - XIIM V2.8 대응: verification 필드 완전 활용
     // ============================================
     const verification = result.data?.verification || {};
     const isDesignDocument = verification.is_design_document;
@@ -7769,7 +7803,7 @@ async function generateMarketingImage() {
     const isR2Fallback = result.data?.isR2Fallback || false;
     const isSample = result.data?.is_sample || result.data?.is_fallback || result.data?.fallback || isR2Fallback;
     
-    console.log('[XIVIX] V2026.37.60 이미지 검증 결과:', { 
+    console.log('[XIVIX] V2026.37.61 이미지 검증 결과:', { 
       isDesignDocument, 
       detectedCompany, 
       verificationConfidence, 
@@ -7778,7 +7812,7 @@ async function generateMarketingImage() {
       reason: verificationReason.substring(0, 100) + '...'
     });
     
-    // ✅ V2026.37.60: XIIM V2.8 - 설계서가 아닌 경우 자동 재시도 (더 정확한 판별)
+    // ✅ V2026.37.61: XIIM V2.8 - 설계서가 아닌 경우 자동 재시도 (더 정확한 판별)
     // verification.is_design_document === false 이면 확실히 설계서가 아님
     if (isDesignDocument === false) {
       console.warn('[XIVIX] ❌ XIIM V2.8 검증 실패: 설계서 아님 (시도 ' + autoRetryCount + ')');
@@ -7807,7 +7841,7 @@ async function generateMarketingImage() {
       }
     }
     
-    // ✅ V2026.37.60: 설계서로 판정된 경우 성공 로그
+    // ✅ V2026.37.61: 설계서로 판정된 경우 성공 로그
     if (isDesignDocument === true) {
       console.log('[XIVIX] ✅ XIIM V2.8 검증 성공: 설계서 확인 (신뢰도: ' + (verificationConfidence * 100).toFixed(0) + '%)');
       console.log('[XIVIX] 감지된 요소:', detectedElements.join(', '));
@@ -7912,7 +7946,7 @@ async function generateMarketingImage() {
         console.warn('[XIVIX] 2_quality_filter: 해상도 검증 실패, 원본 사용:', resCheckError.message);
       }
       
-      // ✅ V2026.37.60: 유효한 이미지 찾음 - 루프 종료
+      // ✅ V2026.37.61: 유효한 이미지 찾음 - 루프 종료
       validImageFound = true;
       finalResolutionData = resolutionData;
       finalIsSample = isSample;
@@ -7957,13 +7991,13 @@ async function generateMarketingImage() {
         fallbackNotice.style.display = 'none';
       }
       
-      // ✅ V2026.37.60: 유효한 이미지 찾음 - while 루프 종료
+      // ✅ V2026.37.61: 유효한 이미지 찾음 - while 루프 종료
       break;
       
     } // end of while (!validImageFound && autoRetryCount < MAX_AUTO_RETRY)
     
     // ============================================
-    // ✅ V2026.37.60: 모든 시도 후 결과 확인
+    // ✅ V2026.37.61: 모든 시도 후 결과 확인
     // ============================================
     if (!validImageFound) {
       console.error('[XIVIX] ❌ ' + MAX_AUTO_RETRY + '회 시도 후 유효한 설계서 이미지를 찾지 못함');
@@ -8006,7 +8040,7 @@ async function generateMarketingImage() {
       userMsg += '💡 해결: 다른 보험사/상품으로 다시 시도해 주세요.';
       showSourceUrlInput = true;
     } else if (error.message.includes('INVALID_IMAGE_TYPE')) {
-      // ✅ V2026.37.60 - 홍보/광고 이미지 감지 시 자동 재시도
+      // ✅ V2026.37.61 - 홍보/광고 이미지 감지 시 자동 재시도
       console.log('[XIVIX] 자동 재검색 시도 (홍보 이미지 감지)');
       
       // 자동 재시도 횟수 체크 (무한 루프 방지)
@@ -8075,14 +8109,14 @@ async function generateMarketingImage() {
 }
 
 // ============================================
-// ✅ V2026.37.60 - CEO 긴급 지시: 이미지 재생성 기능
+// ✅ V2026.37.61 - CEO 긴급 지시: 이미지 재생성 기능
 // XIIM API V2.3 /api/regenerate 연동
 // 이전 이미지 URL을 exclude하고 새 이미지 검색
 // ============================================
 let excludedImageUrls = []; // 제외할 이미지 URL 목록
 
 // ============================================
-// ✅ V2026.37.60 - 이미지 재생성 기능
+// ✅ V2026.37.61 - 이미지 재생성 기능
 // 1차: /api/regenerate (exclude_urls 지원)
 // 2차: /api/process (폴백, 다른 키워드로 재검색)
 // ============================================
