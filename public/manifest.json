@@ -1,0 +1,26 @@
+{
+  "name": "XIVIX 2026 PRO - AI 보험 콘텐츠",
+  "short_name": "XIVIX",
+  "description": "상위 1% 보험 전문가를 위한 AI 콘텐츠 생성 엔진",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#00D4FF",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://res.cloudinary.com/df8yybjcg/image/upload/v1/xivix/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://res.cloudinary.com/df8yybjcg/image/upload/v1/xivix/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "ko-KR"
+}
