@@ -2708,6 +2708,56 @@ app.post('/api/admin/send-expiry-reminders', async (c) => {
 });
 
 // ============================================
+// V2026.37.71 - XIIM 프록시 API (도메인 제한 우회)
+// 프론트엔드 → 백엔드 → XIIM 서버-서버 통신
+// ============================================
+app.post('/api/xiim/process', async (c) => {
+  try {
+    const body = await c.req.json();
+    console.log('[XIVIX] XIIM 프록시 요청:', body.keyword || body.request_info?.keyword);
+    
+    // XIIM API 형식으로 변환 (request_info 객체 필요)
+    const xiimPayload = body.request_info ? body : {
+      api_key: body.api_key,
+      request_info: {
+        keyword: body.keyword,
+        user_id: body.user_id,
+        target_company: body.target_company,
+        title: body.title,
+        exclude_urls: body.exclude_urls || [],
+        source_url: body.source_url,
+        skip_verification: body.skip_verification,
+        insurance_type: body.insurance_type,
+        strict_match: body.strict_match
+      }
+    };
+    
+    // 실제 XIIM 서버로 서버-서버 통신
+    const response = await fetch('https://xivix-xiim.pages.dev/api/process', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Origin': 'https://xivix-2026-pro.pages.dev',
+        'Referer': 'https://xivix-2026-pro.pages.dev/'
+      },
+      body: JSON.stringify(xiimPayload)
+    });
+    
+    const result: any = await response.json();
+    console.log('[XIVIX] XIIM 응답:', result.status, result.data?.final_url ? '이미지있음' : '이미지없음');
+    
+    return c.json(result);
+  } catch (err: any) {
+    console.error('[XIVIX] XIIM 프록시 오류:', err);
+    return c.json({ 
+      success: false, 
+      status: 'error',
+      error: { code: 'PROXY_ERROR', message: err?.message }
+    });
+  }
+});
+
+// ============================================
 // 첫 페이지: GPT 스타일 검색창 + 실시간 보험 트렌드 + 바로 결과 출력
 // ============================================
 const mainPageHtml = `<!DOCTYPE html>
@@ -7908,7 +7958,7 @@ loadTrends();
 
 // ============================================
 // 🖼️ AI 마케팅 이미지 생성 기능
-// 미들웨어 서버: https://xivix-xiim.pages.dev/api/process
+// 미들웨어 서버: /api/xiim/process
 // API 규격: api_key(최상위), request_info(keyword, user_id 필수)
 // ============================================
 let generatedImageUrl = '';
@@ -8220,7 +8270,7 @@ async function generateMarketingImage() {
       try {
         console.log('[XIVIX] XIIM API 호출 시도 ' + attempt + '/' + maxRetries);
         
-        response = await fetch('https://xivix-xiim.pages.dev/api/process', {
+        response = await fetch('/api/xiim/process', {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -8947,7 +8997,7 @@ async function fetchImageCandidates(company, insurance, title) {
     
     try {
       // ✅ V2026.37.71 - XIIM에 상품 유형(insurance_type) 명시적 전달
-      const response = await fetch('https://xivix-xiim.pages.dev/api/process', {
+      const response = await fetch('/api/xiim/process', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
