@@ -5246,7 +5246,7 @@ body{
         </div>
         <div class="trend-timer">
           <span class="trend-time" id="trendTime"><i class="fas fa-clock"></i> 방금 전</span>
-          <button class="refresh-btn" id="refreshBtn" onclick="refreshTrends()">
+          <button class="refresh-btn" id="refreshBtn" onclick="refreshTrends()" ontouchend="refreshTrends()">
             <i class="fas fa-sync-alt"></i> 새로고침
           </button>
         </div>
@@ -5818,13 +5818,15 @@ function removeFile(id) {
   renderFileList();
 }
 
-// 트렌드 로드 (Linear 스타일 미니멀 UI)
+// 트렌드 로드 (Linear 스타일 미니멀 UI) - V2026.37.71 null 체크 추가
 async function loadTrends() {
+  console.log('[XIVIX] loadTrends 시작, trendsEl:', trendsEl ? '존재' : 'NULL');
   try {
     const res = await fetch('/api/trend');
     const data = await res.json();
+    console.log('[XIVIX] 트렌드 API 응답:', data.success, '키워드 수:', data.trends?.length);
     
-    if (data.success && data.trends) {
+    if (data.success && data.trends && trendsEl) {
       // 트렌드 그리드 렌더링 (컴팩트 1줄 레이아웃)
       trendsEl.innerHTML = data.trends.map(t => {
         let changeHtml = '';
@@ -7883,6 +7885,26 @@ searchEl.addEventListener('keydown', (e) => {
 
 // 초기화 (처음 1회만 로드, 이후 수동 새로고침)
 loadTrends();
+
+// V2026.37.71 - 트렌드 새로고침 버튼 이벤트 강제 바인딩 (모바일 대응)
+(function bindRefreshBtn() {
+  const btn = document.getElementById('refreshBtn');
+  if (btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      console.log('[XIVIX] 새로고침 버튼 클릭 (addEventListener)');
+      refreshTrends();
+    });
+    btn.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      console.log('[XIVIX] 새로고침 버튼 터치 (touchend)');
+      refreshTrends();
+    });
+    console.log('[XIVIX] ✅ 새로고침 버튼 이벤트 바인딩 완료');
+  } else {
+    console.warn('[XIVIX] ⚠️ refreshBtn 요소를 찾을 수 없음');
+  }
+})();
 
 // ============================================
 // 🖼️ AI 마케팅 이미지 생성 기능
