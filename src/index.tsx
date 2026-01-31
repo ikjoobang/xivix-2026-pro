@@ -9024,17 +9024,18 @@ async function fetchImageCandidates(company, insurance, title) {
         
         imgEl.src = url;
         
+        // V2026.37.72 - CEO 지시: 홍보물이라도 이미지 표시! (사용자가 선택 가능)
         if (isDesignDoc === true) {
           badgeEl.textContent = '⭐ 설계서 (추천)';
           badgeEl.className = 'candidate-badge verified';
           return { index, url, verification, isValid: true, isRecommended: true };
         } else if (isDesignDoc === false) {
-          badgeEl.textContent = '⚠️ 홍보물 의심';
+          badgeEl.textContent = '⚠️ 홍보물';
           badgeEl.className = 'candidate-badge warning';
-          globalExcludedUrls.push(url); // 홍보물은 전역 제외에 추가
-          return { index, url, verification, isValid: false, reason: verification.reason };
+          // V2026.37.72 - 홍보물도 선택 가능하도록 isValid: true로 변경
+          return { index, url, verification, isValid: true, isRecommended: false, isPromo: true };
         } else {
-          badgeEl.textContent = '❓ 미검증';
+          badgeEl.textContent = '✓ 사용 가능';
           badgeEl.className = 'candidate-badge';
           return { index, url, verification, isValid: true, isRecommended: false };
         }
