@@ -1299,7 +1299,7 @@ app.post('/api/generate/full-package-stream', async (c) => {
   let mimeType = body.mimeType || 'image/jpeg'
   
   // V2026.37.82 - AI 모델 선택 (gemini | gpt)
-  const aiModel = body.aiModel || 'gemini'
+  const aiModel = body.aiModel || 'gpt' // V2026.37.82 - GPT-4o 기본값
   const useGPT = aiModel === 'gpt'
   
   // V39: API 요청에서 직접 전달된 OCR 데이터 (브라우저에서 미리 분석한 경우)
@@ -6772,7 +6772,7 @@ let selectedTitle = 0;
 let selectedContent = 0;
 
 // V2026.37.82 - AI 모델 선택 (gemini | gpt)
-let selectedAIModel = 'gemini';
+let selectedAIModel = 'gpt'; // V2026.37.82 - GPT-4o 기본값
 
 function selectAIModel(model) {
   selectedAIModel = model;
@@ -6796,12 +6796,16 @@ function selectAIModel(model) {
   console.log('[XIVIX] AI 모델 선택:', model);
 }
 
-// 페이지 로드 시 저장된 모델 복원
+// 페이지 로드 시 저장된 모델 복원 (V2026.37.82 - GPT-4o 기본값)
 (function initAIModel() {
   const saved = localStorage.getItem('xivix_ai_model');
   if (saved && (saved === 'gemini' || saved === 'gpt')) {
     selectedAIModel = saved;
     setTimeout(() => selectAIModel(saved), 100);
+  } else {
+    // 기본값: GPT-4o (V2026.37.82)
+    selectedAIModel = 'gpt';
+    setTimeout(() => selectAIModel('gpt'), 100);
   }
 })();
 
