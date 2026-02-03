@@ -6,7 +6,7 @@ type Bindings = {
   GEMINI_API_KEY?: string;
   GEMINI_API_KEY_PRO?: string;
   GEMINI_API_KEY_FLASH?: string;
-  OPENAI_API_KEY?: string;  // V2026.37.82 - OpenAI GPT-4o 지원
+  OPENAI_API_KEY?: string;  // V2026.37.83 - OpenAI GPT-4o 지원
   NAVER_CLIENT_ID?: string;
   NAVER_CLIENT_SECRET?: string;
   DB?: D1Database; // V2026.37.33 - D1 데이터베이스 바인딩
@@ -28,10 +28,10 @@ const ENGINE = {
   FLASH: 'gemini-2.0-flash',       // 데이터 엔진 (빠른 처리용)
   PRO: 'gemini-2.5-pro',           // 전문가 브레인 (API 확인됨) ← 최종 확정
   VISION: 'gemini-2.5-pro',        // 이미지 OCR 분석용 (PRO와 동일)
-  GPT4O: 'gpt-4o'                  // V2026.37.82 - OpenAI GPT-4o
+  GPT4O: 'gpt-4o'                  // V2026.37.83 - OpenAI GPT-4o
 }
 
-// V2026.37.82 - OpenAI API 키는 환경변수에서 가져옴
+// V2026.37.83 - OpenAI API 키는 환경변수에서 가져옴
 // Cloudflare Dashboard → xivix-2026-pro → Settings → Environment variables
 // 또는: npx wrangler pages secret put OPENAI_API_KEY
 let OPENAI_API_KEY = '';
@@ -305,7 +305,7 @@ async function callGeminiWithPersona(
 }
 
 // ============================================
-// V2026.37.82 - OpenAI GPT-4o API 호출 함수
+// V2026.37.83 - OpenAI GPT-4o API 호출 함수
 // 3박자 시스템 동일 적용 (질문/전문가/댓글)
 // ============================================
 async function callOpenAI(
@@ -358,7 +358,7 @@ async function callOpenAI(
   return content;
 }
 
-// V2026.37.82 - GPT용 시스템 프롬프트 (보험 전문가)
+// V2026.37.83 - GPT용 시스템 프롬프트 (보험 전문가)
 const GPT_SYSTEM_PROMPT = {
   expert: `당신은 30년 경력 MDRT 보험왕이자 '희망을 주는 보험 멘토'입니다.
 
@@ -989,32 +989,58 @@ app.post('/api/generate/full-package', async (c) => {
     // ============================================
     if (image) {
       contextSource = 'image'
-      const visionPrompt = `당신은 30년 경력 MDRT 보험왕입니다. 이 이미지(보험증권, 약관, 설계서 등)를 분석하고 JSON으로 응답하세요.
+      // V2026.37.83 - OCR 프롬프트 대폭 강화 (종신/100세만기 구분, 피보험자 정보 필수)
+      const visionPrompt = `당신은 30년 경력 MDRT 보험왕입니다. 이 보험 이미지를 **정확하게** 분석하고 JSON으로 응답하세요.
 
-[📊 분석 항목]
-1. 이미지 종류 파악 (보험증권, 약관, 설계서, 청구서, 진단서 등)
-2. 보험사, 상품명, 가입일, 만기일 등 기본 정보 → 이 정보를 바탕으로 detected_keyword 필드 생성
-3. 각 보장 항목별 현재 가입금액과 권장 금액 비교
-4. 주의해야 할 약관 조항이나 함정
-5. 전문가 조언 포인트
+🔴🔴🔴 [핵심 분석 규칙 - 반드시 준수!] 🔴🔴🔴
+
+1. **보험 종류 정확히 구분** (환각/추측 절대 금지!)
+   - "종신보험" = 사망 시까지 평생 보장 (만기 없음, 피보험자 사망 시 보험금 지급)
+   - "100세 만기 보험" = 100세까지만 보장 (만기 도래 시 보장 종료)
+   - "정기보험" = 일정 기간만 보장 (예: 20년, 30년)
+   - 📌 이미지에 "100세 만기", "보험기간: 100세" 등이 있으면 → "100세 만기 치매보험" 등으로 명시
+   - 📌 이미지에 "종신", "평생 보장" 등이 있으면 → "종신보험"으로 명시
+
+2. **필수 추출 정보** (이미지에서 반드시 찾을 것!)
+   - 피보험자명: 계약서에 기재된 이름
+   - 피보험자 나이: 생년월일 또는 연령
+   - 보험기간/만기: "100세 만기", "종신", "20년 만기" 등 정확히
+   - 납입기간: "20년납", "전기납", "일시납" 등
+   - 월 보험료: 숫자만 추출 (예: 162,365원)
+   - 보험사명: 정확한 회사명
+   - 상품명: 정확한 상품명
+
+3. **detected_keyword 작성 규칙**
+   - 형식: "{보험종류}" 또는 "{나이}세 {보험종류} 리모델링"
+   - 예시: "100세 만기 치매보험", "70세 치매보험 리모델링", "종신보험", "암보험"
+   - ❌ 잘못된 예: 100세 만기인데 "종신보험"이라고 쓰면 안됨!
+
+4. **report_data 작성 규칙**
+   - 이미지에 보이는 담보/특약 항목을 정확히 추출
+   - 가입금액이 명시되어 있으면 그대로 기재
+   - 추측하지 말고 이미지에 있는 것만 기재
 
 반드시 아래 JSON 형식으로만 응답하세요:
 
 {
-  "imageType": "보험증권/약관/설계서 등",
-  "company": "보험사명",
-  "productName": "상품명",
-  "detected_keyword": "이미지에서 감지된 핵심 보험 종류 (예: 암보험, 종신보험, 실손보험 등)",
-  "summary": "핵심 분석 요약 (2-3줄)",
+  "imageType": "보험설계서/보험증권/약관 등",
+  "company": "보험사명 (이미지에서 정확히 추출)",
+  "productName": "상품명 (이미지에서 정확히 추출)",
+  "insuredName": "피보험자 이름",
+  "insuredAge": "피보험자 나이 (숫자만, 예: 70)",
+  "insurancePeriod": "보험기간 (예: 100세 만기, 종신, 20년)",
+  "paymentPeriod": "납입기간 (예: 20년납, 전기납)",
+  "monthlyPremium": "월 보험료 (숫자만, 예: 162365)",
+  "detected_keyword": "정확한 보험 종류 (위 규칙 참조)",
+  "insuranceCategory": "종신보험/정기보험/건강보험/치매보험/암보험/실손보험 등",
+  "isWholeLife": false,
+  "summary": "핵심 분석 요약 (피보험자 정보 포함, 2-3줄)",
   "report_data": [
-    {"item": "암진단비", "current": "현재 가입금액", "target": "권장 금액", "status": "critical/essential/good"},
-    {"item": "뇌혈관질환", "current": "현재 가입금액", "target": "권장 금액", "status": "critical/essential/good"},
-    {"item": "급성심근경색", "current": "현재 가입금액", "target": "권장 금액", "status": "critical/essential/good"},
-    {"item": "수술비", "current": "현재 가입금액", "target": "권장 금액", "status": "critical/essential/good"},
-    {"item": "입원일당", "current": "현재 가입금액", "target": "권장 금액", "status": "critical/essential/good"}
+    {"item": "담보명1", "current": "가입금액", "target": "권장금액", "status": "critical/essential/good"},
+    {"item": "담보명2", "current": "가입금액", "target": "권장금액", "status": "critical/essential/good"}
   ],
   "warnings": ["주의사항1", "주의사항2"],
-  "advice": "전문가 핵심 조언"
+  "advice": "전문가 핵심 조언 (피보험자 상황 반영)"
 }`
       
       const visionEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`
@@ -1047,18 +1073,47 @@ app.post('/api/generate/full-package', async (c) => {
           imageAnalysis = parsed.summary || rawText
           reportData = parsed.report_data || []
           
-          // 🎯 Context Override: 이미지에서 감지된 키워드로 주제 교체
+          // 🎯 V2026.37.83 - Context Override: 이미지에서 감지된 키워드로 주제 교체
           if (parsed.detected_keyword) {
             topic = parsed.detected_keyword
             console.log(`[Context Switch] 이미지 감지 키워드로 주제 교체: ${topic}`)
           }
           
-          // 전체 분석 결과 저장
-          imageAnalysis = `📋 ${parsed.imageType || '문서'} 분석\n🏢 ${parsed.company || ''} - ${parsed.productName || ''}\n\n${parsed.summary || ''}\n\n⚠️ 주의사항:\n${(parsed.warnings || []).map((w: string) => '• ' + w).join('\n')}\n\n💡 전문가 조언:\n${parsed.advice || ''}`
+          // V2026.37.83 - 피보험자 정보 포함한 전체 분석 결과 저장
+          const insuredInfo = parsed.insuredName && parsed.insuredAge 
+            ? `👤 피보험자: ${parsed.insuredName} (${parsed.insuredAge}세)\n` 
+            : ''
+          const periodInfo = parsed.insurancePeriod 
+            ? `📅 보험기간: ${parsed.insurancePeriod}\n` 
+            : ''
+          const paymentInfo = parsed.paymentPeriod 
+            ? `💳 납입기간: ${parsed.paymentPeriod}\n` 
+            : ''
+          const premiumInfo = parsed.monthlyPremium 
+            ? `💰 월 보험료: ${Number(parsed.monthlyPremium).toLocaleString()}원\n` 
+            : ''
           
-          // V2026.37.82 - 이미지에서 추출한 보험사명 저장 (자동 이미지 생성용)
+          imageAnalysis = `📋 ${parsed.imageType || '문서'} 분석
+🏢 ${parsed.company || ''} - ${parsed.productName || ''}
+${insuredInfo}${periodInfo}${paymentInfo}${premiumInfo}
+${parsed.summary || ''}
+
+⚠️ 주의사항:
+${(parsed.warnings || []).map((w: string) => '• ' + w).join('\n')}
+
+💡 전문가 조언:
+${parsed.advice || ''}`
+          
+          // V2026.37.83 - 이미지에서 추출한 모든 핵심 정보 저장
           imageAnalysisResult.company = parsed.company || null
           imageAnalysisResult.productName = parsed.productName || null
+          imageAnalysisResult.insuredName = parsed.insuredName || null
+          imageAnalysisResult.insuredAge = parsed.insuredAge || null
+          imageAnalysisResult.insurancePeriod = parsed.insurancePeriod || null
+          imageAnalysisResult.paymentPeriod = parsed.paymentPeriod || null
+          imageAnalysisResult.monthlyPremium = parsed.monthlyPremium || null
+          imageAnalysisResult.insuranceCategory = parsed.insuranceCategory || null
+          imageAnalysisResult.isWholeLife = parsed.isWholeLife || false
         } catch (e) {
           console.error('Vision JSON Parse Error:', e)
           imageAnalysis = rawText
@@ -1080,7 +1135,7 @@ app.post('/api/generate/full-package', async (c) => {
     ).join(', ')
     
     // ============================================
-    // 🚨 핵심 제약 조건 (프롬프트 최상단 배치) - V2026.37.82
+    // 🚨 핵심 제약 조건 (프롬프트 최상단 배치) - V2026.37.83
     // ============================================
     const fullPackagePrompt = `## XIVIX 2026 마케팅 콘텐츠 생성 (v5) ##
 
@@ -1253,7 +1308,7 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         context_priority: '이미지 > 입력 텍스트 > 트렌드',
         target: targetAudience,
         insurance: insuranceProduct,
-        // V2026.37.82 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
+        // V2026.37.83 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
         company: imageAnalysisResult?.company || null,
         productName: imageAnalysisResult?.productName || null,
         seo_audit: expertData.seo_audit || { score: 95, grade: 'S+', rank_prediction: '1-3위', analysis: 'SEO 최적화 완료' },
@@ -1276,7 +1331,7 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         expert: ENGINE.PRO,
         comments: ENGINE.FLASH
       },
-      version: '2026.37.82',
+      version: '2026.37.83',
       changelog: 'v4: 스트리밍 대응, 제목 25자, 본문 1,000자, Context Switching'
     })
     
@@ -1298,8 +1353,8 @@ app.post('/api/generate/full-package-stream', async (c) => {
   let image = body.image || null
   let mimeType = body.mimeType || 'image/jpeg'
   
-  // V2026.37.82 - AI 모델 선택 (gemini | gpt)
-  const aiModel = body.aiModel || 'gpt' // V2026.37.82 - GPT-4o 기본값
+  // V2026.37.83 - AI 모델 선택 (gemini | gpt)
+  const aiModel = body.aiModel || 'gpt' // V2026.37.83 - GPT-4o 기본값
   const useGPT = aiModel === 'gpt'
   
   // V39: API 요청에서 직접 전달된 OCR 데이터 (브라우저에서 미리 분석한 경우)
@@ -1314,7 +1369,7 @@ app.post('/api/generate/full-package-stream', async (c) => {
       let imageAnalysis = requestImageAnalysis // API 요청에서 전달된 분석 데이터 우선 사용
       let reportData: any[] = []
       let imageDetectedKeyword = ''
-      // V2026.37.82 - 이미지에서 추출한 보험사/상품명 (자동 이미지 생성용)
+      // V2026.37.83 - 이미지에서 추출한 보험사/상품명 (자동 이미지 생성용)
       let detectedCompany: string | null = null
       let detectedProductName: string | null = null
       
@@ -1371,28 +1426,52 @@ app.post('/api/generate/full-package-stream', async (c) => {
         contextSource = 'image'
         await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '🖼️ 이미지 OCR 분석 중 (담보/보험료 추출)...' }) + '\n')
         
-        // V39: 강화된 이미지 OCR 프롬프트 - 담보 정보/보험료 즉시 대입
-        const visionPrompt = `## 보험 설계서/증권 이미지 OCR 분석 ##
+        // V2026.37.83 - 강화된 OCR 프롬프트 (종신/100세만기 구분, 피보험자 정보 필수)
+        const visionPrompt = `## 보험 설계서/증권 이미지 정밀 OCR 분석 ##
 
-🚨 [최우선 지시] 이미지에서 다음 정보를 정확히 추출하세요:
+🔴🔴🔴 [핵심 분석 규칙 - 환각/추측 절대 금지!] 🔴🔴🔴
 
-1. detected_keyword: 보험 종류 (암보험, 실손보험, 종신보험, 치매보험 등)
-2. company: 보험사명
-3. monthly_premium: 월 보험료 (숫자만, 예: 124000)
-4. total_premium: 총 보험료 또는 납입기간
-5. insured_name: 피보험자 이름 (있으면)
-6. insured_age: 피보험자 나이 (있으면)
-7. contract_date: 계약일자 (있으면)
-8. summary: 설계서 핵심 요약 (2~3문장)
+1. **보험 종류 정확히 구분** (가장 중요!)
+   - "종신보험" = 사망 시까지 평생 보장 (만기 없음)
+   - "100세 만기" = 100세까지만 보장 (만기 도래 시 종료)
+   - "정기보험" = 일정 기간만 보장
+   📌 이미지에 "100세", "100세 만기" 있으면 → 절대 "종신보험"이라고 하지 마세요!
+   📌 이미지에 "종신", "평생" 있으면 → "종신보험"
 
-9. report_data: 담보 항목 배열 (가장 중요!)
-   - item: 담보명 (예: 암 진단비, 수술비, 입원일당 등)
-   - current: 현재 가입 금액 (예: 3,000만원)
-   - target: 권장 금액 (예: 5,000만원) - 없으면 null
-   - status: "critical" | "essential" | "good"
+2. **detected_keyword 작성법**
+   - 100세 만기 치매보험 → "100세 만기 치매보험" (O)
+   - 100세 만기인데 "종신보험" → (X) 절대 금지!
+   - 70세가 가입한 치매보험 → "70세 치매보험 리모델링" (O)
 
-모든 숫자와 담보 정보를 이미지에서 정확히 읽어 JSON으로 응답하세요.
-이미지에 없는 정보는 null로 표시하세요.`
+3. **필수 추출 항목** (이미지에서 정확히 읽을 것)
+   - company: 보험사명
+   - productName: 상품명 (정확히)
+   - insured_name: 피보험자 이름
+   - insured_age: 피보험자 나이 (숫자만)
+   - insurance_period: 보험기간 ("100세 만기", "종신", "20년" 등)
+   - payment_period: 납입기간 ("20년납", "전기납" 등)
+   - monthly_premium: 월 보험료 (숫자만, 예: 162365)
+
+4. **report_data 작성법**
+   - 이미지에 보이는 담보/특약만 추출
+   - 추측/환각 금지 - 이미지에 없으면 추가하지 말 것
+
+반드시 아래 JSON 형식으로만 응답:
+{
+  "detected_keyword": "정확한 보험 종류 (예: 100세 만기 치매보험, 종신보험, 암보험)",
+  "company": "보험사명",
+  "productName": "상품명",
+  "insured_name": "피보험자명",
+  "insured_age": "나이(숫자만)",
+  "insurance_period": "보험기간 (100세 만기/종신/20년 등)",
+  "payment_period": "납입기간",
+  "monthly_premium": "월보험료(숫자만)",
+  "is_whole_life": false,
+  "summary": "핵심 요약 (피보험자 정보 포함, 2-3문장)",
+  "report_data": [
+    {"item": "담보명", "current": "가입금액", "target": null, "status": "info"}
+  ]
+}`
 
         const visionEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.VISION}:generateContent?key=${proKey}`
         
@@ -1401,7 +1480,7 @@ app.post('/api/generate/full-package-stream', async (c) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ role: 'user', parts: [{ text: visionPrompt }, { inline_data: { mime_type: mimeType, data: image } }] }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 4096, responseMimeType: 'application/json' }
+            generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: 'application/json' }
           })
         })
         
@@ -1411,30 +1490,45 @@ app.post('/api/generate/full-package-stream', async (c) => {
           try {
             const parsed = JSON.parse(rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim())
             if (parsed.detected_keyword) {
-              // 🔥 이미지에서 추출한 키워드 + 사용자 입력 병합
-              topic = userContextAngle ? `${userContextAngle} (${parsed.detected_keyword})` : parsed.detected_keyword
+              // V2026.37.83 - 이미지에서 추출한 키워드 사용 (사용자 입력과 병합 안함 - OCR 우선)
+              topic = parsed.detected_keyword
               imageDetectedKeyword = parsed.detected_keyword
             }
-            // V2026.37.82 - 보험사명 저장 (자동 이미지 생성용)
+            // V2026.37.83 - 보험사명/상품명 저장
             detectedCompany = parsed.company || null
-            detectedProductName = parsed.productName || parsed.detected_keyword || null
+            detectedProductName = parsed.productName || null
             
-            imageAnalysis = JSON.stringify({
-              company: parsed.company,
-              premium: parsed.monthly_premium,
-              insured_age: parsed.insured_age,
-              summary: parsed.summary
-            })
+            // V2026.37.83 - 피보험자 정보 포함한 imageAnalysis 생성
+            const insuredInfo = parsed.insured_name && parsed.insured_age 
+              ? `👤 피보험자: ${parsed.insured_name} (${parsed.insured_age}세)\n` 
+              : ''
+            const periodInfo = parsed.insurance_period 
+              ? `📅 보험기간: ${parsed.insurance_period}\n` 
+              : ''
+            const premiumInfo = parsed.monthly_premium 
+              ? `💰 월 보험료: ${Number(parsed.monthly_premium).toLocaleString()}원\n` 
+              : ''
+            
+            imageAnalysis = `📋 ${parsed.productName || '보험설계서'} 분석
+🏢 ${parsed.company || ''}
+${insuredInfo}${periodInfo}${premiumInfo}
+${parsed.summary || ''}`
+            
             reportData = parsed.report_data || []
             
-            // OCR 결과 스트림 전송
+            // OCR 결과 스트림 전송 (V2026.37.83 - 추가 필드)
             await stream.write(JSON.stringify({ 
               type: 'ocr_result', 
               data: {
                 keyword: parsed.detected_keyword,
                 company: parsed.company,
+                productName: parsed.productName,
                 premium: parsed.monthly_premium,
+                insured_name: parsed.insured_name,
                 insured_age: parsed.insured_age,
+                insurance_period: parsed.insurance_period,
+                payment_period: parsed.payment_period,
+                is_whole_life: parsed.is_whole_life || false,
                 report_data_count: reportData.length
               }
             }) + '\n')
@@ -1461,12 +1555,15 @@ app.post('/api/generate/full-package-stream', async (c) => {
       const ageMatch = targetAudience.match(/(\d+)/)
       const targetAge = ageMatch ? ageMatch[1] : ''
       
-      // ✅ V2026.37.82 - OCR 데이터 강화 바인딩 (GPT-4o 프롬프트 개선)
+      // ✅ V2026.37.83 - OCR 데이터 강화 바인딩 (종신/100세만기 구분 추가)
       // OCR에서 추출한 피보험자 정보를 제목/질문에 필수 반영
       let ocrContextBlock = ''
       let ocrPersona = '' // OCR 기반 페르소나 (본인 vs 가족)
       let ocrPremiumText = '' // 월 보험료 텍스트
       let ocrAgeText = '' // 나이 텍스트
+      let ocrInsurancePeriod = '' // 보험기간 (종신/100세만기 등)
+      let ocrProductName = '' // 상품명
+      let ocrInsuredName = '' // 피보험자명
       
       if (reportData.length > 0 || imageAnalysis) {
         // imageAnalysis에서 정보 추출 시도
@@ -1474,12 +1571,24 @@ app.post('/api/generate/full-package-stream', async (c) => {
         try {
           parsedOcr = typeof imageAnalysis === 'string' ? JSON.parse(imageAnalysis) : (imageAnalysis || {})
         } catch (e) {
+          // 문자열 형식 파싱 실패 시 텍스트에서 정보 추출 시도
           parsedOcr = {}
+          if (typeof imageAnalysis === 'string') {
+            const ageMatch = imageAnalysis.match(/(\d+)세/)
+            const premiumMatch = imageAnalysis.match(/월\s*보험료[:\s]*([0-9,]+)/)
+            const periodMatch = imageAnalysis.match(/보험기간[:\s]*(.+?)[\n$]/)
+            if (ageMatch) parsedOcr.insured_age = ageMatch[1]
+            if (premiumMatch) parsedOcr.premium = premiumMatch[1].replace(/,/g, '')
+            if (periodMatch) parsedOcr.insurance_period = periodMatch[1].trim()
+          }
         }
         
         const ocrAge = parsedOcr.insured_age || targetAge || ''
-        const ocrPremium = parsedOcr.premium || ''
-        const ocrCompany = parsedOcr.company || ''
+        const ocrPremium = parsedOcr.premium || parsedOcr.monthly_premium || ''
+        const ocrCompany = parsedOcr.company || detectedCompany || ''
+        ocrInsurancePeriod = parsedOcr.insurance_period || ''
+        ocrProductName = parsedOcr.productName || detectedProductName || ''
+        ocrInsuredName = parsedOcr.insured_name || ''
         
         if (ocrAge) {
           ocrAgeText = String(ocrAge)
@@ -1502,37 +1611,55 @@ app.post('/api/generate/full-package-stream', async (c) => {
           }
         }
         
+        // V2026.37.83 - 보험기간 표시 (종신 vs 100세만기 명확히!)
+        const periodDisplay = ocrInsurancePeriod 
+          ? `■ 보험기간: ${ocrInsurancePeriod} ${ocrInsurancePeriod.includes('종신') ? '(평생 보장)' : ocrInsurancePeriod.includes('100세') ? '(100세까지만 보장!)' : ''}`
+          : '■ 보험기간: 미확인'
+        
         ocrContextBlock = `
 🔴🔴🔴 [OCR 데이터 - 제목/질문에 최우선 반영!] 🔴🔴🔴
-■ 피보험자 나이: ${ocrAgeText || '미확인'}세 
+■ 피보험자: ${ocrInsuredName || '미확인'} (${ocrAgeText || '?'}세)
 ■ 월 보험료: ${ocrPremiumText || '미확인'}
 ■ 보험사: ${ocrCompany || '미확인'}
+■ 상품명: ${ocrProductName || '미확인'}
 ■ 보험 종류: ${insuranceProduct}
+${periodDisplay}
 
-⚠️⚠️⚠️ [핵심 - 반드시 준수!] ⚠️⚠️⚠️
-이 보험은 "${ocrAgeText || '?'}세 본인"이 직접 가입한 것입니다!
-→ ❌ "부모님 보험", "부모님 생각에" 절대 금지!
-→ ✅ "제가 들고 있는 보험", "내 보험" 관점으로 작성!
-→ ✅ 월 보험료 ${ocrPremiumText || 'XX만원'}을 제목/질문에 자연스럽게 포함!
+⚠️⚠️⚠️ [핵심 규칙 - 환각/추측 절대 금지!] ⚠️⚠️⚠️
+1. 이 보험은 "${ocrAgeText || '?'}세 ${ocrInsuredName || '본인'}"이 직접 가입한 것입니다!
+   → ❌ "부모님 보험", "부모님 생각에" 절대 금지!
+   → ✅ "제가 들고 있는 보험", "내 보험" 관점으로 작성!
+
+2. 보험 종류를 정확히 표현!
+   → ❌ "100세 만기"인데 "종신보험"이라고 쓰면 안됨!
+   → ✅ OCR 결과 그대로: "${insuranceProduct}" "${ocrInsurancePeriod || ''}"
+
+3. 월 보험료 ${ocrPremiumText || 'XX만원'}을 제목/질문에 자연스럽게 포함!
 `
       }
       
-      const titlePrompt = `## XIVIX V2026.37.82 제목 + 바이럴 질문 생성 ##
+      // V2026.37.83 - 보험기간 정보 포함
+      const periodText = ocrInsurancePeriod ? `(${ocrInsurancePeriod})` : ''
+      
+      const titlePrompt = `## XIVIX V2026.37.83 제목 + 바이럴 질문 생성 ##
 ${ocrContextBlock}
 사용자 원본 입력: ${topic}
-보험: ${insuranceProduct}
+보험: ${insuranceProduct} ${periodText}
 타겟: ${targetAudience}
 
-🚨🚨🚨 [CEO 최우선 지시 - V2026.37.82] 🚨🚨🚨
+🚨🚨🚨 [CEO 최우선 지시 - V2026.37.83] 🚨🚨🚨
 "제목은 설계사가 아니라 고객이 짓는 거다"
 "OCR 데이터가 있으면 그 사람 관점에서 써라!"
+"종신이면 종신, 100세 만기면 100세 만기라고 정확히 써라!"
 ${ocrPersona ? `→ OCR 감지: "${ocrPersona}" 관점으로 작성!` : ''}
+${ocrInsurancePeriod ? `→ 보험기간: "${ocrInsurancePeriod}" - 정확히 반영!` : ''}
 
-📌 [제목 5개 생성 규칙 - V2026.37.82 OCR 반영 강화]
+📌 [제목 5개 생성 규칙 - V2026.37.83 OCR 반영 강화]
 ■ 공백 포함 20~25자 필수!
 ■ ✅ OCR 데이터가 있으면 해당 고객(본인) 관점으로 작성!
 ■ ❌ "부모님 보험", "부모님 생각에" 절대 금지! (본인 가입 보험임!)
 ■ ❌ 설계사용 홍보 제목 절대 금지
+■ ❌ 보험 종류 환각 금지! (100세 만기를 종신이라고 쓰면 안됨!)
 ■ 금지어: "가이드", "전략", "포인트", "대비", "선택", "추천", "충격", "손해"
 
 🎨 [5가지 스타일 - OCR 데이터 반영 필수!]
@@ -1542,12 +1669,13 @@ ${ocrPersona ? `→ OCR 감지: "${ocrPersona}" 관점으로 작성!` : ''}
 4️⃣ 후회/불안형: "${insuranceProduct} 이대로 유지해도 되는 건가요?"
 5️⃣ 정보 요청형: "${insuranceProduct} 가입자분들 경험담 부탁드려요"
 
-❌ 나쁜 제목 예시 (절대 금지!):
+❌ 나쁜 제목/질문 예시 (절대 금지!):
 - "부모님 생각에 치매보험 고민" ← OCR에 70세 본인인데 부모님?!
+- "종신보험 괜찮을까요" ← 100세 만기인데 종신?! 환각!
 - "30대를 위한 암보험 가이드" ← 설계사 어투
 - "현직 설계사가 알려주는 꿀팁" ← 홍보
 
-📌 [바이럴 질문 3개 생성 규칙 - V2026.37.82 강화]
+📌 [바이럴 질문 3개 생성 규칙 - V2026.37.83 강화]
 ■ 질문1: 150~250자 / 질문2: 250~350자 / 질문3: 350~450자
 
 🚨🚨🚨 [GPT-4o 최우선 규칙 - 위반 시 실패!] 🚨🚨🚨
@@ -1558,20 +1686,24 @@ ${ocrPersona ? `→ OCR 감지: "${ocrPersona}" 관점으로 작성!` : ''}
 - "부모님 생각에" ← 절대 금지!
 - "부모님이 정리해보라고" ← 절대 금지!
 - "엄마/아빠 보험" ← 절대 금지!
+- "종신보험" ← 실제 보험이 100세 만기인 경우 절대 금지!
 ※ OCR에 ${ocrAgeText || '?'}세로 나왔으면 그 사람이 "본인"입니다!
 ※ 70세 피보험자 = 70세 본인이 직접 카페에 질문하는 상황!
+${ocrInsurancePeriod ? `※ 보험기간이 "${ocrInsurancePeriod}"이면 그대로 사용! 종신/100세만기 혼동 금지!` : ''}
 
 ✅✅✅ [올바른 표현 - 반드시 사용!] ✅✅✅
 - "제가 가입한 ${insuranceProduct}인데요..."
 - "내 ${insuranceProduct} 월 ${ocrPremiumText || 'XX만원'} 내고 있는데..."
 - "제 보험료가 ${ocrPremiumText || 'XX만원'}인데 적정한가요?"
 - "내 담보 내용 보니까 장기요양진단비가 있던데..."
+${ocrInsurancePeriod ? `- "${ocrInsurancePeriod} ${insuranceProduct}" ← 정확한 표현!` : ''}
 
 ■ 필수 반영 사항:
 1. OCR 보험료 "${ocrPremiumText || '?'}"를 3개 질문 중 최소 2개에 자연스럽게 포함!
 2. "${insuranceProduct}" 키워드를 각 질문에 3회 이상 반복!
 3. 모든 문장을 질문형으로 끝낼 것! ("~인가요?", "~될까요?", "~맞나요?")
 4. "나", "제가", "내 보험" 관점으로 작성! (본인 시점!)
+5. 보험기간 "${ocrInsurancePeriod || '확인필요'}"를 정확히 반영! (환각 금지!)
 
 🎭 [페르소나 - 본인 시점 필수!]
 ${ocrAgeText ? `→ ${ocrAgeText}세 본인이 직접 네이버 카페에 질문하는 상황!` : '→ 보험 가입자 본인 관점'}
@@ -1594,6 +1726,7 @@ ${ocrAgeText ? `→ ${ocrAgeText}세 본인이 직접 네이버 카페에 질문
 □ 보험료 ${ocrPremiumText || '?'}가 반영되었는가?
 □ ${insuranceProduct} 키워드가 3회 이상 반복되었는가?
 □ 질문형("~인가요?")으로 끝나는가?
+□ 보험기간(${ocrInsurancePeriod || '?'})이 정확히 반영되었는가? (종신/100세만기 혼동 없는가?)
 
 JSON 형식으로만 응답:
 {
@@ -1605,7 +1738,7 @@ JSON 형식으로만 응답:
       let viralQuestions: any[] = []
       
       // ============================================
-      // V2026.37.82 - GPT/Gemini 분기 처리 (GPT 프롬프트 대폭 강화)
+      // V2026.37.83 - GPT/Gemini 분기 처리 (GPT 프롬프트 대폭 강화)
       // ============================================
       if (useGPT) {
         // GPT-4o 사용
@@ -1616,7 +1749,7 @@ JSON 형식으로만 응답:
           return
         }
         
-        // V2026.37.82 - GPT-4o 시스템 프롬프트 대폭 강화
+        // V2026.37.83 - GPT-4o 시스템 프롬프트 대폭 강화
         const titleSystemPrompt = `당신은 네이버 카페 보험 커뮤니티의 "진짜 고객" 역할입니다.
 
 🚨🚨🚨 [절대 금지 규칙 - 위반 시 실패!] 🚨🚨🚨
@@ -1706,15 +1839,22 @@ JSON 형식으로만 응답하세요.`
       const styles = ['공감형', '팩트형', '영업형']
       const contents: any[] = []
       
-      // 이미지 OCR 데이터가 있으면 본문에 강제 바인딩
+      // V2026.37.83 - 이미지 OCR 데이터가 있으면 본문에 강제 바인딩
       // V39 마스터 지시: "이미지 업로드해서 데이터 안 박히면 OCR 연결 고장 난 거니까 배포 중단"
       let ocrDataBinding = ''
       if (reportData.length > 0) {
         ocrDataBinding = `\n\n■ [이미지에서 추출한 담보 정보 - 반드시 답변에 언급할 것!]\n${reportData.map((r: any) => `- ${r.item}: 현재 ${r.current || '미가입'} → 권장 ${r.target || '확인 필요'} (${r.status === 'critical' ? '⚠️위험' : r.status === 'essential' ? '📌필수' : '✅양호'})`).join('\n')}`
       }
-      // imageAnalysis가 있으면 추가 바인딩 (보험사명, 상품명, 보험료 등)
+      // V2026.37.83 - imageAnalysis가 있으면 추가 바인딩 (보험사명, 상품명, 보험료, 보험기간 등)
       if (imageAnalysis) {
-        ocrDataBinding += `\n\n🔴🔴🔴 [OCR 데이터 강제 바인딩 - 반드시 본문에 인용!] 🔴🔴🔴\n${imageAnalysis}\n→ 위 정보(보험사명, 상품명, 월 보험료 금액)를 본문에 구체적으로 언급해야 합니다!`
+        ocrDataBinding += `\n\n🔴🔴🔴 [OCR 데이터 강제 바인딩 - 반드시 본문에 인용!] 🔴🔴🔴
+${imageAnalysis}
+
+⚠️⚠️⚠️ [환각 금지 규칙] ⚠️⚠️⚠️
+1. 위 정보(보험사명, 상품명, 월 보험료, 피보험자 정보)를 본문에 구체적으로 언급!
+2. 보험기간이 "100세 만기"면 절대 "종신보험"이라고 쓰지 마세요!
+3. 보험기간이 "종신"이면 "평생 보장"이라고 쓸 수 있습니다.
+4. OCR에 없는 정보를 추측해서 쓰지 마세요!`
       }
       
       // 사용자 입력 원본 강제 바인딩
@@ -1820,7 +1960,7 @@ ${style === '공감형' ? `
         let fullText = ''
         
         // ============================================
-        // V2026.37.82 - 본문 생성 GPT/Gemini 분기
+        // V2026.37.83 - 본문 생성 GPT/Gemini 분기
         // ============================================
         if (useGPT) {
           // GPT-4o로 본문 생성
@@ -1929,7 +2069,7 @@ JSON 형식으로만 응답:
       let comments: any[] = []
       
       // ============================================
-      // V2026.37.82 - 댓글 생성 GPT/Gemini 분기
+      // V2026.37.83 - 댓글 생성 GPT/Gemini 분기
       // ============================================
       if (useGPT) {
         const openaiKey = c.env.OPENAI_API_KEY || OPENAI_API_KEY
@@ -2016,7 +2156,7 @@ JSON 형식으로만 응답:
       console.log('[XIVIX] 댓글 전송 완료:', comments.length, '개')
       
       // ============================================
-      // 🔥 V2026.37.82 - CEO 긴급 지시: SEO 키워드 다양성 + 고정 키워드
+      // 🔥 V2026.37.83 - CEO 긴급 지시: SEO 키워드 다양성 + 고정 키워드
       // 1. 필수 고정 키워드: 보험상담, 보험리모델링, 보험상담이필요하신분
       // 2. 상품명 기반 다양한 키워드 생성
       // 3. 매번 다른 조합으로 생성 (랜덤 요소)
@@ -2051,14 +2191,14 @@ JSON 형식으로만 응답:
         type: 'complete',
         package: {
           topic, context_source: contextSource, insurance: insuranceProduct, target: targetAudience,
-          // V2026.37.82 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
+          // V2026.37.83 - CEO 지시: 보험사명 추가 (자동 이미지 생성용)
           company: detectedCompany,
           productName: detectedProductName,
           image_detected_keyword: imageDetectedKeyword || null,
           titles, viral_questions: viralQuestions, contents, comments, report_data: reportData,
           seoKeywords, hashtags
         },
-        version: '2026.37.82'
+        version: '2026.37.83'
       }) + '\n')
       
     } catch (error) {
@@ -2225,7 +2365,7 @@ app.post('/api/registration', async (c) => {
   }
 })
 
-// ✅ V2026.37.82 - PWA manifest.json
+// ✅ V2026.37.83 - PWA manifest.json
 app.get('/manifest.json', (c) => {
   return c.json({
     "name": "XIVIX 2026 PRO - AI 보험 콘텐츠",
@@ -2251,7 +2391,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '2026.37.82',
+    version: '2026.37.83',
     project: 'XIVIX_Insurance_King_2026 (MASTER-1)',
     masterInstruction: MASTER_INSTRUCTION_V3,
     engines: {
@@ -2974,7 +3114,7 @@ app.post('/api/admin/send-expiry-reminders', async (c) => {
 });
 
 // ============================================
-// V2026.37.82 - XIIM 프록시 API (도메인 제한 우회)
+// V2026.37.83 - XIIM 프록시 API (도메인 제한 우회)
 // 프론트엔드 → 백엔드 → XIIM 서버-서버 통신
 // ============================================
 app.post('/api/xiim/process', async (c) => {
@@ -3024,7 +3164,7 @@ app.post('/api/xiim/process', async (c) => {
 });
 
 // ============================================
-// V2026.37.82 - XIIM OpenAI DALL-E 3 프록시 API
+// V2026.37.83 - XIIM OpenAI DALL-E 3 프록시 API
 // 프론트엔드 → 백엔드 → XIIM OpenAI 엔드포인트
 // ============================================
 app.post('/api/xiim/openai/generate', async (c) => {
@@ -3327,7 +3467,7 @@ body{
   gap:clamp(20px, 3vh, 32px);
 }
 
-/* V2026.37.82 - AI 모델 선택 토글 (모바일 최적화) */
+/* V2026.37.83 - AI 모델 선택 토글 (모바일 최적화) */
 .ai-model-selector{
   display:flex;
   justify-content:center;
@@ -4478,7 +4618,7 @@ body{
 .image-gen-loading-sub{font-size:12px;color:var(--text-muted)}
 
 /* ============================================
-   V2026.37.82 - 전체 화면 로딩 오버레이 (CEO 긴급 지시)
+   V2026.37.83 - 전체 화면 로딩 오버레이 (CEO 긴급 지시)
    문제: 생성 중 복사 버튼 누르고 "고장났다" 연락
    해결: 생성 완료까지 전체 화면 차단 + 깜빡이는 메시지
 ============================================ */
@@ -4554,7 +4694,7 @@ body{
   100%{background-position:200px 0}
 }
 
-/* V2026.37.82 - 로딩 중 실시간 정보 표시 (CEO 지시: 뉴스 자막 흐르게) */
+/* V2026.37.83 - 로딩 중 실시간 정보 표시 (CEO 지시: 뉴스 자막 흐르게) */
 .fullscreen-loading-news{
   margin-top:24px;
   padding:16px;
@@ -4617,7 +4757,7 @@ body{
 .candidate-item:hover{border-color:var(--primary);transform:scale(1.05);box-shadow:0 8px 24px rgba(0,212,255,0.3)}
 .candidate-item.selected{border-color:#10b981;box-shadow:0 0 20px rgba(16,185,129,0.6);transform:scale(1.03)}
 .candidate-item.rejected{opacity:0.4;pointer-events:none}
-/* V2026.37.82 - 이미지1: 눈에 잘 보이게 크게 표시 */
+/* V2026.37.83 - 이미지1: 눈에 잘 보이게 크게 표시 */
 .candidate-item img{width:100%;height:200px;object-fit:cover;display:block;border-radius:6px}
 .candidate-badge{
   position:absolute;
@@ -5410,9 +5550,9 @@ body{
 .login-close:hover{color:var(--red);transform:scale(1.2)}
 </style>
 
-<!-- V2026.37.82 - 카카오 SDK 제거 (CEO 지시: 카카오 로그인 안되니 지워) -->
+<!-- V2026.37.83 - 카카오 SDK 제거 (CEO 지시: 카카오 로그인 안되니 지워) -->
 
-<!-- ✅ V2026.37.82 - PWA 지원 (바탕화면 바로가기) -->
+<!-- ✅ V2026.37.83 - PWA 지원 (바탕화면 바로가기) -->
 <link rel="manifest" href="/manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -5423,7 +5563,7 @@ body{
 <body>
 
 <!-- ============================================
-     V2026.37.82 - 전체 화면 로딩 오버레이 (CEO 긴급 지시)
+     V2026.37.83 - 전체 화면 로딩 오버레이 (CEO 긴급 지시)
      생성 완료까지 화면 전체 차단 + 깜빡이는 메시지
 ============================================ -->
 <div class="fullscreen-loading-overlay" id="fullscreenLoading">
@@ -5444,7 +5584,7 @@ body{
       🔥 본문 #2 생성 중...
     </div>
     
-    <!-- V2026.37.82 - 실시간 정보 표시 (CEO 지시: 뉴스 자막 흐르게) -->
+    <!-- V2026.37.83 - 실시간 정보 표시 (CEO 지시: 뉴스 자막 흐르게) -->
     <div class="fullscreen-loading-news" id="fullscreenLoadingNews">
       <div class="fullscreen-loading-news-title">
         <i class="fas fa-chart-line"></i> 실시간 시세 정보
@@ -5514,7 +5654,7 @@ body{
       <button type="submit" class="login-submit" id="loginSubmitBtn"><i class="fas fa-sign-in-alt"></i> 로그인</button>
     </form>
     
-    <!-- V2026.37.82 - 카카오 로그인 제거 (CEO 지시: 카카오 로그인 안되니 지워) -->
+    <!-- V2026.37.83 - 카카오 로그인 제거 (CEO 지시: 카카오 로그인 안되니 지워) -->
     
     <div class="login-result" id="loginResult"></div>
   </div>
@@ -5585,7 +5725,7 @@ body{
 </div>
 
 <nav class="nav">
-  <!-- V2026.37.82 - Admin 버튼은 관리자(010-4845-3065)만 볼 수 있음 -->
+  <!-- V2026.37.83 - Admin 버튼은 관리자(010-4845-3065)만 볼 수 있음 -->
   <a href="/admin" id="adminNavLink" style="display:none"><i class="fas fa-cog"></i> Admin</a>
   <a href="/api/docs"><i class="fas fa-book"></i> Docs</a>
   <button onclick="openRegistrationModal()" class="nav-btn register-btn"><i class="fas fa-user-plus"></i> 가입 신청</button>
@@ -5639,7 +5779,7 @@ body{
   
   <div class="main">
     
-    <!-- V2026.37.82 - AI 모델 선택 (Gemini / GPT-4o 둘 다 보이게) -->
+    <!-- V2026.37.83 - AI 모델 선택 (Gemini / GPT-4o 둘 다 보이게) -->
     <div class="ai-model-selector" id="aiModelSelector">
       <div class="model-toggle-wrap">
         <span class="model-label">🤖 AI 엔진 선택</span>
@@ -5810,7 +5950,7 @@ body{
         <i class="fas fa-plus"></i> 새로운 콘텐츠 생성
       </button>
       
-      <!-- V2026.37.82 - CEO 지시: 새로고침/바로가기 버튼 삭제 -->
+      <!-- V2026.37.83 - CEO 지시: 새로고침/바로가기 버튼 삭제 -->
       
       <!-- 🖼️ AI 이미지 생성 섹션 -->
       <div class="image-gen-section" id="imageGenSection">
@@ -5845,12 +5985,12 @@ body{
           <div class="image-gen-loading-sub" id="imageGenLoadingSub">약 5~10초 소요됩니다</div>
         </div>
         
-        <!-- V2026.37.82 - 이미지 1개만 출력 (후보 UI 숨김) -->
+        <!-- V2026.37.83 - 이미지 1개만 출력 (후보 UI 숨김) -->
         <div class="image-candidates" id="imageCandidates" style="display:none;">
           <!-- 후보 선택 UI 제거됨 - 이미지 1개만 자동 표시 -->
         </div>
         
-        <!-- V2026.37.82 - 이미지 1개 출력 + 다운로드/재생성만 -->
+        <!-- V2026.37.83 - 이미지 1개 출력 + 다운로드/재생성만 -->
         <div class="image-gen-result" id="imageGenResult">
           <img class="image-gen-preview" id="imageGenPreview" src="" alt="생성된 마케팅 이미지">
           <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;justify-content:center">
@@ -5894,14 +6034,14 @@ let uploadedFiles = [];
 let isGenerating = false;
 let lastTrendUpdate = null;
 
-// ✅ V2026.37.82 - 전역 로딩 오버레이 요소 (중복 선언 에러 방지)
+// ✅ V2026.37.83 - 전역 로딩 오버레이 요소 (중복 선언 에러 방지)
 let fullscreenOverlay = null;
 let fullscreenTitle = null;
 let fullscreenSub = null;
 let fullscreenProgressBar = null;
 let fullscreenStep = null;
 
-// ✅ V2026.37.82 - 실시간 시세 정보 (CEO 지시: 뉴스 자막 흐르게, 시세는 고정)
+// ✅ V2026.37.83 - 실시간 시세 정보 (CEO 지시: 뉴스 자막 흐르게, 시세는 고정)
 let realTimeDataInterval = null;
 let newsTickerIndex = 0;
 const INSURANCE_NEWS = [
@@ -5917,14 +6057,14 @@ const INSURANCE_NEWS = [
   "📢 치매보험 가입자 5년 새 3배 증가 - 고령화 시대 필수 보장으로 부상"
 ];
 
-// 시세 데이터 (V2026.37.82 - 2026년 1월 31일 기준 업데이트)
+// 시세 데이터 (V2026.37.83 - 2026년 1월 31일 기준 업데이트)
 const MARKET_DATA = {
   gold: { price: 880000, change: -5.5 },     // 금 1돈 약 88만원 (2026.01.31 기준)
   btc: { price: 145000000, change: 1.8 },    // BTC 약 1.45억
   usd: { price: 1382.50, change: -0.3 }      // USD/KRW
 };
 
-// 시간만 1초마다 갱신 - V2026.37.82 한국시간 수정
+// 시간만 1초마다 갱신 - V2026.37.83 한국시간 수정
 function updateTime() {
   // 한국 시간대로 직접 포맷팅 (브라우저 로컬 시간과 무관하게 KST 표시)
   const now = new Date();
@@ -6238,7 +6378,7 @@ function removeFile(id) {
   renderFileList();
 }
 
-// 트렌드 로드 (Linear 스타일 미니멀 UI) - V2026.37.82 null 체크 추가
+// 트렌드 로드 (Linear 스타일 미니멀 UI) - V2026.37.83 null 체크 추가
 async function loadTrends() {
   console.log('[XIVIX] loadTrends 시작, trendsEl:', trendsEl ? '존재' : 'NULL');
   try {
@@ -6282,7 +6422,7 @@ async function loadTrends() {
   }
 }
 
-// 새로고침 버튼 클릭 (에러 가드 포함) - V2026.37.82 디버깅 강화
+// 새로고침 버튼 클릭 (에러 가드 포함) - V2026.37.83 디버깅 강화
 async function refreshTrends() {
   console.log('[XIVIX] 🔄 트렌드 새로고침 시작');
   try {
@@ -6771,8 +6911,8 @@ let resultData = null;
 let selectedTitle = 0;
 let selectedContent = 0;
 
-// V2026.37.82 - AI 모델 선택 (gemini | gpt)
-let selectedAIModel = 'gpt'; // V2026.37.82 - GPT-4o 기본값
+// V2026.37.83 - AI 모델 선택 (gemini | gpt)
+let selectedAIModel = 'gpt'; // V2026.37.83 - GPT-4o 기본값
 
 function selectAIModel(model) {
   selectedAIModel = model;
@@ -6796,14 +6936,14 @@ function selectAIModel(model) {
   console.log('[XIVIX] AI 모델 선택:', model);
 }
 
-// 페이지 로드 시 저장된 모델 복원 (V2026.37.82 - GPT-4o 기본값)
+// 페이지 로드 시 저장된 모델 복원 (V2026.37.83 - GPT-4o 기본값)
 (function initAIModel() {
   const saved = localStorage.getItem('xivix_ai_model');
   if (saved && (saved === 'gemini' || saved === 'gpt')) {
     selectedAIModel = saved;
     setTimeout(() => selectAIModel(saved), 100);
   } else {
-    // 기본값: GPT-4o (V2026.37.82)
+    // 기본값: GPT-4o (V2026.37.83)
     selectedAIModel = 'gpt';
     setTimeout(() => selectAIModel('gpt'), 100);
   }
@@ -6930,7 +7070,7 @@ function closeLoginModal() {
 }
 
 // ============================================
-// V2026.37.82 - 카카오 로그인 제거 (CEO 지시: 카카오 로그인 안되니 지워)
+// V2026.37.83 - 카카오 로그인 제거 (CEO 지시: 카카오 로그인 안되니 지워)
 // ============================================
 
 // ============================================
@@ -7152,7 +7292,7 @@ const repairModalCloseButtons = () => {
         };
     }
     
-    // 로그인 모달 X 버튼 (V2026.37.82 수정: 올바른 클래스명 .login-close)
+    // 로그인 모달 X 버튼 (V2026.37.83 수정: 올바른 클래스명 .login-close)
     const loginCloseBtn = document.querySelector('#loginModal .login-close');
     const loginModal = document.getElementById('loginModal');
     if (loginCloseBtn && loginModal) {
@@ -7579,7 +7719,7 @@ function copyAllContent() {
   alert('선택한 콘텐츠가 복사되었습니다!\\n\\n- 제목: #' + (selectedTitle+1) + '\\n- 본문: #' + (selectedContent+1) + ' (' + (resultData.contents?.[selectedContent]?.style || '기본') + ')\\n- 댓글: ' + (resultData.comments?.length || 0) + '개');
 }
 
-// ✅ V2026.37.82 - TXT 파일 다운로드 (CEO 지시)
+// ✅ V2026.37.83 - TXT 파일 다운로드 (CEO 지시)
 function downloadAsTxt() {
   if (!resultData) {
     alert('다운로드할 콘텐츠가 없습니다.');
@@ -7676,19 +7816,19 @@ function downloadAsTxt() {
 }
 
 // ============================================
-// V2026.37.82 - API 호출 제한 완전 해제 (CEO 긴급 지시)
+// V2026.37.83 - API 호출 제한 완전 해제 (CEO 긴급 지시)
 // 모든 사용자 무제한!
 // ============================================
 const API_LIMIT_KEY = 'xivix_api_usage';
 const DAILY_API_LIMIT = 999999; // 사실상 무제한
 
-// ✅ V2026.37.82 - VIP 사용자 (API 무제한)
+// ✅ V2026.37.83 - VIP 사용자 (API 무제한)
 const VIP_PHONES = [
   '010-4845-3065',  // 방익주 대표
   '010-3159-3697'   // 김미경 지사장
 ];
 
-// ✅ V2026.37.82 - VIP 토큰 (URL 파라미터로 무제한 해제)
+// ✅ V2026.37.83 - VIP 토큰 (URL 파라미터로 무제한 해제)
 // 사용법: https://xivix.ai.kr?vip=김미경 또는 ?vip=방익주
 const VIP_TOKENS = {
   '김미경': '010-3159-3697',
@@ -7725,7 +7865,7 @@ function checkVipToken() {
 // 페이지 로드 시 VIP 토큰 확인
 checkVipToken();
 
-// V2026.37.82 - 관리자 전용: Admin 버튼 표시
+// V2026.37.83 - 관리자 전용: Admin 버튼 표시
 // 관리자: 방익주(010-4845-3065), 김미경(010-3159-3697)
 function showAdminForOwner() {
   const ADMIN_PHONES = [
@@ -7807,7 +7947,7 @@ function incrementApiUsage() {
 }
 
 function checkApiLimit() {
-  // ✅ V2026.37.82 - CEO 긴급 지시: 모든 사용자 무제한!
+  // ✅ V2026.37.83 - CEO 긴급 지시: 모든 사용자 무제한!
   console.log('[XIVIX] ✅ API 제한 해제됨 - 모든 사용자 무제한');
   return true;
 }
@@ -7876,7 +8016,7 @@ async function goGenerateStream() {
   isGenerating = true;
   
   // ============================================
-  // ✅ V2026.37.82 - 전체 화면 로딩 오버레이 표시 (CEO 긴급 지시)
+  // ✅ V2026.37.83 - 전체 화면 로딩 오버레이 표시 (CEO 긴급 지시)
   // 문제: 생성 중 복사 버튼 누르고 "고장났다" 연락
   // 해결: 생성 완료까지 전체 화면 차단
   // ============================================
@@ -7892,7 +8032,7 @@ async function goGenerateStream() {
     fullscreenSub.innerHTML = '생성이 완료될 때까지<br><strong>잠시만 기다려 주세요</strong>';
     fullscreenProgressBar.style.width = '5%';
     fullscreenStep.textContent = 'AI 엔진 연결 중...';
-    // V2026.37.82 - 실시간 데이터 시작 (CEO 지시: 기다리다 잠들겠다!)
+    // V2026.37.83 - 실시간 데이터 시작 (CEO 지시: 기다리다 잠들겠다!)
     startRealTimeData();
   }
   
@@ -7958,7 +8098,7 @@ async function goGenerateStream() {
   
   const requestData = { 
     concern: q,
-    aiModel: selectedAIModel  // V2026.37.82 - AI 모델 선택 전달
+    aiModel: selectedAIModel  // V2026.37.83 - AI 모델 선택 전달
   };
   if (uploadedFiles.length > 0) {
     requestData.image = uploadedFiles[0].base64;
@@ -8033,7 +8173,7 @@ async function goGenerateStream() {
               progressPct.textContent = stepPct + '%';
               progressText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + event.msg;
               
-              // ✅ V2026.37.82 - 전체 화면 오버레이 진행 상황 업데이트
+              // ✅ V2026.37.83 - 전체 화면 오버레이 진행 상황 업데이트
               if (fullscreenProgressBar) fullscreenProgressBar.style.width = stepPct + '%';
               if (fullscreenStep) fullscreenStep.textContent = event.msg;
               break;
@@ -8057,7 +8197,7 @@ async function goGenerateStream() {
               progressFill.style.width = (50 + event.id * 10) + '%';
               streamData.contents[event.id - 1] = { id: event.id, style: event.style, text: '' };
               
-              // ✅ V2026.37.82 - 전체 화면 오버레이 진행 상황 업데이트
+              // ✅ V2026.37.83 - 전체 화면 오버레이 진행 상황 업데이트
               if (fullscreenProgressBar) fullscreenProgressBar.style.width = (50 + event.id * 10) + '%';
               if (fullscreenStep) fullscreenStep.textContent = '✍️ 본문 #' + event.id + ' 생성 중...';
               if (fullscreenTitle) fullscreenTitle.textContent = '📝 콘텐츠 작성 중입니다';
@@ -8100,7 +8240,7 @@ async function goGenerateStream() {
               progressPct.textContent = '100%';
               progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ SSE 스트리밍 완료! (v' + event.version + ')';
               
-              // ✅ V2026.37.82 - 전체 화면 오버레이 완료 표시 후 숨김
+              // ✅ V2026.37.83 - 전체 화면 오버레이 완료 표시 후 숨김
               if (fullscreenOverlay) {
                 fullscreenProgressBar.style.width = '100%';
                 fullscreenTitle.textContent = '✅ 생성 완료!';
@@ -8111,7 +8251,7 @@ async function goGenerateStream() {
                 // 2초 후 오버레이 숨김
                 setTimeout(() => {
                   fullscreenOverlay.classList.remove('show');
-                  // V2026.37.82 - 실시간 데이터 중지
+                  // V2026.37.83 - 실시간 데이터 중지
                   stopRealTimeData();
                 }, 1500);
               }
@@ -8136,10 +8276,10 @@ async function goGenerateStream() {
                   setTimeout(() => { cdEl.style.display = 'none'; }, 3000);
                 }
                 
-                // V2026.37.82 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
+                // V2026.37.83 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
                 // 보험 정보가 감지된 경우 자동으로 마케팅 이미지 생성 (company는 topic에서 추출 가능)
                 if (resultData && resultData.insurance) {
-                  console.log('[XIVIX] V2026.37.82 자동 이미지 생성 시작:', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
+                  console.log('[XIVIX] V2026.37.83 자동 이미지 생성 시작:', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
                   // 토스트 알림
                   const autoToast = document.createElement('div');
                   autoToast.innerHTML = '<i class="fas fa-magic"></i> AI가 마케팅 이미지를 자동 생성합니다...';
@@ -8196,9 +8336,9 @@ async function goGenerateStream() {
             // ✅ 이미지 생성 섹션 표시
             document.getElementById('imageGenSection').classList.add('show');
             
-            // V2026.37.82 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
+            // V2026.37.83 - CEO 지시: 3단계 자동화 (분석→정리→이미지 생성)
             if (resultData && resultData.insurance) {
-              console.log('[XIVIX] V2026.37.82 자동 이미지 생성 (버퍼):', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
+              console.log('[XIVIX] V2026.37.83 자동 이미지 생성 (버퍼):', resultData.company || '(topic에서 추출 예정)', resultData.insurance);
               setTimeout(() => {
                 generateMarketingImage();
               }, 1500);
@@ -8227,12 +8367,12 @@ async function goGenerateStream() {
   btn.innerHTML = '<span class="btn-text"><i class="fas fa-fire"></i> 미끼 질문 + 답변 세트 생성</span><div class="spinner"></div>';
   isGenerating = false;
   
-  // ✅ V2026.37.82 - 에러/완료 시 전체 화면 오버레이 숨김
+  // ✅ V2026.37.83 - 에러/완료 시 전체 화면 오버레이 숨김
   fullscreenOverlay = document.getElementById('fullscreenLoading');
   if (fullscreenOverlay) {
     fullscreenOverlay.classList.remove('show');
   }
-  // V2026.37.82 - 실시간 데이터 중지
+  // V2026.37.83 - 실시간 데이터 중지
   stopRealTimeData();
 }
 
@@ -8273,7 +8413,7 @@ function generateFullContent() {
 }
 
 // ============================================
-// ✅ V2026.37.82 - CEO 지시: 바탕화면 바로가기 추가
+// ✅ V2026.37.83 - CEO 지시: 바탕화면 바로가기 추가
 // 휴대폰/PC 모두 지원
 // ============================================
 let deferredPrompt = null;
@@ -8365,7 +8505,7 @@ searchEl.addEventListener('keydown', (e) => {
 // 초기화 (처음 1회만 로드, 이후 수동 새로고침)
 loadTrends();
 
-// V2026.37.82 - 트렌드 새로고침 버튼 이벤트 강제 바인딩 (모바일 대응)
+// V2026.37.83 - 트렌드 새로고침 버튼 이벤트 강제 바인딩 (모바일 대응)
 (function bindRefreshBtn() {
   const btn = document.getElementById('refreshBtn');
   if (btn) {
@@ -8527,7 +8667,7 @@ async function generateMarketingImage() {
   }
   
   // ============================================
-  // ✅ V2026.37.82 - CEO 긴급 지시: 하이브리드 UI 시스템
+  // ✅ V2026.37.83 - CEO 긴급 지시: 하이브리드 UI 시스템
   // 핵심 문제 해결: 같은 이미지 무한 반복
   // 해결책: 
   // 1. 후보 3개를 병렬로 가져와서 사용자가 선택
@@ -8535,13 +8675,13 @@ async function generateMarketingImage() {
   // 3. 무한 재시도 대신 사용자 선택 UI
   // ============================================
   
-  // ✅ V2026.37.82 - 전역 제외 URL 동기화
+  // ✅ V2026.37.83 - 전역 제외 URL 동기화
   // globalExcludedUrls를 사용하여 세션 동안 중복 방지
   
-  // V2026.37.82 - XIIM API V2.2 규격에 맞춘 keyword 생성
+  // V2026.37.83 - XIIM API V2.2 규격에 맞춘 keyword 생성
   // 공식: {보험사 한글명} {상품유형} {설계안/설계서}
   
-  // V2026.37.82 - 보험사명 추출 우선순위:
+  // V2026.37.83 - 보험사명 추출 우선순위:
   // 1. 이미지 분석에서 추출한 company
   // 2. topic에서 보험사명 추출
   // 3. 기본값 '삼성생명'
@@ -8557,7 +8697,7 @@ async function generateMarketingImage() {
     for (const c of companyList) {
       if (topicLower.includes(c.toLowerCase()) || topicLower.includes(c.replace('생명', '').replace('손해보험', '').replace('화재', ''))) {
         company = c;
-        console.log('[XIVIX] V2026.37.82 topic에서 보험사 추출:', company);
+        console.log('[XIVIX] V2026.37.83 topic에서 보험사 추출:', company);
         break;
       }
     }
@@ -8630,13 +8770,13 @@ async function generateMarketingImage() {
   
   try {
     // ============================================
-    // ✅ V2026.37.82 - CEO 긴급 지시: 하이브리드 UI 시스템
+    // ✅ V2026.37.83 - CEO 긴급 지시: 하이브리드 UI 시스템
     // 핵심 변경: 무한 재시도 대신 후보 3개 사용자 선택
     // ============================================
     
     // 직접 URL이 없으면 후보 3개 시스템 사용
     if (!hasDirectUrl) {
-      console.log('[XIVIX] V2026.37.82 하이브리드 UI - 후보 3개 병렬 검색 시작');
+      console.log('[XIVIX] V2026.37.83 하이브리드 UI - 후보 3개 병렬 검색 시작');
       if (loadingText) loadingText.textContent = '🔍 설계서 후보 3개를 검색 중...';
       if (loadingSub) loadingSub.textContent = '3개의 다른 키워드로 병렬 검색';
       
@@ -8657,7 +8797,7 @@ async function generateMarketingImage() {
       // 유효한 후보가 있으면 성공
       const validCandidates = imageCandidates.filter(c => c.isValid);
       if (validCandidates.length > 0) {
-        console.log('[XIVIX] V2026.37.82 하이브리드 UI 성공 - 유효 후보:', validCandidates.length);
+        console.log('[XIVIX] V2026.37.83 하이브리드 UI 성공 - 유효 후보:', validCandidates.length);
         return; // 사용자가 후보 중 선택하도록 함
       } else {
         // 모든 후보가 실패한 경우에만 에러
@@ -8686,7 +8826,7 @@ async function generateMarketingImage() {
       const currentKeyword = keywordVariations[0];
     
     // ============================================
-    // ✅ V2026.37.82 - XIIM API V2.4 재시도 로직 (미들웨어 수정 완료 대응)
+    // ✅ V2026.37.83 - XIIM API V2.4 재시도 로직 (미들웨어 수정 완료 대응)
     // - Rate Limit (HTTP 429) → Retry-After 대기 후 재시도
     // - Subrequest 에러 → 지수 백오프 재시도
     // - 최대 3회 시도
@@ -8709,17 +8849,17 @@ async function generateMarketingImage() {
             api_key: XIIM_API_KEY,  // ❗ 최상위에 위치 필수
             request_info: {
               user_id: XIIM_USER_ID,              // ❗ 필수 (설계사 고유 ID)
-              keyword: currentKeyword,             // ✅ V2026.37.82: 변형 키워드 사용
+              keyword: currentKeyword,             // ✅ V2026.37.83: 변형 키워드 사용
               target_company: targetCompany,       // ❗ 필수: keyword와 일치해야 함!
               title: selectedTitleText,            // 선택: 검색 정확도 향상
-              exclude_urls: excludedUrls.length > 0 ? excludedUrls : undefined, // ✅ V2026.37.82: 제외 URL
+              exclude_urls: excludedUrls.length > 0 ? excludedUrls : undefined, // ✅ V2026.37.83: 제외 URL
               source_url: hasDirectUrl ? directSourceUrl : undefined,  // 직접 URL 입력 시에만
               skip_verification: hasDirectUrl      // 직접 URL 입력 시 검증 스킵
             }
           })
         });
         
-        // ✅ V2026.37.82 - Rate Limit 처리 (HTTP 429)
+        // ✅ V2026.37.83 - Rate Limit 처리 (HTTP 429)
         if (response.status === 429) {
           const retryAfter = parseInt(response.headers.get('Retry-After') || '5', 10);
           const remaining = response.headers.get('X-RateLimit-Remaining') || '0';
@@ -8763,7 +8903,7 @@ async function generateMarketingImage() {
       throw lastError || new Error('XIIM API 호출 실패');
     }
     
-    // ✅ V2026.37.82 - 캐시 상태 로깅
+    // ✅ V2026.37.83 - 캐시 상태 로깅
     const cacheStatus = response.headers.get('X-Cache') || 'UNKNOWN';
     const rateLimitRemaining = response.headers.get('X-RateLimit-Remaining') || '-';
     console.log('[XIVIX] XIIM 캐시:', cacheStatus, '/ 남은 요청:', rateLimitRemaining);
@@ -8787,7 +8927,7 @@ async function generateMarketingImage() {
     console.log('[XIVIX] 미들웨어 응답:', result);
     
     // ============================================
-    // ✅ V2026.37.82 - XIIM V2.7 대응: success 필드 확인 강화
+    // ✅ V2026.37.83 - XIIM V2.7 대응: success 필드 확인 강화
     // XIIM 팀 권고: API 실패 시 캐시된 이전 이미지 표시 방지
     // ============================================
     
@@ -8811,12 +8951,12 @@ async function generateMarketingImage() {
     }
     
     // ============================================
-    // ✅ V2026.37.82 - CEO 긴급 지시: 잘못된 이미지 패턴 감지 및 자동 재검색
+    // ✅ V2026.37.83 - CEO 긴급 지시: 잘못된 이미지 패턴 감지 및 자동 재검색
     // "삼성금융 Open Collaboration", 홍보 포스터, 광고 이미지 등 필터링
     // 이 패턴이 감지되면 자동으로 재생성 시도
     // ============================================
     // ============================================
-    // ✅ V2026.37.82 - CEO 긴급 지시: 홍보물/광고 이미지 필터 강화
+    // ✅ V2026.37.83 - CEO 긴급 지시: 홍보물/광고 이미지 필터 강화
     // "삼성금융 Open Collaboration" 같은 홍보 이미지 차단
     // ============================================
     const INVALID_IMAGE_PATTERNS = [
@@ -8863,7 +9003,7 @@ async function generateMarketingImage() {
       // 잘못된 이미지 URL을 제외 목록에 추가
       excludedUrls.push(imageUrl);
       
-      // ✅ V2026.37.82: 자동 재시도 - throw 대신 continue
+      // ✅ V2026.37.83: 자동 재시도 - throw 대신 continue
       if (autoRetryCount < MAX_AUTO_RETRY) {
         console.log('[XIVIX] 🔄 자동 재검색 시도... (' + (autoRetryCount + 1) + '/' + MAX_AUTO_RETRY + ')');
         if (loadingText) loadingText.textContent = '🔄 홍보 이미지 감지됨, 설계서 재검색 중...';
@@ -8876,7 +9016,7 @@ async function generateMarketingImage() {
     }
     
     // ============================================
-    // ✅ V2026.37.82 - XIIM V2.8 대응: verification 필드 완전 활용
+    // ✅ V2026.37.83 - XIIM V2.8 대응: verification 필드 완전 활용
     // ============================================
     const verification = result.data?.verification || {};
     const isDesignDocument = verification.is_design_document;
@@ -8887,7 +9027,7 @@ async function generateMarketingImage() {
     const isR2Fallback = result.data?.isR2Fallback || false;
     const isSample = result.data?.is_sample || result.data?.is_fallback || result.data?.fallback || isR2Fallback;
     
-    console.log('[XIVIX] V2026.37.82 이미지 검증 결과:', { 
+    console.log('[XIVIX] V2026.37.83 이미지 검증 결과:', { 
       isDesignDocument, 
       detectedCompany, 
       verificationConfidence, 
@@ -8896,7 +9036,7 @@ async function generateMarketingImage() {
       reason: verificationReason.substring(0, 100) + '...'
     });
     
-    // ✅ V2026.37.82: XIIM V2.8 - 설계서가 아닌 경우 자동 재시도 (더 정확한 판별)
+    // ✅ V2026.37.83: XIIM V2.8 - 설계서가 아닌 경우 자동 재시도 (더 정확한 판별)
     // verification.is_design_document === false 이면 확실히 설계서가 아님
     if (isDesignDocument === false) {
       console.warn('[XIVIX] ❌ XIIM V2.8 검증 실패: 설계서 아님 (시도 ' + autoRetryCount + ')');
@@ -8925,7 +9065,7 @@ async function generateMarketingImage() {
       }
     }
     
-    // ✅ V2026.37.82: 설계서로 판정된 경우 성공 로그
+    // ✅ V2026.37.83: 설계서로 판정된 경우 성공 로그
     if (isDesignDocument === true) {
       console.log('[XIVIX] ✅ XIIM V2.8 검증 성공: 설계서 확인 (신뢰도: ' + (verificationConfidence * 100).toFixed(0) + '%)');
       console.log('[XIVIX] 감지된 요소:', detectedElements.join(', '));
@@ -9030,7 +9170,7 @@ async function generateMarketingImage() {
         console.warn('[XIVIX] 2_quality_filter: 해상도 검증 실패, 원본 사용:', resCheckError.message);
       }
       
-      // ✅ V2026.37.82: 유효한 이미지 찾음 - 루프 종료
+      // ✅ V2026.37.83: 유효한 이미지 찾음 - 루프 종료
       validImageFound = true;
       finalResolutionData = resolutionData;
       finalIsSample = isSample;
@@ -9075,13 +9215,13 @@ async function generateMarketingImage() {
         fallbackNotice.style.display = 'none';
       }
       
-      // ✅ V2026.37.82: 유효한 이미지 찾음 - while 루프 종료
+      // ✅ V2026.37.83: 유효한 이미지 찾음 - while 루프 종료
       break;
       
     } // end of while (!validImageFound && autoRetryCount < MAX_AUTO_RETRY)
     
     // ============================================
-    // ✅ V2026.37.82: 모든 시도 후 결과 확인
+    // ✅ V2026.37.83: 모든 시도 후 결과 확인
     // ============================================
     if (!validImageFound) {
       console.error('[XIVIX] ❌ ' + MAX_AUTO_RETRY + '회 시도 후 유효한 설계서 이미지를 찾지 못함');
@@ -9124,7 +9264,7 @@ async function generateMarketingImage() {
       userMsg += '💡 해결: 다른 보험사/상품으로 다시 시도해 주세요.';
       showSourceUrlInput = true;
     } else if (error.message.includes('INVALID_IMAGE_TYPE')) {
-      // ✅ V2026.37.82 - 홍보/광고 이미지 감지 시 자동 재시도
+      // ✅ V2026.37.83 - 홍보/광고 이미지 감지 시 자동 재시도
       console.log('[XIVIX] 자동 재검색 시도 (홍보 이미지 감지)');
       
       // 자동 재시도 횟수 체크 (무한 루프 방지)
@@ -9193,20 +9333,20 @@ async function generateMarketingImage() {
 }
 
 // ============================================
-// ✅ V2026.37.82 - CEO 긴급 지시: 이미지 재생성 기능
+// ✅ V2026.37.83 - CEO 긴급 지시: 이미지 재생성 기능
 // XIIM API V2.3 /api/regenerate 연동
 // 이전 이미지 URL을 exclude하고 새 이미지 검색
 // ============================================
 let excludedImageUrls = []; // 제외할 이미지 URL 목록
 
 // ============================================
-// ✅ V2026.37.82 - 이미지 재생성 기능
+// ✅ V2026.37.83 - 이미지 재생성 기능
 // 1차: /api/regenerate (exclude_urls 지원)
 // 2차: /api/process (폴백, 다른 키워드로 재검색)
 // ============================================
 let regenerateAttempts = 0;
 
-// ✅ V2026.37.82 - 이미지 재생성 (1개만)
+// ✅ V2026.37.83 - 이미지 재생성 (1개만)
 async function regenerateMarketingImage() {
   const btn = document.getElementById('imageRegenerateBtn');
   const statusEl = document.getElementById('regenerateStatus');
@@ -9223,7 +9363,7 @@ async function regenerateMarketingImage() {
   }
   
   regenerateAttempts++;
-  console.log('[XIVIX] V2026.37.82 재생성 요청 #' + regenerateAttempts);
+  console.log('[XIVIX] V2026.37.83 재생성 요청 #' + regenerateAttempts);
   
   // UI 업데이트
   btn.disabled = true;
@@ -9254,7 +9394,7 @@ async function regenerateMarketingImage() {
     const insurance = resultData?.insurance || '종합보험';
     const selectedTitleText = resultData.titles?.[selectedTitle]?.text || resultData.titles?.[selectedTitle] || '';
     
-    console.log('[XIVIX] V2026.37.82 재생성:', company, insurance);
+    console.log('[XIVIX] V2026.37.83 재생성:', company, insurance);
     
     // 이미지 1개 생성 호출
     const results = await fetchImageCandidates(company, insurance, selectedTitleText);
@@ -9284,7 +9424,7 @@ async function regenerateMarketingImage() {
   }
 }
 
-// ✅ V2026.37.82 - 레거시 코드 제거됨 (이미지 1개만 생성)
+// ✅ V2026.37.83 - 레거시 코드 제거됨 (이미지 1개만 생성)
 
 // ============================================
 // ✅ V2026.37.63 - 이미지 후보 3개 관리 시스템
@@ -9294,7 +9434,7 @@ let imageCandidates = []; // 후보 이미지 배열 [{url, verification, isVali
 let selectedCandidateIndex = -1;
 let globalExcludedUrls = []; // 전역 제외 URL (세션 동안 유지)
 
-// ✅ V2026.37.82 - 후보 선택 UI 제거됨 (1개만 자동 표시)
+// ✅ V2026.37.83 - 후보 선택 UI 제거됨 (1개만 자동 표시)
 function selectCandidate(index) {
   if (!imageCandidates[index] || !imageCandidates[index].isValid) {
     console.warn('[XIVIX] 유효하지 않은 이미지');
@@ -9313,18 +9453,18 @@ function selectCandidate(index) {
   console.log('[XIVIX] 이미지 설정:', generatedImageUrl);
 }
 
-// ✅ V2026.37.82 - 후보 보기 기능 제거 (더미 함수)
+// ✅ V2026.37.83 - 후보 보기 기능 제거 (더미 함수)
 function showImageCandidates() {
   console.log('[XIVIX] 후보 보기 기능 비활성화됨 (1개만 표시)');
 }
 
 // ============================================
-// ✅ V2026.37.82 - 이미지 1개만 생성 (DALL-E 3 우선)
+// ✅ V2026.37.83 - 이미지 1개만 생성 (DALL-E 3 우선)
 // 후보 선택 UI 제거, 1개만 자동 표시
 // ============================================
 async function fetchImageCandidates(company, insurance, title) {
-  // ✅ V2026.37.82 - 이미지 1개만 생성 (DALL-E 3 우선 → 검색 폴백)
-  console.log('[XIVIX] V2026.37.82 이미지 생성 시작 (1개만):', { company, insurance });
+  // ✅ V2026.37.83 - 이미지 1개만 생성 (DALL-E 3 우선 → 검색 폴백)
+  console.log('[XIVIX] V2026.37.83 이미지 생성 시작 (1개만):', { company, insurance });
   
   const companyCodeMap = {
     '삼성생명': 'SAMSUNG_LIFE', '한화생명': 'HANWHA_LIFE', '교보생명': 'KYOBO_LIFE',
@@ -10008,7 +10148,7 @@ app.get('/', (c) => {
   setSecurityHeaders(c);
   return c.html(mainPageHtml);
 })
-// V2026.37.82 - 이미지2: 관리자 페이지 보안 (010-4845-3065 방익주 대표만 접근 가능)
+// V2026.37.83 - 이미지2: 관리자 페이지 보안 (010-4845-3065 방익주 대표만 접근 가능)
 // 관리자 인증 페이지
 const adminLoginHtml = `<!DOCTYPE html>
 <html lang="ko">
@@ -10049,7 +10189,7 @@ h1{font-size:24px;color:#00ff00;margin:0 0 8px}
   <div class="back-link"><a href="/">← 메인으로 돌아가기</a></div>
 </div>
 <script>
-// V2026.37.82 - 관리자: 방익주(010-4845-3065), 김미경(010-3159-3697)
+// V2026.37.83 - 관리자: 방익주(010-4845-3065), 김미경(010-3159-3697)
 const ADMIN_PHONES = ['010-4845-3065', '010-3159-3697'];
 const adminForm = document.getElementById('adminForm');
 const adminPhone = document.getElementById('adminPhone');
