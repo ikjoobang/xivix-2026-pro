@@ -7891,26 +7891,55 @@ function renderHashtags(hashtags) {
   // 중복 제거 후 5개만
   const uniqueTags = [...new Set(hashtags.map(tag => tag.startsWith('#') ? tag : '#' + tag))].slice(0, 5);
   
+  // ✅ V2026.37.92 - 해시태그 복사 기능 개선
+  // 전체 복사용 데이터 먼저 저장
+  window.hashtagsForCopy = uniqueTags.join(' ');
+  window.hashtagsArray = uniqueTags; // 개별 복사용
+  
   // 전체 복사 버튼 + 개별 태그
   let html = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">';
-  html += '<button onclick="copyAllHashtags()" style="background:var(--primary);color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600"><i class="fas fa-copy"></i> 5개 전체복사</button>';
+  html += '<button onclick="copyAllHashtags()" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(79,140,255,0.3)"><i class="fas fa-copy"></i> 전체복사</button>';
   
-  uniqueTags.forEach(tag => {
-    html += '<span class="keyword-tag" onclick="copyKeyword(this, \\'' + tag + '\\')"><i class="fas fa-hashtag"></i> ' + tag.replace('#', '') + '</span>';
+  uniqueTags.forEach((tag, idx) => {
+    // data-index 사용하여 안전하게 복사
+    html += '<span class="keyword-tag" data-idx="' + idx + '" onclick="copyHashtagByIndex(' + idx + ', this)" style="cursor:pointer;padding:6px 12px;background:rgba(79,140,255,0.1);border-radius:6px;font-size:13px;color:var(--primary)"><i class="fas fa-hashtag"></i> ' + tag.replace('#', '') + '</span>';
   });
   html += '</div>';
   
-  // 전체 복사용 데이터 저장
-  window.hashtagsForCopy = uniqueTags.join(' ');
   container.innerHTML = html;
 }
 
-// 해시태그 5개 전체 복사
+// ✅ V2026.37.92 - 인덱스로 해시태그 복사 (문자열 이스케이프 문제 해결)
+function copyHashtagByIndex(idx, el) {
+  const tag = window.hashtagsArray?.[idx] || '';
+  if (!tag) return;
+  navigator.clipboard.writeText(tag).then(() => {
+    el.style.background = 'var(--green)';
+    el.style.color = '#fff';
+    setTimeout(() => {
+      el.style.background = 'rgba(79,140,255,0.1)';
+      el.style.color = 'var(--primary)';
+    }, 1000);
+  });
+}
+
+// ✅ V2026.37.92 - 해시태그 전체 복사 개선
 function copyAllHashtags() {
   const text = window.hashtagsForCopy || '';
-  if (!text) return;
+  if (!text) {
+    alert('복사할 해시태그가 없습니다.');
+    return;
+  }
   navigator.clipboard.writeText(text).then(() => {
-    alert('해시태그 5개 복사 완료!\\n\\n' + text);
+    // 복사 완료 토스트
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#10b981,#059669);color:white;padding:14px 24px;border-radius:10px;z-index:99999;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(16,185,129,0.4);max-width:90%;text-align:center;';
+    toast.innerHTML = '<i class="fas fa-check-circle"></i> 해시태그 복사 완료!<br><span style="font-size:12px;opacity:0.9">' + text + '</span>';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }).catch(() => {
+    // 폴백: prompt로 복사
+    prompt('해시태그를 복사하세요:', text);
   });
 }
 
