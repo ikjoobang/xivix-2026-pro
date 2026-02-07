@@ -4783,6 +4783,97 @@ body{
 }
 .trend-hint i{color:#f59e0b}
 
+/* ============================================
+   V2026.37.100 - 전체 새로고침 버튼 (중앙 크게)
+   PC/모바일 반응형 대응
+============================================ */
+.global-reset-container{
+  width:100%;
+  display:flex;
+  justify-content:center;
+  margin-bottom:clamp(16px, 3vw, 24px);
+  padding:0 16px;
+  box-sizing:border-box;
+}
+.global-reset-btn{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  padding:clamp(16px, 2.5vw, 24px) clamp(32px, 6vw, 80px);
+  background:linear-gradient(135deg, rgba(239,68,68,0.15), rgba(255,107,107,0.15));
+  border:2px solid rgba(239,68,68,0.4);
+  border-radius:clamp(14px, 2vw, 20px);
+  color:#ef4444;
+  font-weight:700;
+  cursor:pointer;
+  transition:all 0.3s cubic-bezier(0.4,0,0.2,1);
+  min-width:clamp(200px, 50vw, 300px);
+  position:relative;
+  overflow:hidden;
+}
+.global-reset-btn::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(135deg, rgba(239,68,68,0.2), rgba(255,107,107,0.2));
+  opacity:0;
+  transition:opacity 0.3s;
+}
+.global-reset-btn:hover::before{opacity:1}
+.global-reset-btn:hover{
+  transform:scale(1.02);
+  border-color:rgba(239,68,68,0.7);
+  box-shadow:0 8px 30px rgba(239,68,68,0.3);
+}
+.global-reset-btn:active{
+  transform:scale(0.98);
+}
+.global-reset-btn i{
+  font-size:clamp(20px, 3vw, 28px);
+  animation:none;
+  z-index:1;
+}
+.global-reset-btn:hover i{
+  animation:spinOnce 0.6s ease-out;
+}
+@keyframes spinOnce{
+  0%{transform:rotate(0deg)}
+  100%{transform:rotate(360deg)}
+}
+@keyframes fadeInScale{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(0.8)}
+  100%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+}
+@keyframes fadeOutScale{
+  0%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(0.8)}
+}
+.global-reset-btn span{
+  font-size:clamp(14px, 2vw, 18px);
+  z-index:1;
+}
+.global-reset-btn small{
+  font-size:clamp(10px, 1.5vw, 12px);
+  color:rgba(239,68,68,0.7);
+  font-weight:500;
+  z-index:1;
+}
+
+/* 모바일 전용 최적화 */
+@media(max-width:600px){
+  .global-reset-container{
+    padding:0 12px;
+    margin-bottom:16px;
+  }
+  .global-reset-btn{
+    width:100%;
+    min-width:auto;
+    padding:14px 24px;
+  }
+}
+
 /* 반응형 - 2열 */
 @media(max-width:900px){
   .trend-grid{grid-template-columns:repeat(2, 1fr)}
@@ -6634,6 +6725,15 @@ body{
   
   <p class="title">AI 보험 전문가 콘텐츠 생성 엔진</p>
   
+  <!-- ✅ V2026.37.100 - 전체 새로고침 버튼 (중앙 크게) -->
+  <div class="global-reset-container" id="globalResetContainer">
+    <button class="global-reset-btn" id="globalResetBtn" onclick="resetEverything()">
+      <i class="fas fa-sync-alt"></i>
+      <span>전체 새로고침</span>
+      <small>모든 입력/결과 초기화</small>
+    </button>
+  </div>
+  
   <div class="main">
     
     <!-- V2026.37.95 - AI 모델 선택 (Gemini / GPT-4o 둘 다 보이게) -->
@@ -7372,6 +7472,130 @@ function removeFile(id) {
       searchInput.placeholder = '핵심 고민을 입력하세요...\\n\\n예: 워킹맘인데 아이 교육자금으로 증여하려면 세금이 얼마나 나올까요?';
     }
   }
+}
+
+// ============================================
+// ✅ V2026.37.100 - 전체 새로고침 기능 (CEO 요청)
+// 모든 텍스트/이미지/결과를 초기화하고 새로 시작
+// PC와 모바일 모두 대응
+// ============================================
+function resetEverything() {
+  // 확인 메시지 (모바일에서도 작동)
+  if (!confirm('모든 입력과 결과를 초기화하시겠습니까?\\n\\n✓ 입력한 텍스트\\n✓ 업로드한 이미지\\n✓ 생성된 결과\\n\\n모두 삭제됩니다.')) {
+    return;
+  }
+  
+  console.log('[XIVIX] 🔄 전체 새로고침 시작...');
+  
+  // 1. 텍스트 입력 초기화
+  const searchInput = document.getElementById('search');
+  if (searchInput) {
+    searchInput.value = '';
+    searchInput.placeholder = '핵심 고민을 입력하세요...\\n\\n예: 워킹맘인데 아이 교육자금으로 증여하려면 세금이 얼마나 나올까요?';
+  }
+  
+  // 2. 글자수 카운트 초기화
+  const charEl = document.getElementById('char');
+  if (charEl) charEl.textContent = '0';
+  
+  // 3. 업로드된 이미지 모두 삭제
+  uploadedFiles = [];
+  const fileList = document.getElementById('fileList');
+  if (fileList) fileList.innerHTML = '';
+  
+  // 4. 파일 인풋 초기화
+  const fileInput = document.getElementById('fileInput');
+  if (fileInput) fileInput.value = '';
+  
+  // 5. 결과 섹션 숨기기 및 초기화
+  const resultSection = document.getElementById('resultSection');
+  if (resultSection) {
+    resultSection.classList.remove('show');
+    resultSection.style.display = 'none';
+  }
+  
+  // 6. 각 결과 영역 초기화
+  const sectionsToReset = [
+    'tab-titles', 'tab-questions', 'tab-answers', 'tab-extras',
+    'seoKeywords', 'hashtagsContent', 'viralQuestions', 
+    'reportTable', 'seoAuditCard', 'section-titles', 
+    'section-keywords', 'section-questions', 'section-answers',
+    'section-comments', 'section-hashtags'
+  ];
+  
+  sectionsToReset.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.querySelector) {
+      const content = el.querySelector('.section-content');
+      if (content) content.innerHTML = '';
+      else if (el.classList.contains('section-content') || id.startsWith('tab-')) {
+        el.innerHTML = '';
+      }
+    }
+  });
+  
+  // 7. 뉴스 Q&A 결과 영역 초기화
+  const newsQAResults = document.querySelector('.news-qa-results');
+  if (newsQAResults) newsQAResults.remove();
+  
+  // 8. 진행바 초기화
+  const progressBox = document.getElementById('progressBox');
+  const progressFill = document.getElementById('progressFill');
+  const progressText = document.getElementById('progressText');
+  const progressPct = document.getElementById('progressPct');
+  if (progressBox) progressBox.style.display = 'none';
+  if (progressFill) progressFill.style.width = '0%';
+  if (progressText) progressText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 대기 중...';
+  if (progressPct) progressPct.textContent = '0%';
+  
+  // 9. 버튼 상태 초기화
+  const btn = document.getElementById('btn');
+  if (btn) {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+  
+  // 10. 모드 초기화 (일반 모드로)
+  setMode('normal');
+  
+  // 11. AI 모델 초기화 (Gemini로)
+  selectAIModel('gemini');
+  
+  // 12. LocalStorage 클리어
+  try {
+    localStorage.removeItem('xivix_user_state');
+    localStorage.removeItem('xivix_result_data');
+    localStorage.removeItem('xivix_newsqa_data');
+  } catch(e) {
+    console.warn('[XIVIX] LocalStorage 클리어 실패:', e);
+  }
+  
+  // 13. 전역 변수 초기화
+  window.newsQAData = null;
+  window.resultData = null;
+  window.hashtagsForCopy = '';
+  window.hashtagsArray = [];
+  
+  // 14. 트렌드 새로고침
+  loadTrends();
+  
+  // 15. 성공 토스트 표시
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,#10b981,#059669);color:white;padding:24px 40px;border-radius:16px;z-index:99999;font-size:16px;font-weight:700;box-shadow:0 8px 40px rgba(16,185,129,0.5);text-align:center;max-width:90%;';
+  toast.innerHTML = '<i class="fas fa-check-circle" style="font-size:32px;display:block;margin-bottom:12px"></i>전체 초기화 완료!<br><small style="font-size:13px;opacity:0.9;font-weight:400">새로운 콘텐츠를 생성하세요</small>';
+  document.body.appendChild(toast);
+  
+  // 애니메이션 효과
+  toast.style.animation = 'fadeInScale 0.3s ease-out';
+  setTimeout(() => {
+    toast.style.animation = 'fadeOutScale 0.3s ease-out';
+    setTimeout(() => toast.remove(), 300);
+  }, 2000);
+  
+  console.log('[XIVIX] ✅ 전체 새로고침 완료!');
+  
+  // 페이지 상단으로 스크롤
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // 트렌드 로드 (Linear 스타일 미니멀 UI) - V2026.37.95 null 체크 추가
