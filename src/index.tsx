@@ -643,8 +643,10 @@ app.post('/api/generate/master', async (c) => {
 // 초보 질문 게시글 생성 API
 app.post('/api/generate/question', async (c) => {
   const body = await c.req.json()
-  const topic = body.topic || ''
+  // V2026.37.99 - keyword 파라미터도 지원
+  const topic = body.keyword || body.topic || ''
   const situation = body.situation || body.concern || ''
+  const insurance = body.insurance || '' // 보험 종류 힌트
   
   try {
     const apiKey = getApiKey(c.env, 'FLASH')
@@ -1082,7 +1084,8 @@ app.post('/api/analyze/image', async (c) => {
 app.post('/api/generate/full-package', async (c) => {
   try {
     const body = await c.req.json()
-    const inputTopic = body.concern || body.topic || ''
+    // V2026.37.99 - keyword 파라미터도 지원
+    const inputTopic = body.keyword || body.concern || body.topic || ''
     const trendKeyword = body.trend_keyword || '' // 트렌드에서 선택한 키워드
     const image = body.image || null // Base64 이미지 (선택)
     const mimeType = body.mimeType || 'image/jpeg'
