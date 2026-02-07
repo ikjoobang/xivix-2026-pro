@@ -3494,15 +3494,71 @@ app.post('/api/generate/news-qa', async (c) => {
   
   return streamText(c, async (stream) => {
     try {
-      await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '📊 보험 설계서 분석 중... (GPT-4o)' }) + '\\n')
+      // V2026.37.99 - 입력 모드에 따른 메시지
+      const hasOnlyText = newsText.trim() && imageArray.length === 0
+      const stepMsg = hasOnlyText 
+        ? '📊 보험/뉴스 텍스트 분석 중... (GPT-4o)' 
+        : '📊 보험 설계서 이미지 분석 중... (GPT-4o)'
+      await stream.write(JSON.stringify({ type: 'step', step: 1, msg: stepMsg }) + '\\n')
       
       // ============================================
       // Step 1: GPT-4o로 이미지 + 텍스트 통합 분석
       // ============================================
       const contentParts: any[] = []
       
-      // 분석 프롬프트
-      const analysisPrompt = `당신은 30년 경력 MDRT 보험 전문가입니다.
+      // V2026.37.99 - 텍스트 전용 vs 이미지 포함 분기
+      let analysisPrompt = ''
+      
+      if (hasOnlyText) {
+        // 텍스트만 있는 경우 - 뉴스/보험 텍스트 분석
+        analysisPrompt = `당신은 30년 경력 MDRT 보험 전문가입니다.
+아래 보험 관련 텍스트를 정밀하게 분석해주세요.
+
+[사용자 입력 텍스트]
+${newsText}
+
+[분석 요청]
+위 텍스트에서 보험 관련 정보를 추출해주세요:
+
+1. **상품 정보** (언급된 경우)
+   - 보험회사명
+   - 상품명
+   - 보험 종류 (연금보험, 종신보험, 암보험 등)
+
+2. **계약 조건** (언급된 경우)
+   - 피보험자 정보 (나이, 성별)
+   - 납입기간
+   - 월 보험료
+   - 총 납입금액
+
+3. **해약환급금 정보** (언급된 경우)
+   - 해약환급금
+   - 환급률
+
+4. **핵심 이슈/고민**
+   - 질문자의 주요 고민
+   - 상담이 필요한 포인트
+
+JSON 형식으로 응답 (정보가 없는 항목은 빈 문자열):
+{
+  "company": "보험회사명",
+  "product_name": "상품명",
+  "product_type": "보험종류",
+  "insured_age": "피보험자 나이",
+  "insured_gender": "성별",
+  "payment_period": "납입기간(년)",
+  "coverage_period": "보험기간",
+  "monthly_premium": "월보험료",
+  "total_premium": "총납입금액",
+  "surrender_values": [{"year": 10, "amount": "금액", "rate": "환급률%"}],
+  "interest_rate": "",
+  "key_benefits": [],
+  "special_notes": "핵심 이슈/고민",
+  "user_concern": "질문자의 주요 고민"
+}`
+      } else {
+        // 이미지가 있는 경우 - 설계서 OCR 분석
+        analysisPrompt = `당신은 30년 경력 MDRT 보험 전문가입니다.
 아래 보험 설계서 이미지와 텍스트를 정밀하게 분석해주세요.
 
 ${newsText ? '[사용자 입력 텍스트]\\n' + newsText + '\\n\\n' : ''}
@@ -3549,10 +3605,11 @@ JSON 형식으로 응답:
   "key_benefits": ["보장내용1", "보장내용2"],
   "special_notes": "특이사항"
 }`
+      }
 
       contentParts.push({ type: 'text', text: analysisPrompt })
       
-      // 이미지들 추가
+      // 이미지들 추가 (이미지가 있을 때만)
       for (const img of imageArray) {
         contentParts.push({
           type: 'image_url',
@@ -3563,22 +3620,44 @@ JSON 형식으로 응답:
         })
       }
       
-      // GPT-4o API 호출
-      const analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openaiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            { role: 'user', content: contentParts }
-          ],
-          max_tokens: 4096,
-          temperature: 0.2
+      // V2026.37.99 - GPT-4o API 호출 (텍스트만 vs 이미지+텍스트 분기)
+      let analysisResponse: Response
+      
+      if (hasOnlyText) {
+        // 텍스트만 있는 경우 - 단순 텍스트 메시지로 전송
+        analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiKey}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [
+              { role: 'user', content: analysisPrompt }
+            ],
+            max_tokens: 4096,
+            temperature: 0.2
+          })
         })
-      })
+      } else {
+        // 이미지가 있는 경우 - Vision API 형식
+        analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiKey}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [
+              { role: 'user', content: contentParts }
+            ],
+            max_tokens: 4096,
+            temperature: 0.2
+          })
+        })
+      }
       
       let analysisData: any = {}
       if (analysisResponse.ok) {
@@ -3586,7 +3665,7 @@ JSON 형식으로 응답:
         const rawText = json.choices?.[0]?.message?.content || ''
         try {
           // JSON 부분만 추출
-          const jsonMatch = rawText.match(/\\{[\\s\\S]*\\}/)
+          const jsonMatch = rawText.match(/\{[\s\S]*\}/)
           if (jsonMatch) {
             analysisData = JSON.parse(jsonMatch[0])
           }
@@ -3685,7 +3764,7 @@ JSON 형식으로 응답:
         const json = await qaResponse.json() as any
         const rawText = json.choices?.[0]?.message?.content || ''
         try {
-          const jsonMatch = rawText.match(/\\{[\\s\\S]*\\}/)
+          const jsonMatch = rawText.match(/\{[\s\S]*\}/)
           if (jsonMatch) {
             qaData = JSON.parse(jsonMatch[0])
           }
@@ -3794,7 +3873,7 @@ JSON 형식:
         const json = await commentResponse.json() as any
         const rawText = json.choices?.[0]?.message?.content || ''
         try {
-          const jsonMatch = rawText.match(/\\{[\\s\\S]*\\}/)
+          const jsonMatch = rawText.match(/\{[\s\S]*\}/)
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0])
             comments = parsed.comments || []
@@ -3846,7 +3925,7 @@ JSON 형식:
         const json = await hashtagResponse.json() as any
         const rawText = json.choices?.[0]?.message?.content || ''
         try {
-          const jsonMatch = rawText.match(/\\{[\\s\\S]*\\}/)
+          const jsonMatch = rawText.match(/\{[\s\S]*\}/)
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0])
             hashtags = parsed.hashtags || []
