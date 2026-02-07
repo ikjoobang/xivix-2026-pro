@@ -3464,27 +3464,94 @@ app.post('/api/xiim/openai/generate', async (c) => {
 });
 
 // ============================================
-// V2026.37.96 - 뉴스 이미지 → 보험 Q&A 콘텐츠 자동 생성 API
+// V2026.37.97 - 뉴스 이미지/텍스트 → 보험 Q&A 콘텐츠 자동 생성 API
 // CEO 지시: 하나의 뉴스로 수천 개의 보험 콘텐츠 생성
+// 텍스트 입력 지원 추가 (이미지 OCR 또는 텍스트 직접 입력)
 // ============================================
 app.post('/api/generate/news-qa', async (c) => {
   const body = await c.req.json()
   const image = body.image || null
   const mimeType = body.mimeType || 'image/jpeg'
+  const newsText = body.newsText || null // V2026.37.97 - 텍스트 입력 지원
   const questionCount = Math.min(body.questionCount || 10, 30) // 최대 30개
   
-  if (!image) {
-    return c.json({ success: false, error: '뉴스 이미지가 필요합니다.' }, 400)
+  // V2026.37.97 - 텍스트 또는 이미지 중 하나는 필수
+  if (!image && !newsText) {
+    return c.json({ success: false, error: '뉴스 이미지 또는 텍스트가 필요합니다.' }, 400)
   }
   
   const proKey = getApiKey(c.env, 'PRO')
   
+  // V2026.37.97 - 입력 모드 판단: 텍스트가 있으면 텍스트 우선
+  const inputMode = newsText ? 'text' : 'image'
+  const hasTextAndImage = newsText && image
+  
   return streamText(c, async (stream) => {
     try {
-      await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '📰 뉴스 이미지 분석 중...' }) + '\n')
+      // V2026.37.97 - 텍스트+이미지 동시 입력 시 안내 메시지
+      if (hasTextAndImage) {
+        await stream.write(JSON.stringify({ 
+          type: 'notice', 
+          msg: '⚠️ 텍스트 내용으로만 생성해드립니다. 이미지 분석이 필요하시면 이미지만 별도로 업로드해주세요.' 
+        }) + '\n')
+      }
       
-      // Step 1: 뉴스 이미지 OCR 분석
-      const ocrPrompt = `이 뉴스 이미지를 분석해주세요.
+      let newsData: any = {}
+      
+      // V2026.37.97 - 텍스트 모드: OCR 스킵, AI로 뉴스 분석
+      if (inputMode === 'text') {
+        await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '📰 뉴스 텍스트 분석 중...' }) + '\n')
+        
+        const textAnalysisPrompt = `다음 뉴스 기사를 분석해주세요.
+
+[뉴스 내용]
+${newsText}
+
+[추출할 정보]
+1. 뉴스 핵심 내용 (1~2문장 요약)
+2. 사건/이슈 유형 (보험사기, 교통사고, 의료사고, 재해, 범죄, 학교폭력 등)
+3. 핵심 키워드들
+4. 관련될 수 있는 보험 종류들 (자동차보험, 운전자보험, 상해보험, 실손보험, 배상책임보험 등)
+5. 이 뉴스와 관련된 다양한 관점들 (피해자, 가해자, 가담자, 보험사, 일반인 등)
+
+JSON 형식으로 응답:
+{
+  "headline": "뉴스 핵심 내용 요약",
+  "issue_type": "사건 유형",
+  "keywords": ["키워드1", "키워드2", "키워드3"],
+  "related_insurances": ["보험종류1", "보험종류2"],
+  "perspectives": ["관점1", "관점2", "관점3"]
+}`
+
+        const textResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: textAnalysisPrompt }] }],
+              generationConfig: { temperature: 0.3, maxOutputTokens: 2048, responseMimeType: 'application/json' }
+            })
+          }
+        )
+        
+        if (textResponse.ok) {
+          const json = await textResponse.json() as any
+          const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          try {
+            newsData = JSON.parse(rawText.replace(/\`\`\`json\\n?/g, '').replace(/\`\`\`\\n?/g, '').trim())
+          } catch (e) {
+            newsData = { headline: newsText.substring(0, 100), issue_type: '일반', keywords: [], related_insurances: [], perspectives: [] }
+          }
+        }
+        
+        console.log('[XIVIX] 뉴스 텍스트 분석 완료:', newsData.headline)
+        
+      } else {
+        // 이미지 모드: 기존 OCR 방식
+        await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '📰 뉴스 이미지 분석 중...' }) + '\n')
+        
+        const ocrPrompt = `이 뉴스 이미지를 분석해주세요.
 
 [추출할 정보]
 1. 뉴스 제목 또는 핵심 내용 (자막/캡션에서)
@@ -3501,33 +3568,38 @@ JSON 형식으로 응답:
   "perspectives": ["피해자", "가해자", "목격자", "가족"]
 }`
 
-      const ocrResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: ocrPrompt },
-                { inline_data: { mime_type: mimeType, data: image } }
-              ]
-            }],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 2048, responseMimeType: 'application/json' }
-          })
+        const ocrResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: ocrPrompt },
+                  { inline_data: { mime_type: mimeType, data: image } }
+                ]
+              }],
+              generationConfig: { temperature: 0.3, maxOutputTokens: 2048, responseMimeType: 'application/json' }
+            })
+          }
+        )
+        
+        if (ocrResponse.ok) {
+          const json = await ocrResponse.json() as any
+          const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          try {
+            newsData = JSON.parse(rawText.replace(/\`\`\`json\\n?/g, '').replace(/\`\`\`\\n?/g, '').trim())
+          } catch (e) {
+            newsData = { headline: rawText, issue_type: '일반', keywords: [], related_insurances: [], perspectives: [] }
+          }
         }
-      )
-      
-      let newsData: any = {}
-      if (ocrResponse.ok) {
-        const json = await ocrResponse.json() as any
-        const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        try {
-          newsData = JSON.parse(rawText.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim())
-        } catch (e) {
-          newsData = { headline: rawText, issue_type: '일반', keywords: [], related_insurances: [], perspectives: [] }
-        }
+        
+        console.log('[XIVIX] 뉴스 이미지 분석 완료:', newsData.headline)
       }
+      
+      // 분석 결과에 입력 모드 표시
+      newsData.inputMode = inputMode
       
       await stream.write(JSON.stringify({ 
         type: 'news_analysis', 
@@ -8739,7 +8811,7 @@ function getRemainingApiCalls() {
 }
 
 // ============================================
-// ✅ V2026.37.96 - 모드 선택 (일반/뉴스 Q&A)
+// ✅ V2026.37.97 - 모드 선택 (일반/뉴스 Q&A) + 텍스트 입력 지원
 // ============================================
 let currentMode = 'normal'; // 'normal' | 'news'
 
@@ -8765,8 +8837,10 @@ function setMode(mode) {
     normalBtn?.classList.remove('active');
     newsBtn?.classList.add('active');
     if (newsModeGuide) newsModeGuide.style.display = 'flex';
+    // V2026.37.97 - 뉴스 모드에서도 텍스트 입력창 표시 (뉴스 기사 복붙용)
     if (searchEl) {
-      searchEl.style.display = 'none';
+      searchEl.style.display = 'block';
+      searchEl.placeholder = '뉴스 기사 내용을 붙여넣으세요...\\n\\n이미지 업로드 또는 텍스트 입력 둘 중 하나만 해도 됩니다.\\n(둘 다 입력 시 텍스트 내용으로만 생성됩니다)';
     }
     if (btn) btn.innerHTML = '<span class="btn-text"><i class="fas fa-newspaper"></i> 뉴스 Q&A 생성 (10~30개)</span><div class="spinner"></div>';
   }
@@ -8775,11 +8849,17 @@ function setMode(mode) {
 }
 
 // ============================================
-// ✅ V2026.37.96 - 뉴스 Q&A 스트리밍 생성
+// ✅ V2026.37.97 - 뉴스 Q&A 스트리밍 생성 (텍스트 입력 지원)
 // ============================================
 async function goGenerateNewsQA() {
-  if (uploadedFiles.length === 0) {
-    alert('뉴스 이미지를 업로드해주세요!');
+  const searchEl = document.getElementById('search');
+  const newsText = searchEl?.value?.trim() || '';
+  const hasImage = uploadedFiles.length > 0;
+  const hasText = newsText.length > 0;
+  
+  // V2026.37.97 - 텍스트 또는 이미지 중 하나는 필수
+  if (!hasImage && !hasText) {
+    alert('뉴스 이미지를 업로드하거나 뉴스 기사 텍스트를 입력해주세요!');
     return;
   }
   
@@ -8796,17 +8876,32 @@ async function goGenerateNewsQA() {
   progressBox.style.display = 'block';
   
   try {
-    const file = uploadedFiles[0];
-    
+    // V2026.37.97 - 요청 데이터 구성
     const requestData = {
-      image: file.base64,
-      mimeType: file.type,
       questionCount: 10 // 기본 10개 질문
     };
     
+    // 텍스트가 있으면 텍스트 사용 (텍스트 우선)
+    if (hasText) {
+      requestData.newsText = newsText;
+    }
+    
+    // 이미지가 있고 텍스트가 없으면 이미지 사용
+    if (hasImage && !hasText) {
+      const file = uploadedFiles[0];
+      requestData.image = file.base64;
+      requestData.mimeType = file.type;
+    }
+    
     progressFill.style.width = '10%';
     progressPct.textContent = '10%';
-    progressText.innerHTML = '<i class="fas fa-newspaper"></i> 뉴스 이미지 분석 중...';
+    
+    // V2026.37.97 - 입력 모드에 따른 메시지
+    if (hasText) {
+      progressText.innerHTML = '<i class="fas fa-file-alt"></i> 뉴스 텍스트 분석 중...';
+    } else {
+      progressText.innerHTML = '<i class="fas fa-newspaper"></i> 뉴스 이미지 분석 중...';
+    }
     
     const res = await fetch('/api/generate/news-qa', {
       method: 'POST',
@@ -8839,6 +8934,16 @@ async function goGenerateNewsQA() {
           const event = JSON.parse(line);
           
           switch (event.type) {
+            // V2026.37.97 - 텍스트+이미지 동시 입력 시 안내 메시지 표시
+            case 'notice':
+              // 토스트 메시지로 안내
+              const noticeToast = document.createElement('div');
+              noticeToast.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg, #f59e0b, #d97706);color:white;padding:16px 24px;border-radius:12px;z-index:99999;font-size:14px;max-width:90%;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
+              noticeToast.innerHTML = '<i class="fas fa-info-circle" style="margin-right:8px"></i>' + event.msg;
+              document.body.appendChild(noticeToast);
+              setTimeout(() => noticeToast.remove(), 5000);
+              break;
+              
             case 'step':
               progressText.innerHTML = event.msg;
               progressFill.style.width = (event.step * 25) + '%';
