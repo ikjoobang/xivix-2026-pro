@@ -1487,8 +1487,8 @@ ${imageAnalysis ? `- 🖼️ 이미지 분석 (최우선 컨텍스트):\n${image
         expert: ENGINE.PRO,
         comments: ENGINE.FLASH
       },
-      version: '2026.37.101',
-      changelog: 'v4: 스트리밍 대응, 제목 25자, 본문 1,000자, Context Switching'
+      version: '2026.37.102',
+      changelog: 'v4: 설계서 Q&A SEO/AEO/GEO/C-RANK 전면 재설계, 카페 초보자 글 자동 생성'
     })
     
   } catch (error) {
@@ -2370,7 +2370,7 @@ JSON 형식으로만 응답:
           titles, viral_questions: viralQuestions, contents, comments, report_data: reportData,
           seoKeywords, hashtags
         },
-        version: '2026.37.101'
+        version: '2026.37.102'
       }) + '\n')
       
     } catch (error) {
@@ -2563,7 +2563,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '2026.37.101',
+    version: '2026.37.102',
     project: 'XIVIX_Insurance_King_2026 (MASTER-1)',
     masterInstruction: MASTER_INSTRUCTION_V3,
     engines: {
@@ -3500,8 +3500,8 @@ app.post('/api/generate/news-qa', async (c) => {
       // V2026.37.99 - 입력 모드에 따른 메시지
       const hasOnlyText = newsText.trim() && imageArray.length === 0
       const stepMsg = hasOnlyText 
-        ? '📊 보험/뉴스 텍스트 분석 중... (GPT-4o)' 
-        : '📊 보험 설계서 이미지 분석 중... (GPT-4o)'
+        ? '📊 보험 설계서 텍스트 정밀 분석 중... (GPT-4o)' 
+        : '📊 보험 설계서 이미지 OCR 분석 중... (GPT-4o)'
       await stream.write(JSON.stringify({ type: 'step', step: 1, msg: stepMsg }) + '\\n')
       
       // ============================================
@@ -3513,39 +3513,34 @@ app.post('/api/generate/news-qa', async (c) => {
       let analysisPrompt = ''
       
       if (hasOnlyText) {
-        // 텍스트만 있는 경우 - 뉴스/보험 텍스트 분석
-        analysisPrompt = `당신은 30년 경력 MDRT 보험 전문가입니다.
-아래 보험 관련 텍스트를 정밀하게 분석해주세요.
+        // 텍스트만 있는 경우 - 보험 설계서 텍스트 분석
+        analysisPrompt = `[시스템 역할]
+당신은 대한민국 보험업계 30년 경력 MDRT(백만달러원탁회의) 종신회원이자, 보험계리사 자격을 보유한 최고 수준의 보험 분석 전문가입니다.
 
-[사용자 입력 텍스트]
+[분석 대상 텍스트]
 ${newsText}
 
-[분석 요청]
-위 텍스트에서 보험 관련 정보를 추출해주세요:
+[정밀 분석 지침]
+위 텍스트에서 보험 상품 관련 정보를 빠짐없이 추출하세요.
 
-1. **상품 정보** (언급된 경우)
-   - 보험회사명
-   - 상품명
-   - 보험 종류 (연금보험, 종신보험, 암보험 등)
+■ 추출 우선순위:
+1순위 - 정확한 숫자 데이터 (보험료, 환급금, 환급률, 기간)
+2순위 - 상품 식별 정보 (회사명, 상품명, 보험종류)
+3순위 - 계약 조건 (피보험자 정보, 납입/보험 기간)
+4순위 - 사용자의 핵심 고민/질문 의도
 
-2. **계약 조건** (언급된 경우)
-   - 피보험자 정보 (나이, 성별)
-   - 납입기간
-   - 월 보험료
-   - 총 납입금액
+■ 분석 규칙:
+- 텍스트에 명시된 숫자만 사용, 절대 추측 금지
+- "약 30만원" → "약 30만원" 그대로 기재
+- 정보가 없으면 빈 문자열("") 반환
+- 해약환급금이 여러 시점 언급되면 모두 배열에 포함
+- 보험종류 판별: 연금보험/종신보험/암보험/어린이보험/교육보험/변액보험/저축보험 등 정확히 분류
+- user_concern에는 사용자가 가장 궁금해하는 포인트를 1~2문장으로 요약
 
-3. **해약환급금 정보** (언급된 경우)
-   - 해약환급금
-   - 환급률
-
-4. **핵심 이슈/고민**
-   - 질문자의 주요 고민
-   - 상담이 필요한 포인트
-
-JSON 형식으로 응답 (정보가 없는 항목은 빈 문자열):
+JSON 형식으로만 응답 (설명 없이):
 {
   "company": "보험회사명",
-  "product_name": "상품명",
+  "product_name": "정확한 상품명",
   "product_type": "보험종류",
   "insured_age": "피보험자 나이",
   "insured_gender": "성별",
@@ -3554,45 +3549,41 @@ JSON 형식으로 응답 (정보가 없는 항목은 빈 문자열):
   "monthly_premium": "월보험료",
   "total_premium": "총납입금액",
   "surrender_values": [{"year": 10, "amount": "금액", "rate": "환급률%"}],
-  "interest_rate": "",
-  "key_benefits": [],
-  "special_notes": "핵심 이슈/고민",
-  "user_concern": "질문자의 주요 고민"
+  "interest_rate": "공시이율/최저보증이율",
+  "key_benefits": ["주요보장1", "주요보장2"],
+  "special_notes": "설계서 특이사항",
+  "user_concern": "사용자의 핵심 고민 요약"
 }`
       } else {
-        // 이미지가 있는 경우 - 설계서 OCR 분석
-        analysisPrompt = `당신은 30년 경력 MDRT 보험 전문가입니다.
-아래 보험 설계서 이미지와 텍스트를 정밀하게 분석해주세요.
+        // 이미지가 있는 경우 - 설계서 OCR 정밀 분석
+        analysisPrompt = `[시스템 역할]
+당신은 대한민국 보험업계 30년 경력 MDRT 종신회원 + 보험계리사(FIAA) + OCR 데이터 추출 전문가입니다.
+보험 가입설계서, 보험증권, 해약환급금 예시표를 수만 건 분석한 경험이 있습니다.
 
-${newsText ? '[사용자 입력 텍스트]\\n' + newsText + '\\n\\n' : ''}
-[분석 요청]
-첨부된 이미지는 보험 가입설계서입니다. 다음 정보를 정확하게 추출해주세요:
+${newsText ? '[사용자 추가 입력 텍스트]\\n' + newsText + '\\n\\n' : ''}[OCR 정밀 추출 지침]
 
-1. **상품 정보**
-   - 보험회사명
-   - 상품명 (정확하게)
-   - 보험 종류 (연금보험, 종신보험, 암보험 등)
+⚠️ 절대 규칙 (위반 시 무효):
+1. 이미지에 보이는 숫자를 1원 단위까지 정확하게 추출 - 절대 추측 금지
+2. 해약환급금 테이블: 모든 경과년수의 금액과 환급률을 빠짐없이 추출
+3. 금액 표기: 원본 그대로 (예: "23,400,000원" 또는 "2,340만원")
+4. 환급률: 소수점 첫째자리까지 (예: "130.0%")
+5. 이미지에 없는 정보는 절대 만들지 말 것
 
-2. **계약 조건**
-   - 피보험자 정보 (나이, 성별)
-   - 납입기간 (몇 년)
-   - 보험기간 (몇 세까지)
-   - 월 보험료
-   - 총 납입금액
+■ 추출 항목 (우선순위):
+1순위: 보험회사명 (로고·워터마크·상단 CI에서 확인)
+2순위: 정확한 상품명 (약관명칭 그대로)
+3순위: 보험 종류 분류 (연금/종신/암/어린이/교육/변액/저축/건강)
+4순위: 피보험자 정보 (나이·성별, 예: "10세 남")
+5순위: 납입기간·보험기간 (년 단위)
+6순위: 월 보험료·총 납입금액
+7순위: 해약환급금 전체 테이블 (1년~만기까지 가능한 모든 시점)
+8순위: 공시이율·최저보증이율·적용이율·예정이율
+9순위: 주요 특약·보장 내용·사망보험금·진단금 등
 
-3. **해약환급금 정보** (핵심!)
-   - 주요 시점별 해약환급금 (5년, 10년, 15년, 20년 등)
-   - 해약환급률 (%)
-   - 최저보증이율/공시이율 정보
-
-4. **특약/보장 내용**
-   - 주요 특약
-   - 보장 내용
-
-JSON 형식으로 응답:
+JSON 형식으로만 응답 (마크다운·설명 없이):
 {
   "company": "보험회사명",
-  "product_name": "상품명",
+  "product_name": "정확한 상품명(약관명)",
   "product_type": "보험종류",
   "insured_age": "피보험자 나이",
   "insured_gender": "성별",
@@ -3602,11 +3593,13 @@ JSON 형식으로 응답:
   "total_premium": "총납입금액(원)",
   "surrender_values": [
     {"year": 5, "amount": "금액", "rate": "환급률%"},
-    {"year": 10, "amount": "금액", "rate": "환급률%"}
+    {"year": 10, "amount": "금액", "rate": "환급률%"},
+    {"year": 15, "amount": "금액", "rate": "환급률%"},
+    {"year": 20, "amount": "금액", "rate": "환급률%"}
   ],
-  "interest_rate": "공시이율/최저보증이율",
-  "key_benefits": ["보장내용1", "보장내용2"],
-  "special_notes": "특이사항"
+  "interest_rate": "공시이율·최저보증이율 정보",
+  "key_benefits": ["주요보장/특약1", "주요보장/특약2"],
+  "special_notes": "설계서 특이사항·참고사항"
 }`
       }
 
@@ -3710,38 +3703,88 @@ JSON 형식으로 응답:
           .join(', ')
       }
       
-      const qaPrompt = `당신은 네이버 보험 카페에 글을 올리는 초보 엄마/아빠입니다.
-아래 보험 상품 정보를 바탕으로 실제 카페에 올릴 법한 질문글을 작성해주세요.
+      const qaPrompt = `[시스템 역할]
+당신은 대한민국 네이버 보험 카페에 질문글을 올리는 "보험 초보 학부모"입니다.
+은행 적금을 알아보다가 지인 소개로 보험설계사를 만나 이 상품의 설계서를 받았고, 이게 정말 좋은 건지 판단이 안 서서 카페에 물어보려 합니다.
 
-[분석된 보험 상품 정보]
-- 보험회사: ${company}
-- 상품명: ${productName}
-- 상품종류: ${analysisData.product_type || ''}
-- 피보험자: ${insuredAge}세 ${analysisData.insured_gender || ''}
-- 납입기간: ${paymentPeriod}년
-- 월보험료: ${monthlyPremium}
-- 총납입금액: ${totalPremium}
-- 해약환급금: ${surrenderInfo}
-- 공시이율: ${analysisData.interest_rate || ''}
+[설계서에서 추출한 팩트 데이터 - 이 숫자만 사용하세요]
+• 보험회사: ${company}
+• 상품명: ${productName}
+• 상품종류: ${analysisData.product_type || '보험상품'}
+• 피보험자: ${insuredAge}세 ${analysisData.insured_gender || ''}
+• 납입기간: ${paymentPeriod}년
+• 월보험료: ${monthlyPremium}
+• 총납입금액: ${totalPremium}
+• 해약환급금: ${surrenderInfo || '확인 필요'}
+• 공시이율/최저보증이율: ${analysisData.interest_rate || '확인 필요'}
+• 특약/보장: ${(analysisData.key_benefits || []).join(', ') || '기본'}
+• 사용자 고민: ${analysisData.user_concern || '이 보험이 괜찮은지 모르겠음'}
 
-[작성 규칙]
-1. 제목: 핵심 숫자와 고민을 담은 질문형 (예: "10살 아이 연금보험, 10년이면 130%라는데 이거 괜찮을까요?")
-2. 본문: 초보자가 쓴 것처럼 자연스럽게, 이모지 사용, 설계서 숫자 정확히 인용
-3. 질문: 실제로 궁금한 점 3가지 (체크박스 형태 ✔️)
-4. 참고 근거: 설계서에서 발췌한 정확한 숫자들
-5. 존댓말 필수
+==================================================
+📌 제목 작성법 (SEO/AEO/C-RANK 상위노출 핵심)
+==================================================
+■ 길이: 30~45자 (네이버 검색 노출 최적)
+■ 형식: [상황] + [핵심숫자] + [질문] 복합형
+■ 필수 키워드: "${analysisData.product_type || '연금보험'}", "${company}" 중 1개 이상 포함
+■ 예시 패턴:
+  → "${insuredAge}살 아이 ${analysisData.product_type || '연금보험'}, ${paymentPeriod}년 납입하면 환급률이 이 정도인데 괜찮을까요?"
+  → "${company} ${analysisData.product_type || '연금보험'} 설계서 받았는데 월 ${monthlyPremium} 적금 대신 넣어도 될까요?"
+■ 금지어: 가이드, 전략, 충격, 필독, 대박, 100%, 절대, 총정리
 
-JSON 형식으로 응답:
+==================================================
+📝 본문 작성법 (800~1200자, ChatGPT보다 자연스럽게)
+==================================================
+
+본문은 반드시 아래 5단계 구조로 작성하세요:
+
+【1단계: 상황 설명 (3~4줄)】
+- "안녕하세요, 보험 완전 초보 맘(또는 아빠)이에요 😅"로 시작
+- 은행 적금 알아보다가 → 지인 소개 설계사 → 설계서 받음 → 카페 검색
+- 자연스러운 구어체: "~거든요", "~인데요", "~해서요"
+
+【2단계: 설계서 핵심 내용 공유 (4~5줄)】
+- 설계서에서 추출한 숫자를 정확히 인용 (절대 변형 금지)
+- "설계서 보니까 월 ${monthlyPremium}씩 ${paymentPeriod}년 내면..."
+- "총 ${totalPremium} 넣는 건데..."
+- 해약환급금/환급률 구체적으로 언급
+
+【3단계: 적금과 비교 고민 (3~4줄)】
+- "은행 적금이면 ${paymentPeriod}년 후에 이자가 얼마일까..." 스타일
+- 중도해지 시 원금 손실 걱정
+- "설계사분은 좋다고 하시는데 저는 잘 모르겠어서..."
+
+【4단계: 궁금한 점 (체크박스 3개)】
+- 반드시 "✔️" 이모지로 시작
+- 질문은 구체적이고 전문적으로 (단순 "좋나요?" 절대 금지)
+- 예: "✔️ ${paymentPeriod}년 납입 후 10년 시점 환급률이 적금 대비 실질 수익률이 높은 건지?"
+- 예: "✔️ 중도해지하면 원금 대비 얼마나 손해인지?"
+- 예: "✔️ ${company}말고 다른 보험사도 비교해봐야 하는지?"
+
+【5단계: 마무리 (2~3줄)】
+- "고수님들 의견 좀 부탁드려요 🙏"
+- "─────────────"
+- "📊 참고 근거 (상품설명서 발췌 기준)"
+- 핵심 숫자 2~3줄 요약 (납입/환급금/환급률)
+
+==================================================
+🔒 절대 규칙
+==================================================
+1. 설계서에 있는 숫자만 사용 (1원도 만들어내지 마세요)
+2. 초보자 말투: "~됩니다/~입니다" 금지 → "~인데요/~거든요/~같아요" 사용
+3. 답을 내리지 마세요 (물어보는 글이니까)
+4. SEO 키워드 자연 반복: "${analysisData.product_type || '연금보험'}" 2~3회, "보험상담" 1회
+5. 이모지는 😊 😅 🤔 ✔️ 🙏 📊 정도만 자연스럽게
+
+JSON 형식으로만 응답:
 {
-  "title": "제목 (40자 이내)",
-  "content": "본문 내용 (500~800자, 이모지 포함)",
-  "questions_in_content": ["궁금한점1", "궁금한점2", "궁금한점3"],
+  "title": "제목 (30~45자, 질문형, SEO 키워드 포함)",
+  "content": "본문 전체 (800~1200자, 5단계 구조, 이모지 포함, 참고근거 박스 포함)",
+  "questions_in_content": ["✔️ 구체적 질문1", "✔️ 구체적 질문2", "✔️ 구체적 질문3"],
   "reference_data": {
-    "납입기간": "",
-    "월보험료": "",
-    "총납입": "",
-    "해약환급금_10년": "",
-    "환급률": "",
+    "납입기간": "${paymentPeriod}년",
+    "월보험료": "${monthlyPremium}",
+    "총납입": "${totalPremium}",
+    "해약환급금": "${surrenderInfo || '확인 필요'}",
     "출처": "가입설계서"
   }
 }`
@@ -3755,10 +3798,11 @@ JSON 형식으로 응답:
         body: JSON.stringify({
           model: 'gpt-4o',
           messages: [
+            { role: 'system', content: '당신은 네이버 보험 카페에서 가장 자연스러운 초보자 질문글을 작성하는 AI입니다. 실제 카페 회원이 쓴 것처럼 자연스러워야 하며, 설계서의 숫자를 정확히 인용하고, SEO/AEO/GEO/C-RANK 상위노출에 최적화된 구조로 작성합니다. 할루시네이션(없는 숫자 만들기)은 절대 금지입니다.' },
             { role: 'user', content: qaPrompt }
           ],
-          max_tokens: 2048,
-          temperature: 0.7
+          max_tokens: 3000,
+          temperature: 0.75
         })
       })
       
@@ -3781,28 +3825,59 @@ JSON 형식으로 응답:
       // ============================================
       await stream.write(JSON.stringify({ type: 'step', step: 3, msg: '💬 전문가 답변 생성 중...' }) + '\\n')
       
-      const answerPrompt = `당신은 30년 경력 MDRT 보험 전문가입니다.
-아래 질문에 대해 전문가 답변을 작성해주세요.
+      const answerPrompt = `[시스템 역할]
+당신은 네이버 보험 카페 "보험멘토30년" (30년 경력 MDRT·FP·보험계리사)입니다.
+매일 카페에서 초보 질문에 답변하는 인기 답변러이며, 항상 구체적 숫자와 비교 분석으로 신뢰를 얻고 있습니다.
 
-[질문]
+[질문 제목]
 ${qaData.title || '보험 상품 문의'}
 
-[상품 정보]
-- 상품: ${company} ${productName}
-- 납입: ${paymentPeriod}년, 월 ${monthlyPremium}
-- 총납입: ${totalPremium}
-- 해약환급금: ${surrenderInfo}
+[설계서 핵심 데이터]
+• 상품: ${company} ${productName} (${analysisData.product_type || '보험상품'})
+• 피보험자: ${insuredAge}세 ${analysisData.insured_gender || ''}
+• 납입: ${paymentPeriod}년, 월 ${monthlyPremium}
+• 총납입: ${totalPremium}
+• 해약환급금: ${surrenderInfo || '확인 필요'}
+• 공시이율: ${analysisData.interest_rate || '확인 필요'}
 
-[답변 작성 규칙]
-1. 존댓말 사용
-2. 단정적 표현 금지 ("됩니다" X → "가능성이 있습니다", "검토해볼 수 있습니다" O)
-3. 장점과 주의점 균형있게
-4. 적금과의 비교 언급
-5. 중도해지 위험성 언급
-6. 전문가 상담 권유로 마무리
-7. 500~800자 분량
+==================================================
+📝 전문가 답변 작성법 (700~1000자)
+==================================================
 
-답변만 작성 (JSON 아님):`
+반드시 아래 6단계 구조로 작성:
+
+【1】인사+공감 (2줄)
+"안녕하세요~ 보험멘토30년입니다 😊" + 질문자 상황 공감
+
+【2】상품 평가 (3~4줄)
+- ${company} ${productName}의 객관적 장점을 숫자로 설명
+- 환급률 vs 은행 적금(현재 금리 약 3~4%) 비교
+- "${paymentPeriod}년 납입 후 환급률이 ~%라면..." 스타일
+
+【3】주의사항 3가지 (각 1~2줄)
+① 중도해지 시 원금 손실 위험 (구체적으로)
+② 납입기간 중 자금 유동성 제약
+③ 공시이율 변동 리스크 또는 비과세 조건 등
+
+【4】비교 팁 (2~3줄)
+- "같은 ${analysisData.product_type || '보험상품'}이라도 보험사마다 환급률이 다르거든요"
+- "보험리모델링 관점에서 기존 보험과 비교해보시는 것도 추천드려요"
+
+【5】추천 행동 (2줄)
+- "보험상담이필요하신분은 반드시 2~3개 보험사 설계서를 비교해보세요"
+- 전문 상담 권유 (부드럽게)
+
+【6】마무리 (1줄)
+- "좋은 선택 하시길 응원합니다! 추가 궁금한 점 있으시면 편하게 물어보세요 😊"
+
+==================================================
+🔒 규칙
+==================================================
+- 순수 텍스트만 (JSON/마크다운 금지)
+- 단정적 "됩니다" 금지 → "~거든요", "~해볼 수 있어요", "~검토해보시면 좋겠어요"
+- SEO 키워드 자연 반복: "${analysisData.product_type || '연금보험'}" 2~3회, "${company}" 1~2회
+- 설계서 숫자만 사용, 만들어내지 마세요
+- 700~1000자`
 
       const answerResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -3813,10 +3888,11 @@ ${qaData.title || '보험 상품 문의'}
         body: JSON.stringify({
           model: 'gpt-4o',
           messages: [
+            { role: 'system', content: '당신은 30년 경력 MDRT 보험 전문가 "보험멘토30년"입니다. 네이버 보험 카페에서 가장 인기있는 답변러로, 항상 구체적 숫자와 비교 분석을 통해 초보자에게 신뢰감을 주는 답변을 작성합니다. 단정적 표현을 피하고 카페 댓글처럼 자연스러운 존댓말을 사용합니다.' },
             { role: 'user', content: answerPrompt }
           ],
-          max_tokens: 1500,
-          temperature: 0.6
+          max_tokens: 2000,
+          temperature: 0.65
         })
       })
       
@@ -3831,27 +3907,48 @@ ${qaData.title || '보험 상품 문의'}
       // ============================================
       await stream.write(JSON.stringify({ type: 'step', step: 4, msg: '💭 댓글 생성 중...' }) + '\\n')
       
-      const commentPrompt = `아래 보험 상담 Q&A에 달릴 네이버 카페 댓글 3개를 작성해주세요.
+      const commentPrompt = `[시스템 역할]
+당신은 네이버 보험 카페 회원 3명의 역할을 연기합니다. 각자 다른 성격·경험·말투를 가진 실제 카페 회원입니다.
 
-[질문 요약]
-${qaData.title || '보험 상품 문의'}
+[원글 제목] ${qaData.title || '보험 상품 문의'}
+[원글 핵심] ${company} ${productName}, ${paymentPeriod}년납 월 ${monthlyPremium}, 환급률 ${surrenderInfo || '문의 중'}
 
-[답변 요약]
-보험 전문가가 상품의 장단점과 주의사항에 대해 답변함
+==================================================
+💬 댓글 3개 구성 (각 댓글의 성격이 확실히 달라야 함)
+==================================================
 
-[댓글 작성 규칙]
-1. 존댓말 필수
-2. 3개 댓글 (짧은것 1개 40~60자, 중간 2개 80~120자)
-3. 유형 섞기: 공감/감사, 경험담, 추가질문
-4. 자연스러운 카페 회원 어투
-5. 닉네임: 실제 카페 느낌 (예: 워킹맘쭈니, 보험초보아빠, 3아이엄마 등)
+【댓글1: 공감형 - 비슷한 경험 공유】 (100~150자)
+- 닉네임: 육아 관련 닉네임 (예: 뽀뽀맘, 두아이아빠, 맘스카페, 워킹맘이안 등)
+- 내용: "저도 비슷한 상황이었는데~" + 본인 경험 + 결론/조언
+- 말투: 친근한 존댓말, "~요!", "~거든요", "~했어요 ㅎㅎ"
+- 이모지: 1~2개 (😊 ㅎㅎ)
+
+【댓글2: 정보형 - 구체적 비교/팁 공유】 (120~180자)
+- 닉네임: 재테크/분석 관련 (예: 똑소리엄마, 보험공부중, 현명한소비, 재테크맘 등)
+- 내용: 비교 경험 + 구체적 팁 (예: "저는 3개 보험사 비교해봤는데~") + 행동 추천
+- "${analysisData.product_type || '연금보험'}" 또는 "${company}" 키워드 자연 포함
+- 말투: 약간 지적이지만 친근, "~해봤는데요", "~가 좋더라고요"
+
+【댓글3: 질문형 - 추가 관점 제시】 (80~120자)
+- 닉네임: 일반적 (예: 하늘아래, 오래사는비결, 보험고민중, 꼼꼼이 등)
+- 내용: "혹시 ~도 비교해보셨나요?" 또는 "~는 어떤가요?" 형태
+- 원글에 없는 새로운 관점 제시 (예: 비과세 조건, 다른 보험사 비교, 중도인출 기능 등)
+- 말투: 궁금한 톤, "~해봤어요?", "~어떤가요?"
+
+==================================================
+🔒 규칙
+==================================================
+- 3개 닉네임 전부 다른 유형 (절대 비슷하게 X)
+- 카페 댓글 느낌: 줄바꿈 없이 1~3문장으로 쓰기
+- 이모지 과다 사용 금지 (댓글당 0~2개)
+- 실제 네이버 카페에 있을 법한 자연스러움이 최우선
 
 JSON 형식:
 {
   "comments": [
-    {"nickname": "닉네임1", "text": "댓글내용1"},
-    {"nickname": "닉네임2", "text": "댓글내용2"},
-    {"nickname": "닉네임3", "text": "댓글내용3"}
+    {"nickname": "닉네임1", "text": "공감형 댓글"},
+    {"nickname": "닉네임2", "text": "정보형 댓글"},
+    {"nickname": "닉네임3", "text": "질문형 댓글"}
   ]
 }`
 
@@ -3864,10 +3961,11 @@ JSON 형식:
         body: JSON.stringify({
           model: 'gpt-4o',
           messages: [
+            { role: 'system', content: '당신은 네이버 보험 카페의 실제 회원 3명을 연기합니다. 각자 다른 경험·성격·말투를 가진 진짜 카페 회원처럼 자연스러운 댓글을 작성합니다. AI가 쓴 느낌이 전혀 나지 않아야 합니다.' },
             { role: 'user', content: commentPrompt }
           ],
-          max_tokens: 800,
-          temperature: 0.8
+          max_tokens: 1200,
+          temperature: 0.85
         })
       })
       
@@ -3889,23 +3987,33 @@ JSON 형식:
       // ============================================
       await stream.write(JSON.stringify({ type: 'step', step: 5, msg: '🏷️ 해시태그 생성 중...' }) + '\\n')
       
-      const hashtagPrompt = `아래 보험 상품 정보로 네이버 블로그/카페용 해시태그 10개를 생성해주세요.
+      const hashtagPrompt = `[시스템 역할]
+네이버 블로그/카페 SEO 전문가로서, 실제 네이버 검색량이 높은 해시태그 10개를 생성하세요.
 
-[상품 정보]
-- 보험회사: ${company}
-- 상품명: ${productName}
-- 상품종류: ${analysisData.product_type || '연금보험'}
-- 피보험자: ${insuredAge}세
-- 납입기간: ${paymentPeriod}년
+[상품 데이터]
+• 보험회사: ${company}
+• 상품명: ${productName}
+• 상품종류: ${analysisData.product_type || '보험상품'}
+• 피보험자: ${insuredAge}세 ${analysisData.insured_gender || ''}
+• 납입기간: ${paymentPeriod}년
 
-[해시태그 규칙]
-1. #으로 시작
-2. 상품명, 회사명, 보험종류 필수 포함
-3. 관련 검색어 포함 (예: 아이보험, 교육자금, 목돈마련 등)
-4. 10개 생성
+==================================================
+🏷️ 해시태그 10개 생성 규칙 (C-RANK/SEO 최적화)
+==================================================
 
-JSON 형식:
-{"hashtags": ["#해시태그1", "#해시태그2", ...]}`
+■ 구성 비율:
+- 상품 식별 (3개): #${company.replace(/\\s/g, '')}, #${(productName || '').replace(/\\s/g, '')}, #${(analysisData.product_type || '보험상품').replace(/\\s/g, '')}
+- 행동 유도 (3개): #보험상담, #보험리모델링, #보험상담이필요하신분
+- 니즈 키워드 (2개): 상품 관련 (예: #어린이보험, #교육자금, #목돈마련, #비과세, #적금대안)
+- 정보 키워드 (2개): #해약환급금, #보험설계서, #보험비교, #보험가입전확인 중 택2
+
+■ 규칙:
+- #으로 시작, 띄어쓰기 없이 붙여쓰기
+- 정확히 10개
+- 네이버에서 일반인이 실제로 검색할 키워드만
+
+JSON만:
+{"hashtags": ["#태그1", "#태그2", "#태그3", "#태그4", "#태그5", "#태그6", "#태그7", "#태그8", "#태그9", "#태그10"]}`
 
       const hashtagResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -3916,9 +4024,10 @@ JSON 형식:
         body: JSON.stringify({
           model: 'gpt-4o',
           messages: [
+            { role: 'system', content: '네이버 블로그/카페 SEO 전문가입니다. 실제 네이버 검색량이 높고 C-RANK에 유리한 해시태그만 생성합니다.' },
             { role: 'user', content: hashtagPrompt }
           ],
-          max_tokens: 300,
+          max_tokens: 500,
           temperature: 0.5
         })
       })
@@ -3950,7 +4059,7 @@ JSON 형식:
         expert_answer: expertAnswer,
         comments: comments,
         hashtags: hashtags,
-        version: 'V2026.37.98'
+        version: 'V2026.37.102'
       }
       
       await stream.write(JSON.stringify({ type: 'complete', data: finalResult }) + '\\n')
@@ -6756,31 +6865,28 @@ body{
       </div>
     </div>
     
-    <!-- ✅ V2026.37.96 - 모드 선택 (일반/뉴스 Q&A) -->
+    <!-- ✅ V2026.37.102 - 보험 설계서 Q&A 단일 모드 (모드 통합) -->
     <div class="mode-selector" id="modeSelector">
-      <button class="mode-btn active" id="modeNormal" onclick="setMode('normal')">
-        <i class="fas fa-pen"></i> 일반 콘텐츠
-      </button>
-      <button class="mode-btn" id="modeNews" onclick="setMode('news')">
-        <i class="fas fa-newspaper"></i> 뉴스 Q&A
-        <span class="mode-badge">NEW</span>
+      <button class="mode-btn active" id="modeInsurance" onclick="void(0)">
+        <i class="fas fa-file-medical-alt"></i> 보험 설계서 Q&A
+        <span class="mode-badge" style="background:linear-gradient(135deg,#10b981,#059669)">PRO</span>
       </button>
     </div>
     
     <!-- GPT 스타일 검색창 + 파일 업로드 -->
     <div class="search-box" id="searchBox">
-      <textarea id="search" class="search-input" placeholder="핵심 고민을 입력하세요...&#10;&#10;예: 워킹맘인데 아이 교육자금으로 증여하려면 세금이 얼마나 나올까요?"></textarea>
+      <textarea id="search" class="search-input" placeholder="설계서 핵심 내용을 입력하세요...&#10;&#10;예: 10살 남아, KB연금보험 5년납, 월30만원, 10년 환급률 130%&#10;(이미지 업로드 또는 텍스트 입력 둘 중 하나만 해도 됩니다)"></textarea>
       
-      <!-- ✅ V2026.37.96 - 뉴스 모드 안내 (기본 숨김) -->
-      <div class="news-mode-guide" id="newsModeGuide" style="display:none">
-        <div class="news-guide-icon"><i class="fas fa-newspaper"></i></div>
+      <!-- ✅ V2026.37.102 - 보험 설계서 Q&A 안내 (항상 표시) -->
+      <div class="news-mode-guide" id="insuranceGuide" style="display:flex">
+        <div class="news-guide-icon"><i class="fas fa-file-medical-alt" style="color:#10b981"></i></div>
         <div class="news-guide-text">
-          <strong>뉴스 이미지를 업로드하세요</strong>
-          <p>뉴스 캡처 이미지에서 자동으로 보험 Q&A 콘텐츠를 생성합니다</p>
+          <strong>보험 설계서/증권 이미지를 업로드하거나, 핵심 내용을 직접 입력하세요</strong>
+          <p>GPT-4o가 설계서를 정밀 분석하여 네이버 카페 최적화 Q&A 콘텐츠를 자동 생성합니다</p>
           <ul>
-            <li>📰 뉴스 제목/내용 자동 분석</li>
-            <li>❓ 다양한 관점의 질문 10~30개 생성</li>
-            <li>💬 전문가 답변 + 댓글 자동 생성</li>
+            <li>📋 설계서 OCR: 환급률·보험료·보장내용 자동 추출</li>
+            <li>❓ 초보자 질문글 + 전문가 답변 자동 생성</li>
+            <li>💬 자연스러운 댓글 3개 + SEO 해시태그 10개</li>
           </ul>
         </div>
       </div>
@@ -6799,7 +6905,7 @@ body{
       <div class="search-footer">
         <span class="char-count"><span id="char">0</span>/500</span>
         <button id="btn" class="search-btn" onclick="goGenerate()">
-          <span class="btn-text"><i class="fas fa-fire"></i> \ubbf8\ub07c \uc9c8\ubb38 + \ub2f5\ubcc0 \uc138\ud2b8 \uc0dd\uc131</span>
+          <span class="btn-text"><i class="fas fa-file-medical-alt"></i> \ubcf4\ud5d8 \uc124\uacc4\uc11c Q&A \uc0dd\uc131 (GPT-4o)</span>
           <div class="spinner"></div>
         </button>
       </div>
@@ -7538,9 +7644,9 @@ function resetEverything() {
     }
   });
   
-  // 7. 뉴스 Q&A 결과 영역 초기화
-  const newsQAResults = document.querySelector('.news-qa-results');
-  if (newsQAResults) newsQAResults.remove();
+  // 7. 보험 설계서 Q&A 결과 영역 초기화
+  const insuranceQAResults = document.querySelector('.insurance-qa-results');
+  if (insuranceQAResults) insuranceQAResults.remove();
   
   // 8. 진행바 초기화
   const progressBox = document.getElementById('progressBox');
@@ -7559,8 +7665,8 @@ function resetEverything() {
     btn.classList.remove('loading');
   }
   
-  // 10. 모드 초기화 (일반 모드로)
-  setMode('normal');
+  // 10. 모드 초기화 (보험 설계서 Q&A 모드)
+  setMode('insurance');
   
   // 11. AI 모델 초기화 (Gemini로)
   selectAIModel('gemini');
@@ -7569,13 +7675,13 @@ function resetEverything() {
   try {
     localStorage.removeItem('xivix_user_state');
     localStorage.removeItem('xivix_result_data');
-    localStorage.removeItem('xivix_newsqa_data');
+    localStorage.removeItem('xivix_insuranceqa_data');
   } catch(e) {
     console.warn('[XIVIX] LocalStorage 클리어 실패:', e);
   }
   
   // 13. 전역 변수 초기화
-  window.newsQAData = null;
+  window.insuranceQAData = null;
   window.resultData = null;
   window.hashtagsForCopy = '';
   window.hashtagsArray = [];
@@ -9215,41 +9321,14 @@ function getRemainingApiCalls() {
 }
 
 // ============================================
-// ✅ V2026.37.97 - 모드 선택 (일반/뉴스 Q&A) + 텍스트 입력 지원
+// ✅ V2026.37.102 - 보험 설계서 Q&A 단일 모드 (모드 통합)
+// 일반/뉴스 모드 제거 → 모든 입력이 보험 설계서 Q&A로 처리
 // ============================================
-let currentMode = 'normal'; // 'normal' | 'news'
+let currentMode = 'insurance'; // V2026.37.102 - 단일 모드
 
 function setMode(mode) {
-  currentMode = mode;
-  
-  const normalBtn = document.getElementById('modeNormal');
-  const newsBtn = document.getElementById('modeNews');
-  const searchEl = document.getElementById('search');
-  const newsModeGuide = document.getElementById('newsModeGuide');
-  const btn = document.getElementById('btn');
-  
-  if (mode === 'normal') {
-    normalBtn?.classList.add('active');
-    newsBtn?.classList.remove('active');
-    if (newsModeGuide) newsModeGuide.style.display = 'none';
-    if (searchEl) {
-      searchEl.style.display = 'block';
-      searchEl.placeholder = '핵심 고민을 입력하세요...\\n\\n예: 워킹맘인데 아이 교육자금으로 증여하려면 세금이 얼마나 나올까요?';
-    }
-    if (btn) btn.innerHTML = '<span class="btn-text"><i class="fas fa-fire"></i> 미리 질문 + 답변 세트 생성</span><div class="spinner"></div>';
-  } else if (mode === 'news') {
-    normalBtn?.classList.remove('active');
-    newsBtn?.classList.add('active');
-    if (newsModeGuide) newsModeGuide.style.display = 'flex';
-    // V2026.37.97 - 뉴스 모드에서도 텍스트 입력창 표시 (뉴스 기사 복붙용)
-    if (searchEl) {
-      searchEl.style.display = 'block';
-      searchEl.placeholder = '뉴스 기사 내용을 붙여넣으세요...\\n\\n이미지 업로드 또는 텍스트 입력 둘 중 하나만 해도 됩니다.\\n(둘 다 입력 시 텍스트 내용으로만 생성됩니다)';
-    }
-    if (btn) btn.innerHTML = '<span class="btn-text"><i class="fas fa-newspaper"></i> 뉴스 Q&A 생성 (10~30개)</span><div class="spinner"></div>';
-  }
-  
-  console.log('[XIVIX] 모드 변경:', mode);
+  currentMode = 'insurance'; // 항상 insurance 모드
+  console.log('[XIVIX] V2026.37.102 - 보험 설계서 Q&A 통합 모드');
 }
 
 // ============================================
@@ -9265,7 +9344,7 @@ async function goGenerateNewsQA() {
   
   // V2026.37.99 - 텍스트 또는 이미지 중 하나는 필수
   if (!hasImage && !hasText) {
-    alert('보험 설계서 이미지를 업로드하거나 뉴스 기사 텍스트를 입력해주세요!');
+    alert('💡 보험 설계서 이미지를 업로드하거나,\n설계서 핵심 내용(상품명·보험료·환급률 등)을 텍스트로 입력해주세요!');
     return;
   }
   
@@ -9325,7 +9404,7 @@ async function goGenerateNewsQA() {
     } else if (hasImage) {
       progressText.innerHTML = '<i class="fas fa-file-image"></i> GPT-4o 보험 설계서 분석 중... (이미지 ' + imageCount + '장)';
     } else {
-      progressText.innerHTML = '<i class="fas fa-file-alt"></i> GPT-4o 뉴스 텍스트 분석 중...';
+      progressText.innerHTML = '<i class="fas fa-file-alt"></i> GPT-4o 설계서 텍스트 분석 중...';
     }
     
     const res = await fetch('/api/generate/news-qa', {
@@ -9387,7 +9466,7 @@ async function goGenerateNewsQA() {
     }
     
   } catch (error) {
-    console.error('[XIVIX] 뉴스 Q&A 오류:', error);
+    console.error('[XIVIX] 설계서 Q&A 오류:', error);
     alert('오류가 발생했습니다: ' + error.message);
   } finally {
     btn.disabled = false;
@@ -9557,12 +9636,12 @@ function renderInsuranceQAResults(data) {
   }
   
   // 결과 삽입
-  const existingContent = resultSection.querySelector('.news-qa-results');
+  const existingContent = resultSection.querySelector('.insurance-qa-results');
   if (existingContent) {
     existingContent.innerHTML = html;
   } else {
     const div = document.createElement('div');
-    div.className = 'news-qa-results';
+    div.className = 'insurance-qa-results';
     div.innerHTML = html;
     resultSection.insertBefore(div, resultSection.firstChild);
   }
@@ -9626,12 +9705,10 @@ function showCopyToast(msg) {
 // 실시간으로 진행 상황 표시 + 본문 글자 단위 출력
 // ============================================
 async function goGenerateStream() {
-  // ✅ V2026.37.96 - 뉴스 모드면 별도 함수 호출
-  if (currentMode === 'news') {
-    return goGenerateNewsQA();
-  }
+  // ✅ V2026.37.102 - 모든 입력을 보험 설계서 Q&A로 처리 (모드 통합)
+  return goGenerateNewsQA();
   
-  // V2026.37.19 - API 호출 제한 체크
+  // V2026.37.19 - API 호출 제한 체크 (아래 코드는 레거시 - 도달하지 않음)
   if (!checkApiLimit()) {
     return;
   }
