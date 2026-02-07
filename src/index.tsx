@@ -3611,10 +3611,18 @@ JSON 형식으로 응답:
       // Step 2: 다양한 보험 질문 생성
       await stream.write(JSON.stringify({ type: 'step', step: 2, msg: '❓ 보험 관련 질문 생성 중...' }) + '\n')
       
+      // V2026.37.97 - perspectives가 객체일 수도 있으므로 안전하게 처리
+      let perspectivesStr = '일반인'
+      if (Array.isArray(newsData.perspectives)) {
+        perspectivesStr = newsData.perspectives.join(', ')
+      } else if (typeof newsData.perspectives === 'object' && newsData.perspectives !== null) {
+        perspectivesStr = Object.keys(newsData.perspectives).join(', ')
+      }
+      
       const questionPrompt = `뉴스: "${newsData.headline || '사건 발생'}"
 사건 유형: ${newsData.issue_type || '일반'}
 관련 보험: ${(newsData.related_insurances || []).join(', ') || '종합보험'}
-관점: ${(newsData.perspectives || []).join(', ') || '일반인'}
+관점: ${perspectivesStr}
 
 위 뉴스를 본 일반인들이 궁금해할 보험 관련 질문 ${questionCount}개를 생성해주세요.
 
