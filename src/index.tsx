@@ -3464,6 +3464,259 @@ app.post('/api/xiim/openai/generate', async (c) => {
 });
 
 // ============================================
+// V2026.37.96 - 뉴스 이미지 → 보험 Q&A 콘텐츠 자동 생성 API
+// CEO 지시: 하나의 뉴스로 수천 개의 보험 콘텐츠 생성
+// ============================================
+app.post('/api/generate/news-qa', async (c) => {
+  const body = await c.req.json()
+  const image = body.image || null
+  const mimeType = body.mimeType || 'image/jpeg'
+  const questionCount = Math.min(body.questionCount || 10, 30) // 최대 30개
+  
+  if (!image) {
+    return c.json({ success: false, error: '뉴스 이미지가 필요합니다.' }, 400)
+  }
+  
+  const proKey = getApiKey(c.env, 'PRO')
+  
+  return streamText(c, async (stream) => {
+    try {
+      await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '📰 뉴스 이미지 분석 중...' }) + '\n')
+      
+      // Step 1: 뉴스 이미지 OCR 분석
+      const ocrPrompt = `이 뉴스 이미지를 분석해주세요.
+
+[추출할 정보]
+1. 뉴스 제목 또는 핵심 내용 (자막/캡션에서)
+2. 사건/이슈 유형 (학교폭력, 교통사고, 의료사고, 재해, 범죄 등)
+3. 관련될 수 있는 보험 종류들
+4. 피해자/가해자/관계자 등 관점
+
+JSON 형식으로 응답:
+{
+  "headline": "뉴스 핵심 내용",
+  "issue_type": "사건 유형",
+  "keywords": ["키워드1", "키워드2"],
+  "related_insurances": ["보험종류1", "보험종류2"],
+  "perspectives": ["피해자", "가해자", "목격자", "가족"]
+}`
+
+      const ocrResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: ocrPrompt },
+                { inline_data: { mime_type: mimeType, data: image } }
+              ]
+            }],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 2048, responseMimeType: 'application/json' }
+          })
+        }
+      )
+      
+      let newsData: any = {}
+      if (ocrResponse.ok) {
+        const json = await ocrResponse.json() as any
+        const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        try {
+          newsData = JSON.parse(rawText.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim())
+        } catch (e) {
+          newsData = { headline: rawText, issue_type: '일반', keywords: [], related_insurances: [], perspectives: [] }
+        }
+      }
+      
+      await stream.write(JSON.stringify({ 
+        type: 'news_analysis', 
+        data: newsData 
+      }) + '\n')
+      
+      console.log('[XIVIX] 뉴스 분석 완료:', newsData.headline)
+      
+      // Step 2: 다양한 보험 질문 생성
+      await stream.write(JSON.stringify({ type: 'step', step: 2, msg: '❓ 보험 관련 질문 생성 중...' }) + '\n')
+      
+      const questionPrompt = `뉴스: "${newsData.headline || '사건 발생'}"
+사건 유형: ${newsData.issue_type || '일반'}
+관련 보험: ${(newsData.related_insurances || []).join(', ') || '종합보험'}
+관점: ${(newsData.perspectives || []).join(', ') || '일반인'}
+
+위 뉴스를 본 일반인들이 궁금해할 보험 관련 질문 ${questionCount}개를 생성해주세요.
+
+[질문 생성 규칙]
+1. 다양한 관점에서 (피해자/가해자/가족/목격자/제3자)
+2. 다양한 보험 종류 언급 (실손, 상해, 배상책임, 운전자, 화재, 여행자 등)
+3. 다양한 상황 가정 (증거 유무, 합의 여부, 미성년자 등)
+4. 실제 카페에서 물어볼 법한 자연스러운 어투
+5. "~보험 되나요?", "~청구 가능한가요?", "~어떻게 해야 하나요?" 형태
+
+JSON 형식:
+{"questions": [
+  {"id": 1, "perspective": "관점", "insurance_type": "관련 보험", "question": "질문 내용", "situation": "상황 설명"}
+]}`
+
+      const questionResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: questionPrompt }] }],
+            generationConfig: { temperature: 0.9, maxOutputTokens: 4096, responseMimeType: 'application/json' }
+          })
+        }
+      )
+      
+      let questions: any[] = []
+      if (questionResponse.ok) {
+        const json = await questionResponse.json() as any
+        const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        try {
+          const parsed = JSON.parse(rawText.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim())
+          questions = parsed.questions || []
+        } catch (e) {
+          console.error('[XIVIX] 질문 파싱 실패')
+        }
+      }
+      
+      await stream.write(JSON.stringify({ 
+        type: 'questions', 
+        count: questions.length,
+        data: questions 
+      }) + '\n')
+      
+      console.log('[XIVIX] 질문 생성 완료:', questions.length, '개')
+      
+      // Step 3: 각 질문에 대한 전문가 답변 생성 (처음 5개만)
+      await stream.write(JSON.stringify({ type: 'step', step: 3, msg: '💬 전문가 답변 생성 중...' }) + '\n')
+      
+      const qaResults: any[] = []
+      const answersToGenerate = Math.min(questions.length, 5) // 처음 5개만 답변 생성
+      
+      for (let i = 0; i < answersToGenerate; i++) {
+        const q = questions[i]
+        
+        const answerPrompt = `[보험 전문가 답변 생성]
+
+질문: "${q.question}"
+관련 보험: ${q.insurance_type}
+상황: ${q.situation}
+
+[답변 작성 규칙]
+1. 30년 경력 MDRT 보험 전문가 관점
+2. 단정적 표현 금지 ("됩니다" X → "가능성이 있습니다" O)
+3. 관련 보험 종류 구체적으로 언급
+4. 약관 확인 필요성 언급
+5. 전문가 상담 권유로 마무리
+6. 존댓말 사용
+7. 300~500자 분량
+
+[필수 포함 내용]
+- 해당 상황에서 청구 가능한 보험 종류
+- 보상 가능성과 한계점
+- 필요한 서류나 절차
+- 주의사항
+
+답변만 작성 (JSON 아님):`
+
+        const answerResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: answerPrompt }] }],
+              generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
+            })
+          }
+        )
+        
+        let answer = ''
+        if (answerResponse.ok) {
+          const json = await answerResponse.json() as any
+          answer = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        }
+        
+        // 댓글 생성
+        const commentPrompt = `질문: "${q.question}"
+답변 요약: 보험 전문가가 관련 보험과 청구 가능성에 대해 답변함
+
+위 Q&A에 달릴 카페 회원 댓글 3개를 작성해주세요.
+
+[규칙]
+- 존댓말 필수
+- 길이 다양하게 (짧은 것 1개, 중간 2개)
+- 공감/추가질문/경험담 섞어서
+
+JSON: {"comments": [{"nickname": "닉네임", "text": "댓글"}]}`
+
+        const commentResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.FLASH}:generateContent?key=${proKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: commentPrompt }] }],
+              generationConfig: { temperature: 0.9, maxOutputTokens: 1024, responseMimeType: 'application/json' }
+            })
+          }
+        )
+        
+        let comments: any[] = []
+        if (commentResponse.ok) {
+          const json = await commentResponse.json() as any
+          const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          try {
+            const parsed = JSON.parse(rawText)
+            comments = parsed.comments || []
+          } catch (e) {}
+        }
+        
+        const qaItem = {
+          id: i + 1,
+          question: q,
+          answer: answer,
+          comments: comments
+        }
+        
+        qaResults.push(qaItem)
+        
+        // 각 Q&A 완료 시 스트리밍
+        await stream.write(JSON.stringify({ 
+          type: 'qa_item', 
+          index: i + 1,
+          total: answersToGenerate,
+          data: qaItem 
+        }) + '\n')
+      }
+      
+      // Step 4: 완료
+      await stream.write(JSON.stringify({ type: 'step', step: 4, msg: '✅ 생성 완료!' }) + '\n')
+      
+      // 최종 결과
+      const finalResult = {
+        news: newsData,
+        total_questions: questions.length,
+        qa_results: qaResults,
+        remaining_questions: questions.slice(5), // 답변 미생성 질문들
+        version: 'V2026.37.96'
+      }
+      
+      await stream.write(JSON.stringify({ type: 'complete', data: finalResult }) + '\n')
+      
+      console.log('[XIVIX] 뉴스 Q&A 생성 완료:', qaResults.length, '개 Q&A')
+      
+    } catch (error: any) {
+      console.error('[XIVIX] 뉴스 Q&A 생성 오류:', error)
+      await stream.write(JSON.stringify({ type: 'error', message: error.message }) + '\n')
+    }
+  })
+})
+
+// ============================================
 // 첫 페이지: GPT 스타일 검색창 + 실시간 보험 트렌드 + 바로 결과 출력
 // ============================================
 const mainPageHtml = `<!DOCTYPE html>
@@ -3804,6 +4057,99 @@ body{
   background:rgba(255,255,255,0.08);
   border-radius:10px;
   text-align:center;
+}
+
+/* ✅ V2026.37.96 - 모드 선택 버튼 */
+.mode-selector{
+  display:flex;
+  gap:8px;
+  margin-bottom:16px;
+  padding:4px;
+  background:rgba(255,255,255,0.03);
+  border-radius:12px;
+  border:1px solid var(--border);
+}
+.mode-btn{
+  flex:1;
+  padding:12px 16px;
+  background:transparent;
+  border:none;
+  border-radius:10px;
+  color:var(--text-muted);
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all 0.3s ease;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  position:relative;
+}
+.mode-btn:hover{
+  background:rgba(255,255,255,0.05);
+  color:var(--text);
+}
+.mode-btn.active{
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  color:#fff;
+  box-shadow:0 4px 16px rgba(79,140,255,0.3);
+}
+.mode-badge{
+  position:absolute;
+  top:-4px;
+  right:-4px;
+  background:linear-gradient(135deg, #ef4444, #dc2626);
+  color:#fff;
+  font-size:9px;
+  padding:2px 6px;
+  border-radius:8px;
+  font-weight:700;
+}
+
+/* 뉴스 모드 안내 */
+.news-mode-guide{
+  background:linear-gradient(135deg, rgba(79,140,255,0.1), rgba(124,92,255,0.1));
+  border:1px solid rgba(79,140,255,0.2);
+  border-radius:12px;
+  padding:20px;
+  margin-bottom:16px;
+  display:flex;
+  gap:16px;
+  align-items:flex-start;
+}
+.news-guide-icon{
+  width:48px;
+  height:48px;
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:20px;
+  color:#fff;
+  flex-shrink:0;
+}
+.news-guide-text strong{
+  color:var(--text);
+  font-size:15px;
+  display:block;
+  margin-bottom:6px;
+}
+.news-guide-text p{
+  color:var(--text-muted);
+  font-size:13px;
+  margin-bottom:10px;
+}
+.news-guide-text ul{
+  list-style:none;
+  padding:0;
+  margin:0;
+}
+.news-guide-text li{
+  color:var(--text-muted);
+  font-size:12px;
+  margin-bottom:4px;
 }
 
 /* GPT 스타일 검색창 */
@@ -6058,9 +6404,34 @@ body{
       </div>
     </div>
     
+    <!-- ✅ V2026.37.96 - 모드 선택 (일반/뉴스 Q&A) -->
+    <div class="mode-selector" id="modeSelector">
+      <button class="mode-btn active" id="modeNormal" onclick="setMode('normal')">
+        <i class="fas fa-pen"></i> 일반 콘텐츠
+      </button>
+      <button class="mode-btn" id="modeNews" onclick="setMode('news')">
+        <i class="fas fa-newspaper"></i> 뉴스 Q&A
+        <span class="mode-badge">NEW</span>
+      </button>
+    </div>
+    
     <!-- GPT 스타일 검색창 + 파일 업로드 -->
     <div class="search-box" id="searchBox">
       <textarea id="search" class="search-input" placeholder="핵심 고민을 입력하세요...&#10;&#10;예: 워킹맘인데 아이 교육자금으로 증여하려면 세금이 얼마나 나올까요?"></textarea>
+      
+      <!-- ✅ V2026.37.96 - 뉴스 모드 안내 (기본 숨김) -->
+      <div class="news-mode-guide" id="newsModeGuide" style="display:none">
+        <div class="news-guide-icon"><i class="fas fa-newspaper"></i></div>
+        <div class="news-guide-text">
+          <strong>뉴스 이미지를 업로드하세요</strong>
+          <p>뉴스 캡처 이미지에서 자동으로 보험 Q&A 콘텐츠를 생성합니다</p>
+          <ul>
+            <li>📰 뉴스 제목/내용 자동 분석</li>
+            <li>❓ 다양한 관점의 질문 10~30개 생성</li>
+            <li>💬 전문가 답변 + 댓글 자동 생성</li>
+          </ul>
+        </div>
+      </div>
       
       <!-- 파일 업로드 -->
       <div class="upload-area">
@@ -8368,10 +8739,280 @@ function getRemainingApiCalls() {
 }
 
 // ============================================
+// ✅ V2026.37.96 - 모드 선택 (일반/뉴스 Q&A)
+// ============================================
+let currentMode = 'normal'; // 'normal' | 'news'
+
+function setMode(mode) {
+  currentMode = mode;
+  
+  const normalBtn = document.getElementById('modeNormal');
+  const newsBtn = document.getElementById('modeNews');
+  const searchEl = document.getElementById('search');
+  const newsModeGuide = document.getElementById('newsModeGuide');
+  const btn = document.getElementById('btn');
+  
+  if (mode === 'normal') {
+    normalBtn?.classList.add('active');
+    newsBtn?.classList.remove('active');
+    if (newsModeGuide) newsModeGuide.style.display = 'none';
+    if (searchEl) {
+      searchEl.style.display = 'block';
+      searchEl.placeholder = '핵심 고민을 입력하세요...\\n\\n예: 워킹맘인데 아이 교육자금으로 증여하려면 세금이 얼마나 나올까요?';
+    }
+    if (btn) btn.innerHTML = '<span class="btn-text"><i class="fas fa-fire"></i> 미리 질문 + 답변 세트 생성</span><div class="spinner"></div>';
+  } else if (mode === 'news') {
+    normalBtn?.classList.remove('active');
+    newsBtn?.classList.add('active');
+    if (newsModeGuide) newsModeGuide.style.display = 'flex';
+    if (searchEl) {
+      searchEl.style.display = 'none';
+    }
+    if (btn) btn.innerHTML = '<span class="btn-text"><i class="fas fa-newspaper"></i> 뉴스 Q&A 생성 (10~30개)</span><div class="spinner"></div>';
+  }
+  
+  console.log('[XIVIX] 모드 변경:', mode);
+}
+
+// ============================================
+// ✅ V2026.37.96 - 뉴스 Q&A 스트리밍 생성
+// ============================================
+async function goGenerateNewsQA() {
+  if (uploadedFiles.length === 0) {
+    alert('뉴스 이미지를 업로드해주세요!');
+    return;
+  }
+  
+  const btn = document.getElementById('btn');
+  const resultSection = document.getElementById('resultSection');
+  const progressBox = document.getElementById('progressBox');
+  const progressFill = document.getElementById('progressFill');
+  const progressText = document.getElementById('progressText');
+  const progressPct = document.getElementById('progressPct');
+  
+  btn.disabled = true;
+  btn.classList.add('loading');
+  resultSection?.classList.add('show');
+  progressBox.style.display = 'block';
+  
+  try {
+    const file = uploadedFiles[0];
+    
+    const requestData = {
+      image: file.base64,
+      mimeType: file.type,
+      questionCount: 10 // 기본 10개 질문
+    };
+    
+    progressFill.style.width = '10%';
+    progressPct.textContent = '10%';
+    progressText.innerHTML = '<i class="fas fa-newspaper"></i> 뉴스 이미지 분석 중...';
+    
+    const res = await fetch('/api/generate/news-qa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestData)
+    });
+    
+    if (!res.ok || !res.body) {
+      throw new Error('API 오류');
+    }
+    
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let newsData = null;
+    let questions = [];
+    let qaResults = [];
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\\n');
+      buffer = lines.pop() || '';
+      
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const event = JSON.parse(line);
+          
+          switch (event.type) {
+            case 'step':
+              progressText.innerHTML = event.msg;
+              progressFill.style.width = (event.step * 25) + '%';
+              progressPct.textContent = (event.step * 25) + '%';
+              break;
+              
+            case 'news_analysis':
+              newsData = event.data;
+              console.log('[XIVIX] 뉴스 분석:', newsData);
+              break;
+              
+            case 'questions':
+              questions = event.data || [];
+              progressText.innerHTML = '❓ ' + questions.length + '개 질문 생성 완료!';
+              console.log('[XIVIX] 질문 생성:', questions.length);
+              break;
+              
+            case 'qa_item':
+              qaResults.push(event.data);
+              progressText.innerHTML = '💬 Q&A 생성 중... (' + event.index + '/' + event.total + ')';
+              progressFill.style.width = (50 + (event.index / event.total) * 50) + '%';
+              break;
+              
+            case 'complete':
+              progressFill.style.width = '100%';
+              progressPct.textContent = '100%';
+              progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ 뉴스 Q&A 생성 완료!';
+              
+              // 결과 렌더링
+              renderNewsQAResults(event.data);
+              break;
+              
+            case 'error':
+              throw new Error(event.message);
+          }
+        } catch (e) {}
+      }
+    }
+    
+  } catch (error) {
+    console.error('[XIVIX] 뉴스 Q&A 오류:', error);
+    alert('오류가 발생했습니다: ' + error.message);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+// ✅ V2026.37.96 - 뉴스 Q&A 결과 렌더링
+function renderNewsQAResults(data) {
+  const resultSection = document.getElementById('resultSection');
+  if (!resultSection) return;
+  
+  let html = '';
+  
+  // 뉴스 분석 결과
+  if (data.news) {
+    html += '<div class="sequential-section show">';
+    html += '<div class="section-header"><i class="fas fa-newspaper"></i> 뉴스 분석 결과</div>';
+    html += '<div class="section-content">';
+    html += '<div class="item-card">';
+    html += '<div class="item-text"><strong>📰 ' + (data.news.headline || '뉴스 내용') + '</strong></div>';
+    html += '<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">';
+    html += '유형: ' + (data.news.issue_type || '-') + ' | ';
+    html += '관련 보험: ' + (data.news.related_insurances?.join(', ') || '-');
+    html += '</div></div></div></div>';
+  }
+  
+  // Q&A 결과
+  if (data.qa_results && data.qa_results.length > 0) {
+    html += '<div class="sequential-section show" style="margin-top:20px">';
+    html += '<div class="section-header"><i class="fas fa-comments"></i> 생성된 Q&A (' + data.qa_results.length + '개)</div>';
+    html += '<div class="section-content">';
+    
+    data.qa_results.forEach((qa, idx) => {
+      html += '<div class="item-card" style="margin-bottom:16px;border-left:3px solid var(--primary)">';
+      
+      // 질문
+      html += '<div style="margin-bottom:12px">';
+      html += '<div style="font-size:11px;color:var(--primary);margin-bottom:4px">질문 #' + (idx + 1) + ' (' + (qa.question?.perspective || '') + ')</div>';
+      html += '<div class="item-text" style="font-weight:600">❓ ' + (qa.question?.question || '') + '</div>';
+      html += '</div>';
+      
+      // 답변
+      html += '<div style="background:rgba(16,185,129,0.1);padding:12px;border-radius:8px;margin-bottom:12px">';
+      html += '<div style="font-size:11px;color:var(--green);margin-bottom:4px">💬 전문가 답변</div>';
+      html += '<div style="font-size:14px;line-height:1.7;color:var(--text)">' + (qa.answer || '').replace(/\\n/g, '<br>') + '</div>';
+      html += '</div>';
+      
+      // 복사 버튼
+      html += '<div style="display:flex;gap:8px">';
+      html += '<button class="copy-btn" onclick="copyNewsQA(' + idx + ')"><i class="fas fa-copy"></i> Q&A 복사</button>';
+      html += '</div>';
+      
+      // 댓글
+      if (qa.comments && qa.comments.length > 0) {
+        html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">';
+        html += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">💬 댓글 미리보기</div>';
+        qa.comments.forEach(c => {
+          html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">';
+          html += '<strong>' + (c.nickname || '회원') + '</strong>: ' + (c.text || '');
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+      
+      html += '</div>';
+    });
+    
+    html += '</div></div>';
+  }
+  
+  // 추가 질문 목록 (답변 미생성)
+  if (data.remaining_questions && data.remaining_questions.length > 0) {
+    html += '<div class="sequential-section show" style="margin-top:20px">';
+    html += '<div class="section-header"><i class="fas fa-list"></i> 추가 질문 아이디어 (' + data.remaining_questions.length + '개)</div>';
+    html += '<div class="section-content">';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+    data.remaining_questions.forEach((q, idx) => {
+      html += '<span class="keyword-tag" onclick="copyText(\\'' + (q.question || '').replace(/'/g, "\\\\'") + '\\')" style="cursor:pointer;font-size:12px">';
+      html += (idx + 6) + '. ' + (q.question || '').substring(0, 40) + '...';
+      html += '</span>';
+    });
+    html += '</div></div></div>';
+  }
+  
+  // 결과 삽입
+  const existingContent = resultSection.querySelector('.news-qa-results');
+  if (existingContent) {
+    existingContent.innerHTML = html;
+  } else {
+    const div = document.createElement('div');
+    div.className = 'news-qa-results';
+    div.innerHTML = html;
+    resultSection.insertBefore(div, resultSection.firstChild);
+  }
+  
+  // 결과 데이터 저장
+  window.newsQAData = data;
+}
+
+// Q&A 복사
+function copyNewsQA(idx) {
+  const qa = window.newsQAData?.qa_results?.[idx];
+  if (!qa) return;
+  
+  let text = '[질문]\\n' + (qa.question?.question || '') + '\\n\\n';
+  text += '[답변]\\n' + (qa.answer || '') + '\\n\\n';
+  if (qa.comments && qa.comments.length > 0) {
+    text += '[댓글]\\n';
+    qa.comments.forEach(c => {
+      text += (c.nickname || '회원') + ': ' + (c.text || '') + '\\n';
+    });
+  }
+  
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:12px 24px;border-radius:8px;z-index:99999;font-size:14px';
+    toast.innerHTML = '<i class="fas fa-check"></i> Q&A #' + (idx + 1) + ' 복사 완료!';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+  });
+}
+
+// ============================================
 // 🔥 SSE 스트리밍 버전 콘텐츠 생성 (타임아웃 방지)
 // 실시간으로 진행 상황 표시 + 본문 글자 단위 출력
 // ============================================
 async function goGenerateStream() {
+  // ✅ V2026.37.96 - 뉴스 모드면 별도 함수 호출
+  if (currentMode === 'news') {
+    return goGenerateNewsQA();
+  }
+  
   // V2026.37.19 - API 호출 제한 체크
   if (!checkApiLimit()) {
     return;
