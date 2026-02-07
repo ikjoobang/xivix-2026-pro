@@ -3464,334 +3464,420 @@ app.post('/api/xiim/openai/generate', async (c) => {
 });
 
 // ============================================
-// V2026.37.97 - 뉴스 이미지/텍스트 → 보험 Q&A 콘텐츠 자동 생성 API
-// CEO 지시: 하나의 뉴스로 수천 개의 보험 콘텐츠 생성
-// 텍스트 입력 지원 추가 (이미지 OCR 또는 텍스트 직접 입력)
+// V2026.37.98 - 보험 설계서 분석 → Q&A 콘텐츠 생성 API (GPT-4o)
+// CEO 지시: 텍스트 + 이미지(1~10장) 함께 분석하여 정확한 보험 Q&A 생성
+// 결과: 제목 + 질문 1개 + 답변 1개 + 댓글 3개 + 해시태그
 // ============================================
 app.post('/api/generate/news-qa', async (c) => {
   const body = await c.req.json()
-  const image = body.image || null
-  const mimeType = body.mimeType || 'image/jpeg'
-  const newsText = body.newsText || null // V2026.37.97 - 텍스트 입력 지원
-  const questionCount = Math.min(body.questionCount || 10, 30) // 최대 30개
+  const images = body.images || [] // 이미지 배열 (1~10장)
+  const image = body.image || null // 단일 이미지 (하위 호환)
+  const newsText = body.newsText || ''
   
-  // V2026.37.97 - 텍스트 또는 이미지 중 하나는 필수
-  if (!image && !newsText) {
-    return c.json({ success: false, error: '뉴스 이미지 또는 텍스트가 필요합니다.' }, 400)
+  // 단일 이미지를 배열로 변환 (하위 호환)
+  let imageArray: Array<{base64: string, mimeType: string}> = []
+  if (images.length > 0) {
+    imageArray = images.slice(0, 10) // 최대 10장
+  } else if (image) {
+    imageArray = [{ base64: image, mimeType: body.mimeType || 'image/jpeg' }]
   }
   
-  const proKey = getApiKey(c.env, 'PRO')
+  // 텍스트 또는 이미지 중 하나는 필수
+  if (imageArray.length === 0 && !newsText.trim()) {
+    return c.json({ success: false, error: '보험 설계서 이미지 또는 텍스트를 입력해주세요.' }, 400)
+  }
   
-  // V2026.37.97 - 입력 모드 판단: 텍스트가 있으면 텍스트 우선
-  const inputMode = newsText ? 'text' : 'image'
-  const hasTextAndImage = newsText && image
+  const openaiKey = c.env.OPENAI_API_KEY || ''
+  if (!openaiKey) {
+    return c.json({ success: false, error: 'OpenAI API 키가 설정되지 않았습니다.' }, 500)
+  }
   
   return streamText(c, async (stream) => {
     try {
-      // V2026.37.97 - 텍스트+이미지 동시 입력 시 안내 메시지
-      if (hasTextAndImage) {
-        await stream.write(JSON.stringify({ 
-          type: 'notice', 
-          msg: '⚠️ 텍스트 내용으로만 생성해드립니다. 이미지 분석이 필요하시면 이미지만 별도로 업로드해주세요.' 
-        }) + '\n')
-      }
+      await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '📊 보험 설계서 분석 중... (GPT-4o)' }) + '\\n')
       
-      let newsData: any = {}
+      // ============================================
+      // Step 1: GPT-4o로 이미지 + 텍스트 통합 분석
+      // ============================================
+      const contentParts: any[] = []
       
-      // V2026.37.97 - 텍스트 모드: OCR 스킵, AI로 뉴스 분석
-      if (inputMode === 'text') {
-        await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '📰 뉴스 텍스트 분석 중...' }) + '\n')
-        
-        const textAnalysisPrompt = `다음 뉴스 기사를 분석해주세요.
+      // 분석 프롬프트
+      const analysisPrompt = `당신은 30년 경력 MDRT 보험 전문가입니다.
+아래 보험 설계서 이미지와 텍스트를 정밀하게 분석해주세요.
 
-[뉴스 내용]
-${newsText}
+${newsText ? '[사용자 입력 텍스트]\\n' + newsText + '\\n\\n' : ''}
+[분석 요청]
+첨부된 이미지는 보험 가입설계서입니다. 다음 정보를 정확하게 추출해주세요:
 
-[추출할 정보]
-1. 뉴스 핵심 내용 (1~2문장 요약)
-2. 사건/이슈 유형 (보험사기, 교통사고, 의료사고, 재해, 범죄, 학교폭력 등)
-3. 핵심 키워드들
-4. 관련될 수 있는 보험 종류들 (자동차보험, 운전자보험, 상해보험, 실손보험, 배상책임보험 등)
-5. 이 뉴스와 관련된 다양한 관점들 (피해자, 가해자, 가담자, 보험사, 일반인 등)
+1. **상품 정보**
+   - 보험회사명
+   - 상품명 (정확하게)
+   - 보험 종류 (연금보험, 종신보험, 암보험 등)
+
+2. **계약 조건**
+   - 피보험자 정보 (나이, 성별)
+   - 납입기간 (몇 년)
+   - 보험기간 (몇 세까지)
+   - 월 보험료
+   - 총 납입금액
+
+3. **해약환급금 정보** (핵심!)
+   - 주요 시점별 해약환급금 (5년, 10년, 15년, 20년 등)
+   - 해약환급률 (%)
+   - 최저보증이율/공시이율 정보
+
+4. **특약/보장 내용**
+   - 주요 특약
+   - 보장 내용
 
 JSON 형식으로 응답:
 {
-  "headline": "뉴스 핵심 내용 요약",
-  "issue_type": "사건 유형",
-  "keywords": ["키워드1", "키워드2", "키워드3"],
-  "related_insurances": ["보험종류1", "보험종류2"],
-  "perspectives": ["관점1", "관점2", "관점3"]
+  "company": "보험회사명",
+  "product_name": "상품명",
+  "product_type": "보험종류",
+  "insured_age": "피보험자 나이",
+  "insured_gender": "성별",
+  "payment_period": "납입기간(년)",
+  "coverage_period": "보험기간",
+  "monthly_premium": "월보험료(원)",
+  "total_premium": "총납입금액(원)",
+  "surrender_values": [
+    {"year": 5, "amount": "금액", "rate": "환급률%"},
+    {"year": 10, "amount": "금액", "rate": "환급률%"}
+  ],
+  "interest_rate": "공시이율/최저보증이율",
+  "key_benefits": ["보장내용1", "보장내용2"],
+  "special_notes": "특이사항"
 }`
 
-        const textResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ role: 'user', parts: [{ text: textAnalysisPrompt }] }],
-              generationConfig: { temperature: 0.3, maxOutputTokens: 2048, responseMimeType: 'application/json' }
-            })
+      contentParts.push({ type: 'text', text: analysisPrompt })
+      
+      // 이미지들 추가
+      for (const img of imageArray) {
+        contentParts.push({
+          type: 'image_url',
+          image_url: {
+            url: `data:${img.mimeType};base64,${img.base64}`,
+            detail: 'high'
           }
-        )
-        
-        if (textResponse.ok) {
-          const json = await textResponse.json() as any
-          const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
-          try {
-            newsData = JSON.parse(rawText.replace(/\`\`\`json\\n?/g, '').replace(/\`\`\`\\n?/g, '').trim())
-          } catch (e) {
-            newsData = { headline: newsText.substring(0, 100), issue_type: '일반', keywords: [], related_insurances: [], perspectives: [] }
-          }
-        }
-        
-        console.log('[XIVIX] 뉴스 텍스트 분석 완료:', newsData.headline)
-        
-      } else {
-        // 이미지 모드: 기존 OCR 방식
-        await stream.write(JSON.stringify({ type: 'step', step: 1, msg: '📰 뉴스 이미지 분석 중...' }) + '\n')
-        
-        const ocrPrompt = `이 뉴스 이미지를 분석해주세요.
-
-[추출할 정보]
-1. 뉴스 제목 또는 핵심 내용 (자막/캡션에서)
-2. 사건/이슈 유형 (학교폭력, 교통사고, 의료사고, 재해, 범죄 등)
-3. 관련될 수 있는 보험 종류들
-4. 피해자/가해자/관계자 등 관점
-
-JSON 형식으로 응답:
-{
-  "headline": "뉴스 핵심 내용",
-  "issue_type": "사건 유형",
-  "keywords": ["키워드1", "키워드2"],
-  "related_insurances": ["보험종류1", "보험종류2"],
-  "perspectives": ["피해자", "가해자", "목격자", "가족"]
-}`
-
-        const ocrResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: ocrPrompt },
-                  { inline_data: { mime_type: mimeType, data: image } }
-                ]
-              }],
-              generationConfig: { temperature: 0.3, maxOutputTokens: 2048, responseMimeType: 'application/json' }
-            })
-          }
-        )
-        
-        if (ocrResponse.ok) {
-          const json = await ocrResponse.json() as any
-          const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
-          try {
-            newsData = JSON.parse(rawText.replace(/\`\`\`json\\n?/g, '').replace(/\`\`\`\\n?/g, '').trim())
-          } catch (e) {
-            newsData = { headline: rawText, issue_type: '일반', keywords: [], related_insurances: [], perspectives: [] }
-          }
-        }
-        
-        console.log('[XIVIX] 뉴스 이미지 분석 완료:', newsData.headline)
+        })
       }
       
-      // 분석 결과에 입력 모드 표시
-      newsData.inputMode = inputMode
+      // GPT-4o API 호출
+      const analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'user', content: contentParts }
+          ],
+          max_tokens: 4096,
+          temperature: 0.2
+        })
+      })
       
-      await stream.write(JSON.stringify({ 
-        type: 'news_analysis', 
-        data: newsData 
-      }) + '\n')
-      
-      console.log('[XIVIX] 뉴스 분석 완료:', newsData.headline)
-      
-      // Step 2: 다양한 보험 질문 생성
-      await stream.write(JSON.stringify({ type: 'step', step: 2, msg: '❓ 보험 관련 질문 생성 중...' }) + '\n')
-      
-      // V2026.37.97 - perspectives가 객체일 수도 있으므로 안전하게 처리
-      let perspectivesStr = '일반인'
-      if (Array.isArray(newsData.perspectives)) {
-        perspectivesStr = newsData.perspectives.join(', ')
-      } else if (typeof newsData.perspectives === 'object' && newsData.perspectives !== null) {
-        perspectivesStr = Object.keys(newsData.perspectives).join(', ')
-      }
-      
-      const questionPrompt = `뉴스: "${newsData.headline || '사건 발생'}"
-사건 유형: ${newsData.issue_type || '일반'}
-관련 보험: ${(newsData.related_insurances || []).join(', ') || '종합보험'}
-관점: ${perspectivesStr}
-
-위 뉴스를 본 일반인들이 궁금해할 보험 관련 질문 ${questionCount}개를 생성해주세요.
-
-[질문 생성 규칙]
-1. 다양한 관점에서 (피해자/가해자/가족/목격자/제3자)
-2. 다양한 보험 종류 언급 (실손, 상해, 배상책임, 운전자, 화재, 여행자 등)
-3. 다양한 상황 가정 (증거 유무, 합의 여부, 미성년자 등)
-4. 실제 카페에서 물어볼 법한 자연스러운 어투
-5. "~보험 되나요?", "~청구 가능한가요?", "~어떻게 해야 하나요?" 형태
-
-JSON 형식:
-{"questions": [
-  {"id": 1, "perspective": "관점", "insurance_type": "관련 보험", "question": "질문 내용", "situation": "상황 설명"}
-]}`
-
-      const questionResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: questionPrompt }] }],
-            generationConfig: { temperature: 0.9, maxOutputTokens: 4096, responseMimeType: 'application/json' }
-          })
-        }
-      )
-      
-      let questions: any[] = []
-      if (questionResponse.ok) {
-        const json = await questionResponse.json() as any
-        const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      let analysisData: any = {}
+      if (analysisResponse.ok) {
+        const json = await analysisResponse.json() as any
+        const rawText = json.choices?.[0]?.message?.content || ''
         try {
-          const parsed = JSON.parse(rawText.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim())
-          questions = parsed.questions || []
+          // JSON 부분만 추출
+          const jsonMatch = rawText.match(/\\{[\\s\\S]*\\}/)
+          if (jsonMatch) {
+            analysisData = JSON.parse(jsonMatch[0])
+          }
         } catch (e) {
-          console.error('[XIVIX] 질문 파싱 실패')
+          console.error('[XIVIX] 분석 JSON 파싱 실패:', e)
+          analysisData = { raw_text: rawText }
         }
+      } else {
+        const errorText = await analysisResponse.text()
+        console.error('[XIVIX] GPT-4o 분석 실패:', errorText)
+        throw new Error('GPT-4o 분석 실패')
       }
       
       await stream.write(JSON.stringify({ 
-        type: 'questions', 
-        count: questions.length,
-        data: questions 
-      }) + '\n')
+        type: 'analysis', 
+        data: analysisData 
+      }) + '\\n')
       
-      console.log('[XIVIX] 질문 생성 완료:', questions.length, '개')
+      console.log('[XIVIX] 설계서 분석 완료:', analysisData.product_name)
       
-      // Step 3: 각 질문에 대한 전문가 답변 생성 (처음 5개만)
-      await stream.write(JSON.stringify({ type: 'step', step: 3, msg: '💬 전문가 답변 생성 중...' }) + '\n')
+      // ============================================
+      // Step 2: 분석 결과 기반 Q&A 콘텐츠 생성 (GPT-4o)
+      // ============================================
+      await stream.write(JSON.stringify({ type: 'step', step: 2, msg: '✍️ 보험 카페 Q&A 콘텐츠 생성 중...' }) + '\\n')
       
-      const qaResults: any[] = []
-      const answersToGenerate = Math.min(questions.length, 5) // 처음 5개만 답변 생성
+      // 핵심 정보 추출
+      const productName = analysisData.product_name || '보험상품'
+      const company = analysisData.company || '보험사'
+      const insuredAge = analysisData.insured_age || ''
+      const paymentPeriod = analysisData.payment_period || ''
+      const monthlyPremium = analysisData.monthly_premium || ''
+      const totalPremium = analysisData.total_premium || ''
       
-      for (let i = 0; i < answersToGenerate; i++) {
-        const q = questions[i]
-        
-        const answerPrompt = `[보험 전문가 답변 생성]
+      // 해약환급금 정보 포맷팅
+      let surrenderInfo = ''
+      if (analysisData.surrender_values && analysisData.surrender_values.length > 0) {
+        surrenderInfo = analysisData.surrender_values
+          .map((sv: any) => `${sv.year}년: ${sv.amount} (환급률 ${sv.rate})`)
+          .join(', ')
+      }
+      
+      const qaPrompt = `당신은 네이버 보험 카페에 글을 올리는 초보 엄마/아빠입니다.
+아래 보험 상품 정보를 바탕으로 실제 카페에 올릴 법한 질문글을 작성해주세요.
 
-질문: "${q.question}"
-관련 보험: ${q.insurance_type}
-상황: ${q.situation}
+[분석된 보험 상품 정보]
+- 보험회사: ${company}
+- 상품명: ${productName}
+- 상품종류: ${analysisData.product_type || ''}
+- 피보험자: ${insuredAge}세 ${analysisData.insured_gender || ''}
+- 납입기간: ${paymentPeriod}년
+- 월보험료: ${monthlyPremium}
+- 총납입금액: ${totalPremium}
+- 해약환급금: ${surrenderInfo}
+- 공시이율: ${analysisData.interest_rate || ''}
+
+[작성 규칙]
+1. 제목: 핵심 숫자와 고민을 담은 질문형 (예: "10살 아이 연금보험, 10년이면 130%라는데 이거 괜찮을까요?")
+2. 본문: 초보자가 쓴 것처럼 자연스럽게, 이모지 사용, 설계서 숫자 정확히 인용
+3. 질문: 실제로 궁금한 점 3가지 (체크박스 형태 ✔️)
+4. 참고 근거: 설계서에서 발췌한 정확한 숫자들
+5. 존댓말 필수
+
+JSON 형식으로 응답:
+{
+  "title": "제목 (40자 이내)",
+  "content": "본문 내용 (500~800자, 이모지 포함)",
+  "questions_in_content": ["궁금한점1", "궁금한점2", "궁금한점3"],
+  "reference_data": {
+    "납입기간": "",
+    "월보험료": "",
+    "총납입": "",
+    "해약환급금_10년": "",
+    "환급률": "",
+    "출처": "가입설계서"
+  }
+}`
+
+      const qaResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'user', content: qaPrompt }
+          ],
+          max_tokens: 2048,
+          temperature: 0.7
+        })
+      })
+      
+      let qaData: any = {}
+      if (qaResponse.ok) {
+        const json = await qaResponse.json() as any
+        const rawText = json.choices?.[0]?.message?.content || ''
+        try {
+          const jsonMatch = rawText.match(/\\{[\\s\\S]*\\}/)
+          if (jsonMatch) {
+            qaData = JSON.parse(jsonMatch[0])
+          }
+        } catch (e) {
+          console.error('[XIVIX] Q&A JSON 파싱 실패')
+        }
+      }
+      
+      // ============================================
+      // Step 3: 전문가 답변 생성
+      // ============================================
+      await stream.write(JSON.stringify({ type: 'step', step: 3, msg: '💬 전문가 답변 생성 중...' }) + '\\n')
+      
+      const answerPrompt = `당신은 30년 경력 MDRT 보험 전문가입니다.
+아래 질문에 대해 전문가 답변을 작성해주세요.
+
+[질문]
+${qaData.title || '보험 상품 문의'}
+
+[상품 정보]
+- 상품: ${company} ${productName}
+- 납입: ${paymentPeriod}년, 월 ${monthlyPremium}
+- 총납입: ${totalPremium}
+- 해약환급금: ${surrenderInfo}
 
 [답변 작성 규칙]
-1. 30년 경력 MDRT 보험 전문가 관점
-2. 단정적 표현 금지 ("됩니다" X → "가능성이 있습니다" O)
-3. 관련 보험 종류 구체적으로 언급
-4. 약관 확인 필요성 언급
-5. 전문가 상담 권유로 마무리
-6. 존댓말 사용
-7. 300~500자 분량
-
-[필수 포함 내용]
-- 해당 상황에서 청구 가능한 보험 종류
-- 보상 가능성과 한계점
-- 필요한 서류나 절차
-- 주의사항
+1. 존댓말 사용
+2. 단정적 표현 금지 ("됩니다" X → "가능성이 있습니다", "검토해볼 수 있습니다" O)
+3. 장점과 주의점 균형있게
+4. 적금과의 비교 언급
+5. 중도해지 위험성 언급
+6. 전문가 상담 권유로 마무리
+7. 500~800자 분량
 
 답변만 작성 (JSON 아님):`
 
-        const answerResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.PRO}:generateContent?key=${proKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ role: 'user', parts: [{ text: answerPrompt }] }],
-              generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
-            })
-          }
-        )
-        
-        let answer = ''
-        if (answerResponse.ok) {
-          const json = await answerResponse.json() as any
-          answer = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        }
-        
-        // 댓글 생성
-        const commentPrompt = `질문: "${q.question}"
-답변 요약: 보험 전문가가 관련 보험과 청구 가능성에 대해 답변함
+      const answerResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'user', content: answerPrompt }
+          ],
+          max_tokens: 1500,
+          temperature: 0.6
+        })
+      })
+      
+      let expertAnswer = ''
+      if (answerResponse.ok) {
+        const json = await answerResponse.json() as any
+        expertAnswer = json.choices?.[0]?.message?.content || ''
+      }
+      
+      // ============================================
+      // Step 4: 댓글 3개 생성
+      // ============================================
+      await stream.write(JSON.stringify({ type: 'step', step: 4, msg: '💭 댓글 생성 중...' }) + '\\n')
+      
+      const commentPrompt = `아래 보험 상담 Q&A에 달릴 네이버 카페 댓글 3개를 작성해주세요.
 
-위 Q&A에 달릴 카페 회원 댓글 3개를 작성해주세요.
+[질문 요약]
+${qaData.title || '보험 상품 문의'}
 
-[규칙]
-- 존댓말 필수
-- 길이 다양하게 (짧은 것 1개, 중간 2개)
-- 공감/추가질문/경험담 섞어서
+[답변 요약]
+보험 전문가가 상품의 장단점과 주의사항에 대해 답변함
 
-JSON: {"comments": [{"nickname": "닉네임", "text": "댓글"}]}`
+[댓글 작성 규칙]
+1. 존댓말 필수
+2. 3개 댓글 (짧은것 1개 40~60자, 중간 2개 80~120자)
+3. 유형 섞기: 공감/감사, 경험담, 추가질문
+4. 자연스러운 카페 회원 어투
+5. 닉네임: 실제 카페 느낌 (예: 워킹맘쭈니, 보험초보아빠, 3아이엄마 등)
 
-        const commentResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${ENGINE.FLASH}:generateContent?key=${proKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ role: 'user', parts: [{ text: commentPrompt }] }],
-              generationConfig: { temperature: 0.9, maxOutputTokens: 1024, responseMimeType: 'application/json' }
-            })
-          }
-        )
-        
-        let comments: any[] = []
-        if (commentResponse.ok) {
-          const json = await commentResponse.json() as any
-          const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
-          try {
-            const parsed = JSON.parse(rawText)
+JSON 형식:
+{
+  "comments": [
+    {"nickname": "닉네임1", "text": "댓글내용1"},
+    {"nickname": "닉네임2", "text": "댓글내용2"},
+    {"nickname": "닉네임3", "text": "댓글내용3"}
+  ]
+}`
+
+      const commentResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'user', content: commentPrompt }
+          ],
+          max_tokens: 800,
+          temperature: 0.8
+        })
+      })
+      
+      let comments: any[] = []
+      if (commentResponse.ok) {
+        const json = await commentResponse.json() as any
+        const rawText = json.choices?.[0]?.message?.content || ''
+        try {
+          const jsonMatch = rawText.match(/\\{[\\s\\S]*\\}/)
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0])
             comments = parsed.comments || []
-          } catch (e) {}
-        }
-        
-        const qaItem = {
-          id: i + 1,
-          question: q,
-          answer: answer,
-          comments: comments
-        }
-        
-        qaResults.push(qaItem)
-        
-        // 각 Q&A 완료 시 스트리밍
-        await stream.write(JSON.stringify({ 
-          type: 'qa_item', 
-          index: i + 1,
-          total: answersToGenerate,
-          data: qaItem 
-        }) + '\n')
+          }
+        } catch (e) {}
       }
       
-      // Step 4: 완료
-      await stream.write(JSON.stringify({ type: 'step', step: 4, msg: '✅ 생성 완료!' }) + '\n')
+      // ============================================
+      // Step 5: 해시태그 생성
+      // ============================================
+      await stream.write(JSON.stringify({ type: 'step', step: 5, msg: '🏷️ 해시태그 생성 중...' }) + '\\n')
       
-      // 최종 결과
+      const hashtagPrompt = `아래 보험 상품 정보로 네이버 블로그/카페용 해시태그 10개를 생성해주세요.
+
+[상품 정보]
+- 보험회사: ${company}
+- 상품명: ${productName}
+- 상품종류: ${analysisData.product_type || '연금보험'}
+- 피보험자: ${insuredAge}세
+- 납입기간: ${paymentPeriod}년
+
+[해시태그 규칙]
+1. #으로 시작
+2. 상품명, 회사명, 보험종류 필수 포함
+3. 관련 검색어 포함 (예: 아이보험, 교육자금, 목돈마련 등)
+4. 10개 생성
+
+JSON 형식:
+{"hashtags": ["#해시태그1", "#해시태그2", ...]}`
+
+      const hashtagResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'user', content: hashtagPrompt }
+          ],
+          max_tokens: 300,
+          temperature: 0.5
+        })
+      })
+      
+      let hashtags: string[] = []
+      if (hashtagResponse.ok) {
+        const json = await hashtagResponse.json() as any
+        const rawText = json.choices?.[0]?.message?.content || ''
+        try {
+          const jsonMatch = rawText.match(/\\{[\\s\\S]*\\}/)
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0])
+            hashtags = parsed.hashtags || []
+          }
+        } catch (e) {}
+      }
+      
+      // ============================================
+      // 최종 결과 전송
+      // ============================================
       const finalResult = {
-        news: newsData,
-        total_questions: questions.length,
-        qa_results: qaResults,
-        remaining_questions: questions.slice(5), // 답변 미생성 질문들
-        version: 'V2026.37.96'
+        analysis: analysisData,
+        qa: {
+          title: qaData.title || '',
+          content: qaData.content || '',
+          questions_in_content: qaData.questions_in_content || [],
+          reference_data: qaData.reference_data || {}
+        },
+        expert_answer: expertAnswer,
+        comments: comments,
+        hashtags: hashtags,
+        version: 'V2026.37.98'
       }
       
-      await stream.write(JSON.stringify({ type: 'complete', data: finalResult }) + '\n')
+      await stream.write(JSON.stringify({ type: 'complete', data: finalResult }) + '\\n')
       
-      console.log('[XIVIX] 뉴스 Q&A 생성 완료:', qaResults.length, '개 Q&A')
+      console.log('[XIVIX] 보험 Q&A 생성 완료:', finalResult.qa.title)
       
     } catch (error: any) {
-      console.error('[XIVIX] 뉴스 Q&A 생성 오류:', error)
-      await stream.write(JSON.stringify({ type: 'error', message: error.message }) + '\n')
+      console.error('[XIVIX] 보험 Q&A 생성 오류:', error)
+      await stream.write(JSON.stringify({ type: 'error', message: error.message }) + '\\n')
     }
   })
 })
@@ -8857,7 +8943,9 @@ function setMode(mode) {
 }
 
 // ============================================
-// ✅ V2026.37.97 - 뉴스 Q&A 스트리밍 생성 (텍스트 입력 지원)
+// ✅ V2026.37.99 - 보험 설계서 Q&A 스트리밍 생성 (GPT-4o + 다중 이미지)
+// CEO 지시: 텍스트 + 이미지 1~10장 함께 분석
+// 출력: 제목 + 질문 1개 + 답변 1개 + 댓글 3개 + 해시태그
 // ============================================
 async function goGenerateNewsQA() {
   const searchEl = document.getElementById('search');
@@ -8865,9 +8953,9 @@ async function goGenerateNewsQA() {
   const hasImage = uploadedFiles.length > 0;
   const hasText = newsText.length > 0;
   
-  // V2026.37.97 - 텍스트 또는 이미지 중 하나는 필수
+  // V2026.37.99 - 텍스트 또는 이미지 중 하나는 필수
   if (!hasImage && !hasText) {
-    alert('뉴스 이미지를 업로드하거나 뉴스 기사 텍스트를 입력해주세요!');
+    alert('보험 설계서 이미지를 업로드하거나 뉴스 기사 텍스트를 입력해주세요!');
     return;
   }
   
@@ -8884,31 +8972,50 @@ async function goGenerateNewsQA() {
   progressBox.style.display = 'block';
   
   try {
-    // V2026.37.97 - 요청 데이터 구성
-    const requestData = {
-      questionCount: 10 // 기본 10개 질문
-    };
+    // V2026.37.99 - 요청 데이터 구성 (다중 이미지 지원)
+    const requestData = {};
     
-    // 텍스트가 있으면 텍스트 사용 (텍스트 우선)
+    // 텍스트+이미지 함께 전송 (GPT-4o에서 통합 분석)
     if (hasText) {
       requestData.newsText = newsText;
     }
     
-    // 이미지가 있고 텍스트가 없으면 이미지 사용
-    if (hasImage && !hasText) {
-      const file = uploadedFiles[0];
-      requestData.image = file.base64;
-      requestData.mimeType = file.type;
+    // V2026.37.99 - 이미지 다중 업로드 (1~10장)
+    if (hasImage) {
+      // 텍스트+이미지 함께 있으면 안내 메시지 표시
+      if (hasText) {
+        const noticeToast = document.createElement('div');
+        noticeToast.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg, #4f8cff, #7c5cff);color:white;padding:16px 24px;border-radius:12px;z-index:99999;font-size:14px;max-width:90%;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
+        noticeToast.innerHTML = '<i class="fas fa-info-circle" style="margin-right:8px"></i>텍스트와 이미지를 함께 분석합니다! (GPT-4o)';
+        document.body.appendChild(noticeToast);
+        setTimeout(() => noticeToast.remove(), 4000);
+      }
+      
+      // 이미지 배열로 변환 (최대 10장)
+      const imagesToSend = uploadedFiles.slice(0, 10).map(f => ({
+        base64: f.base64,
+        mimeType: f.type
+      }));
+      requestData.images = imagesToSend;
+      
+      // 하위 호환성을 위해 단일 이미지도 전송
+      if (uploadedFiles.length === 1) {
+        requestData.image = uploadedFiles[0].base64;
+        requestData.mimeType = uploadedFiles[0].type;
+      }
     }
     
     progressFill.style.width = '10%';
     progressPct.textContent = '10%';
     
-    // V2026.37.97 - 입력 모드에 따른 메시지
-    if (hasText) {
-      progressText.innerHTML = '<i class="fas fa-file-alt"></i> 뉴스 텍스트 분석 중...';
+    // V2026.37.99 - 입력 모드에 따른 메시지
+    const imageCount = hasImage ? uploadedFiles.length : 0;
+    if (hasText && hasImage) {
+      progressText.innerHTML = '<i class="fas fa-robot"></i> GPT-4o 통합 분석 중... (텍스트 + 이미지 ' + imageCount + '장)';
+    } else if (hasImage) {
+      progressText.innerHTML = '<i class="fas fa-file-image"></i> GPT-4o 보험 설계서 분석 중... (이미지 ' + imageCount + '장)';
     } else {
-      progressText.innerHTML = '<i class="fas fa-newspaper"></i> 뉴스 이미지 분석 중...';
+      progressText.innerHTML = '<i class="fas fa-file-alt"></i> GPT-4o 뉴스 텍스트 분석 중...';
     }
     
     const res = await fetch('/api/generate/news-qa', {
@@ -8924,9 +9031,7 @@ async function goGenerateNewsQA() {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    let newsData = null;
-    let questions = [];
-    let qaResults = [];
+    let analysisData = null;
     
     while (true) {
       const { done, value } = await reader.read();
@@ -8942,46 +9047,26 @@ async function goGenerateNewsQA() {
           const event = JSON.parse(line);
           
           switch (event.type) {
-            // V2026.37.97 - 텍스트+이미지 동시 입력 시 안내 메시지 표시
-            case 'notice':
-              // 토스트 메시지로 안내
-              const noticeToast = document.createElement('div');
-              noticeToast.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg, #f59e0b, #d97706);color:white;padding:16px 24px;border-radius:12px;z-index:99999;font-size:14px;max-width:90%;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
-              noticeToast.innerHTML = '<i class="fas fa-info-circle" style="margin-right:8px"></i>' + event.msg;
-              document.body.appendChild(noticeToast);
-              setTimeout(() => noticeToast.remove(), 5000);
-              break;
-              
             case 'step':
+              // V2026.37.99 - 단계별 진행 메시지 (5단계)
               progressText.innerHTML = event.msg;
-              progressFill.style.width = (event.step * 25) + '%';
-              progressPct.textContent = (event.step * 25) + '%';
+              progressFill.style.width = (event.step * 20) + '%';
+              progressPct.textContent = (event.step * 20) + '%';
               break;
               
-            case 'news_analysis':
-              newsData = event.data;
-              console.log('[XIVIX] 뉴스 분석:', newsData);
-              break;
-              
-            case 'questions':
-              questions = event.data || [];
-              progressText.innerHTML = '❓ ' + questions.length + '개 질문 생성 완료!';
-              console.log('[XIVIX] 질문 생성:', questions.length);
-              break;
-              
-            case 'qa_item':
-              qaResults.push(event.data);
-              progressText.innerHTML = '💬 Q&A 생성 중... (' + event.index + '/' + event.total + ')';
-              progressFill.style.width = (50 + (event.index / event.total) * 50) + '%';
+            case 'analysis':
+              // GPT-4o 보험 설계서 분석 결과
+              analysisData = event.data;
+              console.log('[XIVIX] GPT-4o 분석:', analysisData);
               break;
               
             case 'complete':
               progressFill.style.width = '100%';
               progressPct.textContent = '100%';
-              progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ 뉴스 Q&A 생성 완료!';
+              progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ 보험 Q&A 생성 완료! (GPT-4o)';
               
-              // 결과 렌더링
-              renderNewsQAResults(event.data);
+              // V2026.37.99 - 새 API 응답 구조로 렌더링
+              renderInsuranceQAResults(event.data);
               break;
               
             case 'error':
@@ -9000,81 +9085,164 @@ async function goGenerateNewsQA() {
   }
 }
 
-// ✅ V2026.37.96 - 뉴스 Q&A 결과 렌더링
-function renderNewsQAResults(data) {
+// ✅ V2026.37.99 - 보험 설계서 Q&A 결과 렌더링 (GPT-4o)
+// 출력: 제목 + 질문 1개 + 답변 1개 + 댓글 3개 + 해시태그
+function renderInsuranceQAResults(data) {
   const resultSection = document.getElementById('resultSection');
   if (!resultSection) return;
   
   let html = '';
   
-  // 뉴스 분석 결과
-  if (data.news) {
+  // 1. 보험 상품 분석 결과 (설계서 OCR 결과)
+  if (data.analysis) {
+    const a = data.analysis;
     html += '<div class="sequential-section show">';
-    html += '<div class="section-header"><i class="fas fa-newspaper"></i> 뉴스 분석 결과</div>';
+    html += '<div class="section-header"><i class="fas fa-file-medical-alt"></i> 📊 보험 상품 분석 (GPT-4o)</div>';
     html += '<div class="section-content">';
-    html += '<div class="item-card">';
-    html += '<div class="item-text"><strong>📰 ' + (data.news.headline || '뉴스 내용') + '</strong></div>';
-    html += '<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">';
-    html += '유형: ' + (data.news.issue_type || '-') + ' | ';
-    html += '관련 보험: ' + (data.news.related_insurances?.join(', ') || '-');
+    html += '<div class="item-card" style="background:linear-gradient(135deg, rgba(79,140,255,0.1), rgba(124,92,255,0.1))">';
+    
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">';
+    
+    // 상품 정보
+    html += '<div style="padding:12px;background:rgba(255,255,255,0.05);border-radius:8px">';
+    html += '<div style="font-size:11px;color:var(--primary);margin-bottom:4px">📋 상품 정보</div>';
+    html += '<div style="font-size:14px;font-weight:600">' + (a.company || '-') + ' ' + (a.product_name || '-') + '</div>';
+    html += '<div style="font-size:12px;color:var(--text-muted)">' + (a.product_type || '-') + '</div>';
+    html += '</div>';
+    
+    // 계약 조건
+    html += '<div style="padding:12px;background:rgba(255,255,255,0.05);border-radius:8px">';
+    html += '<div style="font-size:11px;color:var(--green);margin-bottom:4px">👤 계약 조건</div>';
+    html += '<div style="font-size:14px">' + (a.insured_age || '-') + '세 ' + (a.insured_gender || '') + '</div>';
+    html += '<div style="font-size:12px;color:var(--text-muted)">납입기간: ' + (a.payment_period || '-') + '년</div>';
+    html += '</div>';
+    
+    // 보험료 정보
+    html += '<div style="padding:12px;background:rgba(255,255,255,0.05);border-radius:8px">';
+    html += '<div style="font-size:11px;color:var(--orange);margin-bottom:4px">💰 보험료</div>';
+    html += '<div style="font-size:14px;font-weight:600">월 ' + (a.monthly_premium || '-') + '</div>';
+    html += '<div style="font-size:12px;color:var(--text-muted)">총 납입: ' + (a.total_premium || '-') + '</div>';
+    html += '</div>';
+    
+    // 해약환급금 정보
+    if (a.surrender_values && a.surrender_values.length > 0) {
+      html += '<div style="padding:12px;background:rgba(255,255,255,0.05);border-radius:8px">';
+      html += '<div style="font-size:11px;color:var(--accent);margin-bottom:4px">📈 해약환급금</div>';
+      a.surrender_values.forEach(sv => {
+        html += '<div style="font-size:13px">' + sv.year + '년: ' + sv.amount + ' (' + sv.rate + ')</div>';
+      });
+      html += '</div>';
+    }
+    
     html += '</div></div></div></div>';
   }
   
-  // Q&A 결과
-  if (data.qa_results && data.qa_results.length > 0) {
+  // 2. Q&A 콘텐츠 (질문 + 본문)
+  if (data.qa) {
     html += '<div class="sequential-section show" style="margin-top:20px">';
-    html += '<div class="section-header"><i class="fas fa-comments"></i> 생성된 Q&A (' + data.qa_results.length + '개)</div>';
+    html += '<div class="section-header"><i class="fas fa-question-circle"></i> ❓ 카페 질문글</div>';
+    html += '<div class="section-content">';
+    html += '<div class="item-card" style="border-left:4px solid var(--primary)">';
+    
+    // 제목
+    html += '<div style="font-size:18px;font-weight:700;margin-bottom:16px;color:var(--primary)">';
+    html += '📌 ' + (data.qa.title || '보험 상품 문의');
+    html += '</div>';
+    
+    // 본문
+    html += '<div style="font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap">';
+    html += (data.qa.content || '').replace(/\\n/g, '<br>');
+    html += '</div>';
+    
+    // 본문 내 질문들
+    if (data.qa.questions_in_content && data.qa.questions_in_content.length > 0) {
+      html += '<div style="margin-top:16px;padding:12px;background:rgba(79,140,255,0.1);border-radius:8px">';
+      html += '<div style="font-size:12px;color:var(--primary);margin-bottom:8px">✔️ 궁금한 점</div>';
+      data.qa.questions_in_content.forEach(q => {
+        html += '<div style="font-size:13px;margin-bottom:4px">• ' + q + '</div>';
+      });
+      html += '</div>';
+    }
+    
+    // 참조 데이터
+    if (data.qa.reference_data) {
+      const ref = data.qa.reference_data;
+      html += '<div style="margin-top:12px;padding:10px;background:rgba(255,255,255,0.03);border-radius:6px;font-size:12px;color:var(--text-muted)">';
+      html += '📊 참고: ';
+      Object.entries(ref).forEach(([k, v]) => {
+        if (v) html += k + ': ' + v + ' | ';
+      });
+      html += '</div>';
+    }
+    
+    // 복사 버튼
+    html += '<div style="margin-top:16px;display:flex;gap:8px">';
+    html += '<button class="copy-btn" onclick="copyInsuranceQuestion()"><i class="fas fa-copy"></i> 질문글 복사</button>';
+    html += '</div>';
+    
+    html += '</div></div></div>';
+  }
+  
+  // 3. 전문가 답변
+  if (data.expert_answer) {
+    html += '<div class="sequential-section show" style="margin-top:20px">';
+    html += '<div class="section-header"><i class="fas fa-user-tie"></i> 💬 전문가 답변</div>';
+    html += '<div class="section-content">';
+    html += '<div class="item-card" style="border-left:4px solid var(--green);background:rgba(16,185,129,0.05)">';
+    
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">';
+    html += '<div style="width:40px;height:40px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center"><i class="fas fa-user-md" style="color:white"></i></div>';
+    html += '<div><div style="font-weight:600">MDRT 보험전문가</div><div style="font-size:11px;color:var(--text-muted)">30년 경력 · 인증 전문가</div></div>';
+    html += '</div>';
+    
+    html += '<div style="font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap">';
+    html += (data.expert_answer || '').replace(/\\n/g, '<br>');
+    html += '</div>';
+    
+    html += '<div style="margin-top:16px;display:flex;gap:8px">';
+    html += '<button class="copy-btn" onclick="copyInsuranceAnswer()"><i class="fas fa-copy"></i> 답변 복사</button>';
+    html += '</div>';
+    
+    html += '</div></div></div>';
+  }
+  
+  // 4. 댓글 3개
+  if (data.comments && data.comments.length > 0) {
+    html += '<div class="sequential-section show" style="margin-top:20px">';
+    html += '<div class="section-header"><i class="fas fa-comments"></i> 💭 댓글 (' + data.comments.length + '개)</div>';
     html += '<div class="section-content">';
     
-    data.qa_results.forEach((qa, idx) => {
-      html += '<div class="item-card" style="margin-bottom:16px;border-left:3px solid var(--primary)">';
-      
-      // 질문
-      html += '<div style="margin-bottom:12px">';
-      html += '<div style="font-size:11px;color:var(--primary);margin-bottom:4px">질문 #' + (idx + 1) + ' (' + (qa.question?.perspective || '') + ')</div>';
-      html += '<div class="item-text" style="font-weight:600">❓ ' + (qa.question?.question || '') + '</div>';
+    data.comments.forEach((c, idx) => {
+      html += '<div class="item-card" style="margin-bottom:12px;padding:12px">';
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+      html += '<div style="width:32px;height:32px;background:var(--card-bg);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px">👤</div>';
+      html += '<div style="font-weight:500;font-size:13px">' + (c.nickname || '회원' + (idx+1)) + '</div>';
       html += '</div>';
-      
-      // 답변
-      html += '<div style="background:rgba(16,185,129,0.1);padding:12px;border-radius:8px;margin-bottom:12px">';
-      html += '<div style="font-size:11px;color:var(--green);margin-bottom:4px">💬 전문가 답변</div>';
-      html += '<div style="font-size:14px;line-height:1.7;color:var(--text)">' + (qa.answer || '').replace(/\\n/g, '<br>') + '</div>';
-      html += '</div>';
-      
-      // 복사 버튼
-      html += '<div style="display:flex;gap:8px">';
-      html += '<button class="copy-btn" onclick="copyNewsQA(' + idx + ')"><i class="fas fa-copy"></i> Q&A 복사</button>';
-      html += '</div>';
-      
-      // 댓글
-      if (qa.comments && qa.comments.length > 0) {
-        html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">';
-        html += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">💬 댓글 미리보기</div>';
-        qa.comments.forEach(c => {
-          html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">';
-          html += '<strong>' + (c.nickname || '회원') + '</strong>: ' + (c.text || '');
-          html += '</div>';
-        });
-        html += '</div>';
-      }
-      
+      html += '<div style="font-size:14px;color:var(--text);padding-left:40px">' + (c.text || '') + '</div>';
       html += '</div>';
     });
+    
+    html += '<div style="display:flex;gap:8px">';
+    html += '<button class="copy-btn" onclick="copyInsuranceComments()"><i class="fas fa-copy"></i> 댓글 전체 복사</button>';
+    html += '</div>';
     
     html += '</div></div>';
   }
   
-  // 추가 질문 목록 (답변 미생성)
-  if (data.remaining_questions && data.remaining_questions.length > 0) {
+  // 5. 해시태그
+  if (data.hashtags && data.hashtags.length > 0) {
     html += '<div class="sequential-section show" style="margin-top:20px">';
-    html += '<div class="section-header"><i class="fas fa-list"></i> 추가 질문 아이디어 (' + data.remaining_questions.length + '개)</div>';
+    html += '<div class="section-header"><i class="fas fa-hashtag"></i> 🏷️ 해시태그</div>';
     html += '<div class="section-content">';
+    html += '<div class="item-card">';
     html += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
-    data.remaining_questions.forEach((q, idx) => {
-      html += '<span class="keyword-tag" onclick="copyText(\\'' + (q.question || '').replace(/'/g, "\\\\'") + '\\')" style="cursor:pointer;font-size:12px">';
-      html += (idx + 6) + '. ' + (q.question || '').substring(0, 40) + '...';
-      html += '</span>';
+    data.hashtags.forEach(tag => {
+      html += '<span class="keyword-tag" onclick="copyText(\\'' + tag.replace(/'/g, "\\\\'") + '\\')" style="cursor:pointer;font-size:13px;background:var(--primary-soft);color:var(--primary)">' + tag + '</span>';
     });
+    html += '</div>';
+    html += '<div style="margin-top:12px">';
+    html += '<button class="copy-btn" onclick="copyInsuranceHashtags()"><i class="fas fa-copy"></i> 해시태그 전체 복사</button>';
+    html += '</div>';
     html += '</div></div></div>';
   }
   
@@ -9090,30 +9258,57 @@ function renderNewsQAResults(data) {
   }
   
   // 결과 데이터 저장
-  window.newsQAData = data;
+  window.insuranceQAData = data;
 }
 
-// Q&A 복사
-function copyNewsQA(idx) {
-  const qa = window.newsQAData?.qa_results?.[idx];
-  if (!qa) return;
+// ✅ V2026.37.99 - 보험 Q&A 복사 함수들
+function copyInsuranceQuestion() {
+  const data = window.insuranceQAData;
+  if (!data?.qa) return;
   
-  let text = '[질문]\\n' + (qa.question?.question || '') + '\\n\\n';
-  text += '[답변]\\n' + (qa.answer || '') + '\\n\\n';
-  if (qa.comments && qa.comments.length > 0) {
-    text += '[댓글]\\n';
-    qa.comments.forEach(c => {
-      text += (c.nickname || '회원') + ': ' + (c.text || '') + '\\n';
-    });
-  }
+  let text = '[제목]\\n' + (data.qa.title || '') + '\\n\\n';
+  text += '[본문]\\n' + (data.qa.content || '');
   
   navigator.clipboard.writeText(text).then(() => {
-    const toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:12px 24px;border-radius:8px;z-index:99999;font-size:14px';
-    toast.innerHTML = '<i class="fas fa-check"></i> Q&A #' + (idx + 1) + ' 복사 완료!';
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2000);
+    showCopyToast('질문글 복사 완료!');
   });
+}
+
+function copyInsuranceAnswer() {
+  const data = window.insuranceQAData;
+  if (!data?.expert_answer) return;
+  
+  navigator.clipboard.writeText(data.expert_answer).then(() => {
+    showCopyToast('전문가 답변 복사 완료!');
+  });
+}
+
+function copyInsuranceComments() {
+  const data = window.insuranceQAData;
+  if (!data?.comments?.length) return;
+  
+  let text = data.comments.map(c => (c.nickname || '회원') + ': ' + (c.text || '')).join('\\n');
+  
+  navigator.clipboard.writeText(text).then(() => {
+    showCopyToast('댓글 ' + data.comments.length + '개 복사 완료!');
+  });
+}
+
+function copyInsuranceHashtags() {
+  const data = window.insuranceQAData;
+  if (!data?.hashtags?.length) return;
+  
+  navigator.clipboard.writeText(data.hashtags.join(' ')).then(() => {
+    showCopyToast('해시태그 복사 완료!');
+  });
+}
+
+function showCopyToast(msg) {
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:12px 24px;border-radius:8px;z-index:99999;font-size:14px';
+  toast.innerHTML = '<i class="fas fa-check"></i> ' + msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
 }
 
 // ============================================
