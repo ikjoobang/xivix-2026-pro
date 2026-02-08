@@ -7524,7 +7524,10 @@ function loadResultData() {
             try {
               // ✅ V2026.37.101 - 결과 섹션 먼저 표시
               const resultSection = document.getElementById('resultSection');
-              if (resultSection) resultSection.classList.add('show');
+              if (resultSection) {
+                resultSection.style.display = '';
+                resultSection.classList.add('show');
+              }
               
               // 각 렌더링 함수 호출
               if (typeof renderSeoAudit === 'function') {
@@ -9495,7 +9498,11 @@ async function goGenerateNewsQA() {
   
   btn.disabled = true;
   btn.classList.add('loading');
-  resultSection?.classList.add('show');
+  // V2026.37.104 - 인라인 display:none 제거 (CSS .show 클래스보다 우선하므로 결과 안 보이는 버그 수정)
+  if (resultSection) {
+    resultSection.style.display = '';
+    resultSection.classList.add('show');
+  }
   progressBox.style.display = 'block';
   
   try {
@@ -10028,6 +10035,8 @@ async function goGenerateStream() {
   // 결과 섹션 즉시 표시 + 로딩 오버레이
   trendSection.style.display = 'none';
   if (hintSection) hintSection.style.display = 'none';
+  // V2026.37.104 - 인라인 display:none 제거 후 show 클래스 적용
+  resultSection.style.display = '';
   resultSection.classList.add('show');
   progressBox.style.display = 'block';
   // V39: 탭 네비게이션 제거됨 - 순차 섹션 초기화
