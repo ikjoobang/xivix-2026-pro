@@ -4563,14 +4563,23 @@ body{
 
 /* 뉴스 모드 안내 */
 .news-mode-guide{
-  background:linear-gradient(135deg, rgba(79,140,255,0.1), rgba(124,92,255,0.1));
-  border:1px solid rgba(79,140,255,0.2);
-  border-radius:12px;
-  padding:20px;
+  background:linear-gradient(135deg, rgba(16,185,129,0.15), rgba(79,140,255,0.15));
+  border:2px solid rgba(16,185,129,0.4);
+  border-radius:16px;
+  padding:24px;
   margin-bottom:16px;
   display:flex;
   gap:16px;
   align-items:flex-start;
+  box-shadow:0 4px 20px rgba(16,185,129,0.15);
+  position:relative;
+  overflow:hidden;
+}
+.news-mode-guide::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,#10b981,#4f8cff,#7c5cff);
 }
 .news-guide-icon{
   width:48px;
@@ -4652,14 +4661,15 @@ body{
   align-items:center;
   gap:10px;
   padding:14px 24px;
-  background:rgba(79,140,255,0.08);
-  border:2px dashed rgba(79,140,255,0.4);
+  background:rgba(79,140,255,0.12);
+  border:2px dashed rgba(79,140,255,0.7);
   border-radius:14px;
   color:var(--primary);
   font-size:14px;
   font-weight:600;
   cursor:pointer;
   transition:all 0.25s;
+  box-shadow:0 0 12px rgba(79,140,255,0.15);
 }
 .upload-btn i{
   font-size:18px;
@@ -4667,15 +4677,17 @@ body{
 .upload-btn:hover{
   border-color:var(--primary);
   background:var(--primary-soft);
-  box-shadow:0 4px 15px rgba(79,140,255,0.2);
+  box-shadow:0 6px 20px rgba(79,140,255,0.35);
+  border-style:solid;
 }
 .upload-btn input{display:none}
 .upload-hint{
   font-size:13px;
   color:var(--text-muted);
-  background:rgba(255,255,255,0.03);
+  background:rgba(79,140,255,0.06);
   padding:8px 14px;
   border-radius:8px;
+  border:1px solid rgba(79,140,255,0.15);
 }
 .file-preview{
   display:flex;
@@ -4729,24 +4741,50 @@ body{
   border-radius:16px;
   padding:18px 48px;
   color:#fff;
-  font-size:16px;
+  font-size:17px;
   font-weight:700;
   cursor:pointer;
   display:flex;
   align-items:center;
   gap:10px;
-  transition:all 0.25s;
-  box-shadow:0 6px 25px rgba(79,140,255,0.35);
+  transition:all 0.3s;
+  box-shadow:0 6px 25px rgba(79,140,255,0.35), 0 0 40px rgba(124,92,255,0.2);
+  animation:btnPulse 2s ease-in-out infinite;
+  position:relative;
+  overflow:hidden;
+  letter-spacing:0.5px;
+}
+.search-btn::after{
+  content:'';
+  position:absolute;
+  top:-50%;left:-50%;
+  width:200%;height:200%;
+  background:linear-gradient(45deg,transparent 30%,rgba(255,255,255,0.15) 50%,transparent 70%);
+  animation:btnShine 3s ease-in-out infinite;
+}
+@keyframes btnPulse{
+  0%,100%{box-shadow:0 6px 25px rgba(79,140,255,0.35), 0 0 40px rgba(124,92,255,0.2);transform:scale(1)}
+  50%{box-shadow:0 10px 45px rgba(124,92,255,0.6), 0 0 60px rgba(79,140,255,0.35);transform:scale(1.04)}
+}
+@keyframes btnShine{
+  0%{transform:translateX(-100%) rotate(45deg)}
+  40%,100%{transform:translateX(100%) rotate(45deg)}
+}
+@keyframes arrowBounce{
+  0%,100%{transform:translateX(0)}
+  50%{transform:translateX(6px)}
 }
 .search-btn i{
   font-size:18px;
 }
 .search-btn:hover{
-  box-shadow:0 12px 35px rgba(79,140,255,0.45);
-  filter:brightness(1.1);
+  box-shadow:0 12px 40px rgba(79,140,255,0.55);
+  filter:brightness(1.15);
+  transform:translateY(-2px) scale(1.03);
+  animation:none;
 }
-.search-btn:active{filter:brightness(0.95)}
-.search-btn:disabled{opacity:0.6;cursor:not-allowed}
+.search-btn:active{filter:brightness(0.95);transform:scale(0.98)}
+.search-btn:disabled{opacity:0.6;cursor:not-allowed;animation:none}
 
 /* ============================================ */
 /* 프리미엄 트렌드 섹션 (보험설계사 고급형) */
@@ -4978,14 +5016,16 @@ body{
 /* 힌트 메시지 */
 .trend-hint{
   margin-top:16px;
-  padding:12px 16px;
-  background:rgba(245,158,11,0.1);
-  border-radius:10px;
-  font-size:12px;
-  color:var(--text-muted);
+  padding:14px 18px;
+  background:linear-gradient(135deg, rgba(245,158,11,0.15), rgba(234,88,12,0.1));
+  border:1px solid rgba(245,158,11,0.3);
+  border-radius:12px;
+  font-size:13px;
+  color:var(--text);
   display:flex;
-  align-items:center;
-  gap:8px;
+  align-items:flex-start;
+  gap:10px;
+  line-height:1.6;
 }
 .trend-hint i{color:#f59e0b}
 
@@ -6958,13 +6998,8 @@ body{
       </div>
     </div>
     
-    <!-- ✅ V2026.37.102 - 보험 설계서 Q&A 단일 모드 (모드 통합) -->
-    <div class="mode-selector" id="modeSelector">
-      <button class="mode-btn active" id="modeInsurance" onclick="void(0)">
-        <i class="fas fa-file-medical-alt"></i> 보험 설계서 Q&A
-        <span class="mode-badge" style="background:linear-gradient(135deg,#10b981,#059669)">PRO</span>
-      </button>
-    </div>
+    <!-- ✅ V2026.37.102 - 보험 설계서 Q&A 상단 띠 제거 (CEO 지시: 불필요) -->
+    <!-- 모드 선택 버튼 제거됨 - 단일 모드이므로 필요 없음 -->
     
     <!-- GPT 스타일 검색창 + 파일 업로드 -->
     <div class="search-box" id="searchBox">
@@ -6998,7 +7033,7 @@ body{
       <div class="search-footer">
         <span class="char-count"><span id="char">0</span>/500</span>
         <button id="btn" class="search-btn" onclick="goGenerate()">
-          <span class="btn-text"><i class="fas fa-file-medical-alt"></i> \ubcf4\ud5d8 \uc124\uacc4\uc11c Q&A \uc0dd\uc131 (GPT-4o)</span>
+          <span class="btn-text"><i class="fas fa-file-medical-alt"></i> \ubcf4\ud5d8 \uc124\uacc4\uc11c Q&A \uc0dd\uc131 (GPT-4o) <i class="fas fa-arrow-right" style="margin-left:4px;animation:arrowBounce 1.5s ease-in-out infinite"></i></span>
           <div class="spinner"></div>
         </button>
       </div>
@@ -7041,8 +7076,8 @@ body{
       
       <!-- 힌트 -->
       <div class="trend-hint">
-        <i class="fas fa-lightbulb"></i>
-        <span><b>활용 팁:</b> 키워드를 클릭하면 Q&A 생성 칸의 핵심 고민에 자동 입력됩니다. 트렌드 키워드를 활용하면 카페 노출이 높아집니다.</span>
+        <i class="fas fa-hand-pointer" style="color:#f59e0b"></i>
+        <span><b>👆 키워드를 터치하세요!</b> 클릭하면 <b style="color:#10b981">① 키워드 자동 입력</b> → <b style="color:#4f8cff">② Q&A 자동 생성</b>이 시작됩니다. 결과가 나오면 아래로 스크롤!</span>
       </div>
     </div>
     
@@ -7071,54 +7106,57 @@ body{
            출력 순서: 제목 → 질문 → 키워드 → 답변 → 댓글
            ============================================ -->
       
-      <!-- 1. 제목 섹션 -->
-      <div class="sequential-section" id="section-titles">
-        <div class="section-header">
-          <i class="fas fa-heading"></i>
-          <span>1. 제목 선택</span>
-          <span class="badge" id="titleCount">5</span>
+      <!-- V2026.37.103 - 결과 섹션: 일반 모드용 (현재 보험 Q&A 통합 모드이므로 기본 숨김) -->
+      <div id="normalResultSections" style="display:none">
+        <!-- 1. 제목 섹션 -->
+        <div class="sequential-section" id="section-titles">
+          <div class="section-header">
+            <i class="fas fa-heading"></i>
+            <span>1. 제목 선택</span>
+            <span class="badge" id="titleCount">5</span>
+          </div>
+          <div class="section-content" id="tab-titles"></div>
         </div>
-        <div class="section-content" id="tab-titles"></div>
-      </div>
-      
-      <!-- 2. SEO 키워드 섹션 -->
-      <div class="sequential-section" id="section-keywords">
-        <div class="section-header">
-          <i class="fas fa-tags"></i>
-          <span>2. SEO 키워드</span>
-          <span class="badge">5</span>
+        
+        <!-- 2. SEO 키워드 섹션 -->
+        <div class="sequential-section" id="section-keywords">
+          <div class="section-header">
+            <i class="fas fa-tags"></i>
+            <span>2. SEO 키워드</span>
+            <span class="badge">5</span>
+          </div>
+          <div class="section-content" id="seoKeywords"></div>
         </div>
-        <div class="section-content" id="seoKeywords"></div>
-      </div>
-      
-      <!-- 2-2. 해시태그 섹션 (CEO 지시 2026.01.20 추가) -->
-      <div class="sequential-section" id="section-hashtags">
-        <div class="section-header">
-          <i class="fas fa-hashtag"></i>
-          <span>2-2. 해시태그</span>
-          <span class="badge">5</span>
+        
+        <!-- 2-2. 해시태그 섹션 -->
+        <div class="sequential-section" id="section-hashtags">
+          <div class="section-header">
+            <i class="fas fa-hashtag"></i>
+            <span>2-2. 해시태그</span>
+            <span class="badge">5</span>
+          </div>
+          <div class="section-content" id="hashtagsContent"></div>
         </div>
-        <div class="section-content" id="hashtagsContent"></div>
-      </div>
-      
-      <!-- 3. 전문가 답변 섹션 -->
-      <div class="sequential-section" id="section-contents">
-        <div class="section-header">
-          <i class="fas fa-file-alt"></i>
-          <span>3. 전문가 답변</span>
-          <span class="badge" id="contentCount">3</span>
+        
+        <!-- 3. 전문가 답변 섹션 -->
+        <div class="sequential-section" id="section-contents">
+          <div class="section-header">
+            <i class="fas fa-file-alt"></i>
+            <span>3. 전문가 답변</span>
+            <span class="badge" id="contentCount">3</span>
+          </div>
+          <div class="section-content" id="tab-contents"></div>
         </div>
-        <div class="section-content" id="tab-contents"></div>
-      </div>
-      
-      <!-- 4. 댓글 군단 섹션 -->
-      <div class="sequential-section" id="section-comments">
-        <div class="section-header">
-          <i class="fas fa-comments"></i>
-          <span>4. 댓글 군단</span>
-          <span class="badge" id="commentCount">5</span>
+        
+        <!-- 4. 댓글 군단 섹션 -->
+        <div class="sequential-section" id="section-comments">
+          <div class="section-header">
+            <i class="fas fa-comments"></i>
+            <span>4. 댓글 군단</span>
+            <span class="badge" id="commentCount">5</span>
+          </div>
+          <div class="section-content" id="tab-extras"></div>
         </div>
-        <div class="section-content" id="tab-extras"></div>
       </div>
       
       <!-- 전체 복사/다운로드 -->
@@ -8327,6 +8365,13 @@ function selectTrend(el) {
   
   // Step 5: 전체 콘텐츠 일괄 생성 (제목-질문-키워드-답변-댓글 동기화)
   generateFullContent();
+  
+  // Step 6: V2026.37.103 - 생성 버튼 영역으로 자동 스크롤 + 안내 토스트
+  const searchBox = document.getElementById('searchBox');
+  if (searchBox) {
+    searchBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  showCopyToast('✨ "' + keyword + '" Q&A 생성이 시작됩니다! 아래 결과를 확인하세요');
 }
 
 // 저장된 결과 데이터 (탭 전환용)
@@ -9573,6 +9618,10 @@ function renderInsuranceQAResults(data) {
   const resultSection = document.getElementById('resultSection');
   if (!resultSection) return;
   
+  // V2026.37.103 - 일반 모드 결과 섹션 숨김 (보험 Q&A에서는 불필요)
+  const normalSections = document.getElementById('normalResultSections');
+  if (normalSections) normalSections.style.display = 'none';
+  
   let html = '';
   
   // 1. 보험 상품 분석 결과 (설계서 OCR 결과)
@@ -9626,9 +9675,12 @@ function renderInsuranceQAResults(data) {
     html += '<div class="section-content">';
     html += '<div class="item-card" style="border-left:4px solid var(--primary)">';
     
-    // 제목
-    html += '<div style="font-size:18px;font-weight:700;margin-bottom:16px;color:var(--primary)">';
-    html += '📌 ' + (data.qa.title || '보험 상품 문의');
+    // 제목 (V2026.37.103 - 제목 강조 강화: 큰 글씨 + 배경 + 아이콘 + 라벨)
+    html += '<div style="margin-bottom:20px">';
+    html += '<div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px">📌 제목</div>';
+    html += '<div style="font-size:22px;font-weight:800;color:#fff;padding:16px 20px;background:linear-gradient(135deg,rgba(79,140,255,0.2),rgba(124,92,255,0.15));border-radius:12px;border-left:5px solid var(--primary);line-height:1.4">';
+    html += (data.qa.title || '보험 상품 문의');
+    html += '</div>';
     html += '</div>';
     
     // 본문
@@ -9728,6 +9780,12 @@ function renderInsuranceQAResults(data) {
     html += '</div></div></div>';
   }
   
+  // 6. 전체 복사 + TXT 다운로드 버튼 (V2026.37.103)
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px">';
+  html += '<button class="copy-all-btn" onclick="copyInsuranceAll()" style="flex:1;min-width:150px;"><i class="fas fa-copy"></i> 전체 복사 (질문+답변+댓글)</button>';
+  html += '<button class="copy-all-btn" onclick="downloadInsuranceAsTxt()" style="flex:1;min-width:150px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);"><i class="fas fa-file-download"></i> TXT 다운로드</button>';
+  html += '</div>';
+  
   // 결과 삽입
   const existingContent = resultSection.querySelector('.insurance-qa-results');
   if (existingContent) {
@@ -9783,6 +9841,86 @@ function copyInsuranceHashtags() {
   navigator.clipboard.writeText(data.hashtags.join(' ')).then(() => {
     showCopyToast('해시태그 복사 완료!');
   });
+}
+
+// ✅ V2026.37.103 - 보험 Q&A 전체 복사 (질문+답변+댓글+해시태그)
+function copyInsuranceAll() {
+  const data = window.insuranceQAData;
+  if (!data) return;
+  
+  let text = '';
+  if (data.qa) {
+    text += '[제목]\\n' + (data.qa.title || '') + '\\n\\n';
+    text += '[질문글]\\n' + (data.qa.content || '') + '\\n\\n';
+  }
+  if (data.expert_answer) {
+    text += '[전문가 답변]\\n' + data.expert_answer + '\\n\\n';
+  }
+  if (data.comments?.length) {
+    text += '[댓글]\\n';
+    data.comments.forEach((c, i) => {
+      text += (c.nickname || '회원' + (i+1)) + ': ' + (c.text || '') + '\\n';
+    });
+    text += '\\n';
+  }
+  if (data.hashtags?.length) {
+    text += '[해시태그]\\n' + data.hashtags.join(' ') + '\\n';
+  }
+  
+  navigator.clipboard.writeText(text).then(() => {
+    showCopyToast('전체 복사 완료! (질문+답변+댓글+해시태그)');
+  });
+}
+
+// ✅ V2026.37.103 - 보험 Q&A TXT 다운로드
+function downloadInsuranceAsTxt() {
+  const data = window.insuranceQAData;
+  if (!data) { alert('다운로드할 데이터가 없습니다.'); return; }
+  
+  const now = new Date();
+  const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  
+  let text = '═══════════════════════════════════════\\n';
+  text += '  XIVIX 2026 PRO - 보험 Q&A 결과\\n';
+  text += '  생성일시: ' + dateStr + ' ' + timeStr + '\\n';
+  text += '═══════════════════════════════════════\\n\\n';
+  
+  if (data.analysis) {
+    text += '【보험 상품 분석】\\n';
+    const a = data.analysis;
+    if (a.company) text += '보험사: ' + a.company + '\\n';
+    if (a.product_name) text += '상품명: ' + a.product_name + '\\n';
+    if (a.premium) text += '보험료: ' + a.premium + '\\n';
+    text += '\\n';
+  }
+  
+  if (data.qa) {
+    text += '【제목】\\n' + (data.qa.title || '') + '\\n\\n';
+    text += '【질문글】\\n' + (data.qa.content || '') + '\\n\\n';
+  }
+  if (data.expert_answer) {
+    text += '【전문가 답변】\\n' + data.expert_answer + '\\n\\n';
+  }
+  if (data.comments?.length) {
+    text += '【댓글】\\n';
+    data.comments.forEach((c, i) => {
+      text += (c.nickname || '회원' + (i+1)) + ': ' + (c.text || '') + '\\n';
+    });
+    text += '\\n';
+  }
+  if (data.hashtags?.length) {
+    text += '【해시태그】\\n' + data.hashtags.join(' ') + '\\n';
+  }
+  
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'XIVIX_보험QA_' + dateStr + '.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+  showCopyToast('TXT 파일 다운로드 완료!');
 }
 
 function showCopyToast(msg) {
