@@ -3753,13 +3753,13 @@ app.post('/api/generate/news-qa', async (c) => {
       
       let stepMsg = ''
       if (useCache) {
-        stepMsg = '✅ 선택한 질문으로 Q&A 콘텐츠 생성 시작... (GPT-4o)'
+        stepMsg = '✅ 선택한 질문으로 Q&A 콘텐츠 생성 시작... (AI생성)'
       } else if (hasBoth) {
-        stepMsg = '📊 텍스트 질문 + 이미지 OCR 통합 분석 중... (GPT-4o)'
+        stepMsg = '📊 텍스트 질문 + 이미지 OCR 통합 분석 중... (AI생성)'
       } else if (hasOnlyText) {
-        stepMsg = '📊 보험 설계서 텍스트 정밀 분석 중... (GPT-4o)'
+        stepMsg = '📊 보험 설계서 텍스트 정밀 분석 중... (AI생성)'
       } else {
-        stepMsg = '📊 보험 설계서 이미지 OCR 분석 중... (GPT-4o)'
+        stepMsg = '📊 보험 설계서 이미지 OCR 분석 중... (AI생성)'
       }
       await stream.write(JSON.stringify({ type: 'step', step: 1, msg: stepMsg }) + '\n')
       
@@ -7450,7 +7450,7 @@ body{
             <i class="fas fa-gem"></i> Gemini
           </button>
           <button class="model-btn" data-model="gpt" onclick="selectAIModel('gpt')">
-            <i class="fas fa-robot"></i> GPT-4o
+            <i class="fas fa-robot"></i> AI생성
           </button>
         </div>
         <span class="model-hint" id="modelHint">💎 감성적 · 창의적</span>
@@ -7469,7 +7469,7 @@ body{
         <div class="news-guide-icon"><i class="fas fa-file-medical-alt" style="color:#10b981"></i></div>
         <div class="news-guide-text">
           <strong>보험 설계서/증권 이미지를 업로드하거나, 핵심 내용을 직접 입력하세요</strong>
-          <p>GPT-4o가 설계서를 정밀 분석하여 네이버 카페 최적화 Q&A 콘텐츠를 자동 생성합니다</p>
+          <p>AI가 설계서를 정밀 분석하여 네이버 카페 최적화 Q&A 콘텐츠를 자동 생성합니다</p>
           <ul>
             <li>📋 설계서 OCR: 환급률·보험료·보장내용 자동 추출</li>
             <li>❓ 초보자 질문글 + 전문가 답변 자동 생성</li>
@@ -7492,7 +7492,7 @@ body{
       <div class="search-footer">
         <span class="char-count"><span id="char">0</span>/500</span>
         <button id="btn" class="search-btn" onclick="goGenerate()">
-          <span class="btn-text"><i class="fas fa-file-medical-alt"></i> \ubcf4\ud5d8 \uc124\uacc4\uc11c Q&A \uc0dd\uc131 (GPT-4o) <i class="fas fa-arrow-right" style="margin-left:4px;animation:arrowBounce 1.5s ease-in-out infinite"></i></span>
+          <span class="btn-text"><i class="fas fa-file-medical-alt"></i> \ubcf4\ud5d8 \uc124\uacc4\uc11c Q&A \uc0dd\uc131 (AI\uc0dd\uc131) <i class="fas fa-arrow-right" style="margin-left:4px;animation:arrowBounce 1.5s ease-in-out infinite"></i></span>
           <div class="spinner"></div>
         </button>
       </div>
@@ -9983,7 +9983,7 @@ async function goGenerateNewsQA() {
     if (hasImage) {
       progressFill.style.width = '15%';
       progressPct.textContent = '15%';
-      progressText.innerHTML = '<i class="fas fa-search"></i> 📊 설계서 분석 + 초보자 질문 10가지 생성 중... (GPT-4o)';
+      progressText.innerHTML = '<i class="fas fa-search"></i> 📊 설계서 분석 + 초보자 질문 10가지 생성 중... (AI생성)';
       
       // Step 1: 질문 리스트 생성 API 호출
       const qRes = await fetch('/api/generate/questions', {
@@ -10017,7 +10017,7 @@ async function goGenerateNewsQA() {
       
       progressFill.style.width = '50%';
       progressPct.textContent = '50%';
-      progressText.innerHTML = '<i class="fas fa-robot"></i> 🚀 선택한 질문으로 Q&A 콘텐츠 생성 중... (GPT-4o)';
+      progressText.innerHTML = '<i class="fas fa-robot"></i> 🚀 선택한 질문으로 Q&A 콘텐츠 생성 중... (AI생성)';
       
       // Step 3: 선택된 질문으로 Q&A 생성
       const qaRequestData = {
@@ -10041,7 +10041,7 @@ async function goGenerateNewsQA() {
       // 텍스트만 있는 경우 - 기존 방식 (바로 Q&A 생성)
       progressFill.style.width = '10%';
       progressPct.textContent = '10%';
-      progressText.innerHTML = '<i class="fas fa-file-alt"></i> GPT-4o 설계서 텍스트 분석 중...';
+      progressText.innerHTML = '<i class="fas fa-file-alt"></i> AI 설계서 텍스트 분석 중...';
       
       const res = await fetch('/api/generate/news-qa', {
         method: 'POST',
@@ -10095,7 +10095,7 @@ async function processNewsQAStream(res, progressFill, progressPct, progressText)
           case 'complete':
             progressFill.style.width = '100%';
             progressPct.textContent = '100%';
-            progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ 보험 Q&A 생성 완료! (GPT-4o)';
+            progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ 보험 Q&A 생성 완료! (AI생성)';
             renderInsuranceQAResults(event.data);
             break;
           case 'error':
@@ -10186,7 +10186,7 @@ function renderInsuranceQAResults(data) {
   if (data.analysis) {
     const a = data.analysis;
     html += '<div class="sequential-section show">';
-    html += '<div class="section-header"><i class="fas fa-file-medical-alt"></i> 📊 보험 상품 분석 (GPT-4o)</div>';
+    html += '<div class="section-header"><i class="fas fa-file-medical-alt"></i> 📊 보험 상품 분석 (AI생성)</div>';
     html += '<div class="section-content">';
     html += '<div class="item-card" style="background:linear-gradient(135deg, rgba(79,140,255,0.1), rgba(124,92,255,0.1))">';
     
