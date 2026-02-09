@@ -3728,8 +3728,8 @@ app.post('/api/generate/news-qa', async (c) => {
     imageArray = [{ base64: image, mimeType: body.mimeType || 'image/jpeg' }]
   }
   
-  // 텍스트 또는 이미지 중 하나는 필수
-  if (imageArray.length === 0 && !newsText.trim()) {
+  // V2026.37.109 - selectedQuestion + analysisCache 모드에서는 이미지/텍스트 없이도 진행 가능
+  if (imageArray.length === 0 && !newsText.trim() && !selectedQuestion.trim() && !analysisCache) {
     return c.json({ success: false, error: '보험 설계서 이미지 또는 텍스트를 입력해주세요.' }, 400)
   }
   
