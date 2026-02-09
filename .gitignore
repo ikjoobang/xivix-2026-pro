@@ -42,3 +42,8 @@ pids/
 *.bak
 *.tar.gz
 *.zip
+
+# Voice files
+voice_message.*
+voice_chunks/
+voice_small/
