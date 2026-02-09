@@ -3503,20 +3503,72 @@ app.post('/api/generate/questions', async (c) => {
     let analysisPrompt = ''
     if (hasBoth) {
       analysisPrompt = `[시스템 역할] 보험 설계서 OCR + 사용자 질문 분석 전문 시스템
-[사용자 입력 텍스트] ${newsText}
-[지침] 이미지에서 OCR로 보험 데이터를 추출하고, 사용자 텍스트를 user_concern에 반영.
-JSON만 응답: {"company":"","product_name":"","product_type":"","insured_age":"","insured_gender":"","payment_period":"","coverage_period":"","monthly_premium":"","total_premium":"","surrender_values":[],"interest_rate":"","key_benefits":[],"special_notes":"","user_concern":"${newsText}"}`
+
+[사용자 질문] ${newsText}
+
+🚨🚨🚨 [OCR 핵심 규칙 - 위반 시 전체 무효] 🚨🚨🚨
+1. "보험가입금액" 컬럼의 금액을 정확히 읽을 것! 
+   - 2,000만원과 200만원은 완전히 다릅니다! 쉼표(,) 유무를 정확히 확인!
+   - "2,000 만원" = 2천만원, "200 만원" = 2백만원 → 10배 차이!
+2. 이미지에 인쇄된 숫자/텍스트를 있는 그대로 읽을 것
+3. 상품명·회사명: 이미지에서 보이지 않으면 빈 문자열("") 반환! 절대 추측 금지!
+4. key_benefits: 모든 담보명 + 정확한 금액을 괄호로 표기
+   - 예: ["고액치료비암진단비(2,000만원)", "혈전용해치료비(200만원)", "뇌혈관질환진단비(2,000만원)"]
+
+JSON만 응답:
+{
+  "company": "",
+  "product_name": "",
+  "product_type": "담보 기반 판별: 진단비/수술비 → 건강보험, 연금/적립 → 연금보험",
+  "insured_age": "",
+  "insured_gender": "",
+  "payment_period": "",
+  "coverage_period": "",
+  "monthly_premium": "",
+  "total_premium": "",
+  "surrender_values": [],
+  "interest_rate": "",
+  "key_benefits": [{"benefit_name":"담보명 이미지 그대로","coverage_amount":"금액 이미지 그대로(쉼표 포함)"}],
+  "special_notes": "",
+  "user_concern": "${newsText}"
+}`
     } else if (hasOnlyText) {
       analysisPrompt = `[시스템 역할] 보험 텍스트에서 상품 정보를 추출하는 전문 시스템.
 [분석 대상] ${newsText}
 JSON만 응답: {"company":"","product_name":"","product_type":"","insured_age":"","insured_gender":"","payment_period":"","coverage_period":"","monthly_premium":"","total_premium":"","surrender_values":[],"interest_rate":"","key_benefits":[],"special_notes":"","user_concern":""}`
     } else {
-      analysisPrompt = `[시스템 역할] 보험 설계서 이미지 OCR 전문 시스템. 이미지에 인쇄된 텍스트/숫자를 있는 그대로 읽어 JSON 출력.
-■ 상품명·회사명: 이미지 그대로 (변경 금지), 숫자: 1원·0.1% 단위까지 정확히
-■ 없는 정보: 빈 문자열("") 반환
+      analysisPrompt = `[시스템 역할] 보험 설계서 이미지 OCR 전문 시스템.
+
+🚨🚨🚨 [금액 정확도 - 최우선 규칙] 🚨🚨🚨
+■ "보험가입금액" 컬럼의 숫자를 정확히 읽을 것!
+■ 2,000만원(2천만원)과 200만원(2백만원)은 완전히 다릅니다!
+■ 쉼표(,)가 있는지 반드시 확인! "2,000" ≠ "200"
+■ 각 담보별 금액을 개별적으로 정확히 확인!
+
+[OCR 규칙]
+■ 이미지에 인쇄된 텍스트/숫자를 있는 그대로 읽기
+■ 상품명·회사명: 이미지 그대로 (보이지 않으면 빈 문자열)
 ■ 해약환급금 테이블: 가능한 모든 행 추출
-■ 특약/담보 목록: 보이는 모든 특약명을 key_benefits에 정확히 기재
-JSON만 응답: {"company":"","product_name":"","product_type":"","insured_age":"","insured_gender":"","payment_period":"","coverage_period":"","monthly_premium":"","total_premium":"","surrender_values":[],"interest_rate":"","key_benefits":[],"special_notes":"","user_concern":""}`
+■ 담보/특약: 보이는 모든 담보명 + 정확한 금액을 key_benefits에 기재
+■ 빨간 박스/강조 담보는 "★" 표시하여 맨 앞 배치
+
+JSON만 응답:
+{
+  "company": "이미지에서 확인, 안 보이면 빈 문자열",
+  "product_name": "이미지에서 확인, 안 보이면 빈 문자열",
+  "product_type": "담보 기반 판별: 진단비/수술비 → 건강보험, 연금/적립 → 연금보험",
+  "insured_age": "",
+  "insured_gender": "",
+  "payment_period": "",
+  "coverage_period": "",
+  "monthly_premium": "",
+  "total_premium": "",
+  "surrender_values": [],
+  "interest_rate": "",
+  "key_benefits": [{"benefit_name":"담보명 이미지 그대로","coverage_amount":"금액 이미지 그대로(쉼표 포함)"}],
+  "special_notes": "빨간 박스 항목 등",
+  "user_concern": ""
+}`
     }
     
     const contentParts: any[] = [{ type: 'text', text: analysisPrompt }]
@@ -3750,6 +3802,7 @@ ${newsText}
 
 ■ OCR 규칙:
 - 이미지에 인쇄된 숫자/텍스트를 있는 그대로 읽을 것
+- 🚨🚨🚨 "보험가입금액" 컬럼의 금액을 정확히! 2,000만원(2천만원)과 200만원(2백만원)은 10배 차이! 쉼표(,) 확인 필수!
 - 상품명·회사명: 이미지 표기 그대로 (한 글자도 변경 금지)
 - 🚨 이미지에서 회사명/상품명이 안 보이면 → 빈 문자열("") 반환! 절대 추측·생성 금지!
 - 정보 없으면 빈 문자열("") 반환
@@ -3839,6 +3892,9 @@ ${newsText ? '[사용자 추가 입력 텍스트]\\n' + newsText + '\\n\\n' : ''
    - 보이는 텍스트가 확실할 때만 기재
 
 3. 숫자 정확도: 이미지에 인쇄된 숫자를 1원·0.1% 단위까지 정확히 읽을 것
+   - 🚨🚨🚨 "보험가입금액" 컬럼 최우선! 2,000만원(2천만원)과 200만원(2백만원)은 10배 차이!
+   - 쉼표(,)가 있는지 반드시 확인! "2,000" ≠ "200"
+   - 각 담보별 금액을 개별적으로 하나씩 정확히 읽을 것!
    - 해약환급금 테이블: 모든 경과년수 행(行)을 빠짐없이 추출
    - 금액 단위: 이미지 표기 그대로 (만원 단위면 "763만원", 원 단위면 "7,630,000원")
    - 환급률: 소수점 첫째자리까지 (예: "42.4%", "130.0%")
