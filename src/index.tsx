@@ -3467,8 +3467,188 @@ app.post('/api/xiim/openai/generate', async (c) => {
 });
 
 // ============================================
+// ============================================
+// V2026.37.105 - 10가지 초보자 질문 생성 API (CEO 핵심 지시)
+// CEO 지시: "프로그램이 전문가로 세팅되어있으면 안 돼! 초보자가 질문을 던지고 전문가가 답변!"
+// "GPT가 10가지에 대한 질문을 풀어서 나온다고 하면 선택을 해라 → 선택하면 다시 출력"
+// 흐름: 이미지 업로드 → OCR 분석 → 10가지 초보자 질문 리스트 → 사용자 선택 → Q&A 생성
+// ============================================
+app.post('/api/generate/questions', async (c) => {
+  const body = await c.req.json()
+  const images = body.images || []
+  const image = body.image || null
+  const newsText = body.newsText || ''
+  
+  let imageArray: Array<{base64: string, mimeType: string}> = []
+  if (images.length > 0) {
+    imageArray = images.slice(0, 10)
+  } else if (image) {
+    imageArray = [{ base64: image, mimeType: body.mimeType || 'image/jpeg' }]
+  }
+  
+  if (imageArray.length === 0 && !newsText.trim()) {
+    return c.json({ success: false, error: '보험 설계서 이미지 또는 텍스트를 입력해주세요.' }, 400)
+  }
+  
+  const openaiKey = c.env.OPENAI_API_KEY || ''
+  if (!openaiKey) {
+    return c.json({ success: false, error: 'OpenAI API 키가 설정되지 않았습니다.' }, 500)
+  }
+  
+  try {
+    // Step 1: OCR/텍스트 분석으로 설계서 데이터 추출
+    const hasBoth = newsText.trim() && imageArray.length > 0
+    const hasOnlyText = newsText.trim() && imageArray.length === 0
+    
+    let analysisPrompt = ''
+    if (hasBoth) {
+      analysisPrompt = `[시스템 역할] 보험 설계서 OCR + 사용자 질문 분석 전문 시스템
+[사용자 입력 텍스트] ${newsText}
+[지침] 이미지에서 OCR로 보험 데이터를 추출하고, 사용자 텍스트를 user_concern에 반영.
+JSON만 응답: {"company":"","product_name":"","product_type":"","insured_age":"","insured_gender":"","payment_period":"","coverage_period":"","monthly_premium":"","total_premium":"","surrender_values":[],"interest_rate":"","key_benefits":[],"special_notes":"","user_concern":"${newsText}"}`
+    } else if (hasOnlyText) {
+      analysisPrompt = `[시스템 역할] 보험 텍스트에서 상품 정보를 추출하는 전문 시스템.
+[분석 대상] ${newsText}
+JSON만 응답: {"company":"","product_name":"","product_type":"","insured_age":"","insured_gender":"","payment_period":"","coverage_period":"","monthly_premium":"","total_premium":"","surrender_values":[],"interest_rate":"","key_benefits":[],"special_notes":"","user_concern":""}`
+    } else {
+      analysisPrompt = `[시스템 역할] 보험 설계서 이미지 OCR 전문 시스템. 이미지에 인쇄된 텍스트/숫자를 있는 그대로 읽어 JSON 출력.
+■ 상품명·회사명: 이미지 그대로 (변경 금지), 숫자: 1원·0.1% 단위까지 정확히
+■ 없는 정보: 빈 문자열("") 반환
+■ 해약환급금 테이블: 가능한 모든 행 추출
+■ 특약/담보 목록: 보이는 모든 특약명을 key_benefits에 정확히 기재
+JSON만 응답: {"company":"","product_name":"","product_type":"","insured_age":"","insured_gender":"","payment_period":"","coverage_period":"","monthly_premium":"","total_premium":"","surrender_values":[],"interest_rate":"","key_benefits":[],"special_notes":"","user_concern":""}`
+    }
+    
+    const contentParts: any[] = [{ type: 'text', text: analysisPrompt }]
+    for (const img of imageArray) {
+      contentParts.push({
+        type: 'image_url',
+        image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: 'high' }
+      })
+    }
+    
+    const analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: hasOnlyText 
+          ? [{ role: 'user', content: analysisPrompt }]
+          : [{ role: 'user', content: contentParts }],
+        max_tokens: 4096,
+        temperature: 0.2
+      })
+    })
+    
+    let analysisData: any = {}
+    if (analysisResponse.ok) {
+      const json = await analysisResponse.json() as any
+      const rawText = json.choices?.[0]?.message?.content || ''
+      try {
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/)
+        if (jsonMatch) analysisData = JSON.parse(jsonMatch[0])
+      } catch (e) {
+        analysisData = { raw_text: rawText }
+      }
+    } else {
+      throw new Error('GPT-4o OCR 분석 실패')
+    }
+    
+    // Step 2: 초보자 관점 10가지 질문 생성
+    const productName = analysisData.product_name || '보험상품'
+    const company = analysisData.company || '보험사'
+    const benefits = (analysisData.key_benefits || []).join(', ')
+    
+    const questionsPrompt = `[🔒 핵심 역할]
+당신은 보험에 대해 아무것도 모르는 "진짜 초보자"입니다.
+설계사한테 설계서를 받았는데, 용어도 모르고 뭐가 뭔지 하나도 모릅니다.
+카페에 올려서 물어보려고 합니다.
+
+[설계서에서 추출한 정보]
+• 보험회사: ${company}
+• 상품명: ${productName}
+• 상품종류: ${analysisData.product_type || '보험'}
+• 피보험자: ${analysisData.insured_age || '?'}세 ${analysisData.insured_gender || ''}
+• 납입기간: ${analysisData.payment_period || '?'}년
+• 월보험료: ${analysisData.monthly_premium || '?'}
+• 총납입: ${analysisData.total_premium || '?'}
+• 해약환급금: ${(analysisData.surrender_values || []).map((sv: any) => sv.year + '년: ' + sv.amount + ' (' + sv.rate + ')').join(', ') || '?'}
+• 특약/담보: ${benefits || '확인 필요'}
+• 공시이율: ${analysisData.interest_rate || '?'}
+
+${newsText ? `[사용자가 추가로 적은 텍스트 (힌트)]
+"${newsText}"
+→ 이 힌트를 반영한 질문을 우선 배치!
+` : ''}
+
+[🔴🔴🔴 절대 규칙 - 초보자 질문 스타일]
+1. 전문 용어를 모르는 사람이 물어보는 것처럼! 
+   - ❌ "119대 특약의 보장범위는?" (전문가 질문)
+   - ✅ "여기 특약이라고 되어있는데 이게 뭐예요? 꼭 필요한 건가요?" (초보자 질문)
+2. "~인데요", "~거든요", "~모르겠어요", "~뭐예요?" 같은 구어체 사용
+3. 설계서에서 실제로 보이는 특약명/담보명/숫자를 구체적으로 언급
+4. 너무 엉뚱하면 안 됨 → 설계서에서 볼 수 있는 내용 범위 내에서 질문
+5. 하나의 질문이 카페 게시글 제목이 될 수 있는 수준의 구체성
+
+[질문 카테고리 반드시 포함]
+- 2~3개: 특약/담보 관련 ("이 특약이 뭐예요?", "이거 빼면 보험료 줄어요?")
+- 2~3개: 보험료/환급금 관련 ("이 금액이 적은 건가요?", "중간에 해지하면 손해예요?")
+- 1~2개: 비교 질문 ("적금이랑 비교하면 어떤가요?", "다른 보험사꺼는 어때요?")
+- 1~2개: 가입 판단 ("이 나이에 이 보험 가입해도 되나요?", "이거 가입해야 하나요?")
+- 1개: 사용자 힌트 텍스트 반영 질문 (힌트가 있을 경우)
+
+JSON만 응답:
+{
+  "questions": [
+    {"id": 1, "text": "초보자 질문 텍스트", "category": "특약", "related_data": "관련 설계서 데이터"},
+    {"id": 2, "text": "...", "category": "보험료", "related_data": "..."}
+  ]
+}
+
+10개 정확히 생성하세요.`
+
+    const questionsResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: '당신은 보험을 처음 접하는 진짜 초보자입니다. 전문 용어를 모르고 카페에서 물어보듯이 질문합니다. 절대 전문가처럼 말하지 마세요!' },
+          { role: 'user', content: questionsPrompt }
+        ],
+        max_tokens: 2000,
+        temperature: 0.8
+      })
+    })
+    
+    let questionsData: any = { questions: [] }
+    if (questionsResponse.ok) {
+      const json = await questionsResponse.json() as any
+      const rawText = json.choices?.[0]?.message?.content || ''
+      try {
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/)
+        if (jsonMatch) questionsData = JSON.parse(jsonMatch[0])
+      } catch (e) {
+        console.error('[XIVIX] 질문 생성 JSON 파싱 실패')
+      }
+    }
+    
+    return c.json({
+      success: true,
+      analysis: analysisData,
+      questions: questionsData.questions || [],
+      version: 'V2026.37.105'
+    })
+    
+  } catch (error: any) {
+    console.error('[XIVIX] 질문 생성 실패:', error)
+    return c.json({ success: false, error: error.message || '질문 생성 실패' }, 500)
+  }
+})
+
 // V2026.37.98 - 보험 설계서 분석 → Q&A 콘텐츠 생성 API (GPT-4o)
 // CEO 지시: 텍스트 + 이미지(1~10장) 함께 분석하여 정확한 보험 Q&A 생성
+// V2026.37.105 - 선택된 질문으로 Q&A 생성 (10가지 질문 중 선택)
 // 결과: 제목 + 질문 1개 + 답변 1개 + 댓글 3개 + 해시태그
 // ============================================
 app.post('/api/generate/news-qa', async (c) => {
@@ -3476,6 +3656,9 @@ app.post('/api/generate/news-qa', async (c) => {
   const images = body.images || [] // 이미지 배열 (1~10장)
   const image = body.image || null // 단일 이미지 (하위 호환)
   const newsText = body.newsText || ''
+  // V2026.37.105 - 10가지 질문에서 선택된 질문 (선택 모드)
+  const selectedQuestion = body.selectedQuestion || '' // 사용자가 선택한 질문 텍스트
+  const analysisCache = body.analysisCache || null // 이미 분석된 OCR 데이터 (재분석 방지)
   
   // 단일 이미지를 배열로 변환 (하위 호환)
   let imageArray: Array<{base64: string, mimeType: string}> = []
@@ -3497,13 +3680,21 @@ app.post('/api/generate/news-qa', async (c) => {
   
   return streamText(c, async (stream) => {
     try {
+      // V2026.37.105 - selectedQuestion이 있으면 "질문 선택 모드" (10가지 중 선택됨)
+      const effectiveQuestion = selectedQuestion || newsText
+      
       // V2026.37.104 - 3가지 모드 분기: 텍스트전용 / 이미지전용 / 텍스트+이미지 동시
-      const hasOnlyText = newsText.trim() && imageArray.length === 0
-      const hasOnlyImage = !newsText.trim() && imageArray.length > 0
-      const hasBoth = newsText.trim() && imageArray.length > 0
+      const hasOnlyText = effectiveQuestion.trim() && imageArray.length === 0 && !analysisCache
+      const hasOnlyImage = !effectiveQuestion.trim() && imageArray.length > 0 && !analysisCache
+      const hasBoth = effectiveQuestion.trim() && imageArray.length > 0 && !analysisCache
+      
+      // V2026.37.105 - analysisCache가 있으면 OCR 재분석 불필요
+      const useCache = !!analysisCache
       
       let stepMsg = ''
-      if (hasBoth) {
+      if (useCache) {
+        stepMsg = '✅ 선택한 질문으로 Q&A 콘텐츠 생성 시작... (GPT-4o)'
+      } else if (hasBoth) {
         stepMsg = '📊 텍스트 질문 + 이미지 OCR 통합 분석 중... (GPT-4o)'
       } else if (hasOnlyText) {
         stepMsg = '📊 보험 설계서 텍스트 정밀 분석 중... (GPT-4o)'
@@ -3514,7 +3705,15 @@ app.post('/api/generate/news-qa', async (c) => {
       
       // ============================================
       // Step 1: GPT-4o로 이미지 + 텍스트 통합 분석
+      // V2026.37.105 - analysisCache가 있으면 OCR 재분석 스킵!
       // ============================================
+      let analysisData: any = {}
+      
+      if (useCache) {
+        // 🚀 10가지 질문 선택 모드: 이미 분석된 데이터 재사용
+        analysisData = analysisCache
+        console.log('[XIVIX] V2026.37.105 분석 캐시 사용:', analysisData.product_name)
+      } else {
       const contentParts: any[] = []
       
       // V2026.37.104 - 3가지 모드 분기: 텍스트전용 / 이미지전용 / 텍스트+이미지 동시
@@ -3717,7 +3916,7 @@ JSON 형식으로만 응답 (마크다운 블록·설명 없이 순수 JSON만):
         })
       }
       
-      let analysisData: any = {}
+      // V2026.37.105 - analysisData를 새로 분석하는 경우 (캐시 없을 때)
       if (analysisResponse.ok) {
         const json = await analysisResponse.json() as any
         const rawText = json.choices?.[0]?.message?.content || ''
@@ -3736,6 +3935,7 @@ JSON 형식으로만 응답 (마크다운 블록·설명 없이 순수 JSON만):
         console.error('[XIVIX] GPT-4o 분석 실패:', errorText)
         throw new Error('GPT-4o 분석 실패')
       }
+      } // V2026.37.105 - useCache else 블록 끝
       
       await stream.write(JSON.stringify({ 
         type: 'analysis', 
@@ -3863,12 +4063,13 @@ JSON 형식으로만 응답 (마크다운 블록·설명 없이 순수 JSON만):
 [당신의 역할]
 당신은 "${writer.who}"로, ${writer.why} 때문에 보험을 알아보다가 설계사를 통해 설계서를 받고 네이버 보험 카페에 질문을 올리는 사람입니다.
 
-${newsText ? `[🔴 사용자 원문 질문 - 반드시 이 질문이 제목+본문의 핵심이 되어야 함!]
-"${newsText}"
-→ 이 질문/요구사항을 제목과 본문에 직접 반영하세요! 이것이 글의 출발점입니다!
+${effectiveQuestion ? `[🔴 사용자 질문 / 선택된 질문 - 반드시 이 질문이 제목+본문의 핵심이 되어야 함!]
+"${effectiveQuestion}"
+→ 이 질문을 제목과 본문에 직접 반영하세요! 이것이 글의 출발점입니다!
+${selectedQuestion ? '(사용자가 10가지 질문 중 선택한 초보자 질문입니다. 초보자 어투를 유지하세요!)' : ''}
 
 ` : ''}[사용자 원문 맥락 - 반드시 제목+본문에 반영]
-"${analysisData.user_concern || newsText || writer.why}"
+"${analysisData.user_concern || effectiveQuestion || writer.why}"
 
 [🚨 설계서 팩트 데이터 - 이 데이터만 사용! 1글자도 바꾸지 마세요!]
 • 보험회사: ${company} ← 이 회사명 그대로 사용!
@@ -4012,9 +4213,10 @@ JSON:
 
 [원글 제목] ${qaData.title || '보험 상품 문의'}
 
-${newsText ? `[🔴 사용자 원문 질문 - 이 질문에 직접 답변해야 함!]
-"${newsText}"
+${effectiveQuestion ? `[🔴 사용자 질문 / 선택된 질문 - 이 질문에 직접 답변해야 함!]
+"${effectiveQuestion}"
 → 전문가 답변은 반드시 이 질문에 대한 직접적인 답변으로 시작!
+${selectedQuestion ? '(초보자가 올린 질문입니다. 초보자도 이해할 수 있게 쉽게 답변하되, 전문성을 보여주세요!)' : ''}
 
 ` : ''}[설계서 데이터]
 • 상품: ${company} ${productName} (${analysisData.product_type || '보험상품'})
@@ -9551,7 +9753,7 @@ async function goGenerateNewsQA() {
   
   btn.disabled = true;
   btn.classList.add('loading');
-  // V2026.37.104 - 인라인 display:none 제거 (CSS .show 클래스보다 우선하므로 결과 안 보이는 버그 수정)
+  // V2026.37.104 - 인라인 display:none 제거
   if (resultSection) {
     resultSection.style.display = '';
     resultSection.classList.add('show');
@@ -9559,108 +9761,100 @@ async function goGenerateNewsQA() {
   progressBox.style.display = 'block';
   
   try {
-    // V2026.37.99 - 요청 데이터 구성 (다중 이미지 지원)
+    // 요청 데이터 구성
     const requestData = {};
+    if (hasText) requestData.newsText = newsText;
     
-    // 텍스트+이미지 함께 전송 (GPT-4o에서 통합 분석)
-    if (hasText) {
-      requestData.newsText = newsText;
-    }
-    
-    // V2026.37.99 - 이미지 다중 업로드 (1~10장)
     if (hasImage) {
-      // 텍스트+이미지 함께 있으면 안내 메시지 표시
-      if (hasText) {
-        const noticeToast = document.createElement('div');
-        noticeToast.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg, #4f8cff, #7c5cff);color:white;padding:16px 24px;border-radius:12px;z-index:99999;font-size:14px;max-width:90%;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
-        noticeToast.innerHTML = '<i class="fas fa-info-circle" style="margin-right:8px"></i>텍스트와 이미지를 함께 분석합니다! (GPT-4o)';
-        document.body.appendChild(noticeToast);
-        setTimeout(() => noticeToast.remove(), 4000);
-      }
-      
-      // 이미지 배열로 변환 (최대 10장)
       const imagesToSend = uploadedFiles.slice(0, 10).map(f => ({
         base64: f.base64,
         mimeType: f.type
       }));
       requestData.images = imagesToSend;
-      
-      // 하위 호환성을 위해 단일 이미지도 전송
       if (uploadedFiles.length === 1) {
         requestData.image = uploadedFiles[0].base64;
         requestData.mimeType = uploadedFiles[0].type;
       }
     }
     
-    progressFill.style.width = '10%';
-    progressPct.textContent = '10%';
-    
-    // V2026.37.99 - 입력 모드에 따른 메시지
     const imageCount = hasImage ? uploadedFiles.length : 0;
-    if (hasText && hasImage) {
-      progressText.innerHTML = '<i class="fas fa-robot"></i> GPT-4o 통합 분석 중... (텍스트 + 이미지 ' + imageCount + '장)';
-    } else if (hasImage) {
-      progressText.innerHTML = '<i class="fas fa-file-image"></i> GPT-4o 보험 설계서 분석 중... (이미지 ' + imageCount + '장)';
-    } else {
-      progressText.innerHTML = '<i class="fas fa-file-alt"></i> GPT-4o 설계서 텍스트 분석 중...';
-    }
     
-    const res = await fetch('/api/generate/news-qa', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestData)
-    });
-    
-    if (!res.ok || !res.body) {
-      throw new Error('API 오류');
-    }
-    
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let analysisData = null;
-    
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    // ============================================
+    // V2026.37.105 - 10가지 질문 선택 모드
+    // CEO 지시: "이미지 올리면 10가지 질문 리스트 → 선택 → Q&A 생성"
+    // ============================================
+    if (hasImage) {
+      progressFill.style.width = '15%';
+      progressPct.textContent = '15%';
+      progressText.innerHTML = '<i class="fas fa-search"></i> 📊 설계서 분석 + 초보자 질문 10가지 생성 중... (GPT-4o)';
       
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split(String.fromCharCode(10));
-      buffer = lines.pop() || '';
+      // Step 1: 질문 리스트 생성 API 호출
+      const qRes = await fetch('/api/generate/questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+      });
       
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const event = JSON.parse(line);
-          
-          switch (event.type) {
-            case 'step':
-              // V2026.37.99 - 단계별 진행 메시지 (5단계)
-              progressText.innerHTML = event.msg;
-              progressFill.style.width = (event.step * 20) + '%';
-              progressPct.textContent = (event.step * 20) + '%';
-              break;
-              
-            case 'analysis':
-              // GPT-4o 보험 설계서 분석 결과
-              analysisData = event.data;
-              console.log('[XIVIX] GPT-4o 분석:', analysisData);
-              break;
-              
-            case 'complete':
-              progressFill.style.width = '100%';
-              progressPct.textContent = '100%';
-              progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ 보험 Q&A 생성 완료! (GPT-4o)';
-              
-              // V2026.37.99 - 새 API 응답 구조로 렌더링
-              renderInsuranceQAResults(event.data);
-              break;
-              
-            case 'error':
-              throw new Error(event.message);
-          }
-        } catch (e) {}
+      if (!qRes.ok) throw new Error('질문 생성 실패');
+      const qData = await qRes.json();
+      
+      if (!qData.success || !qData.questions || qData.questions.length === 0) {
+        throw new Error('질문 리스트를 생성하지 못했습니다');
       }
+      
+      progressFill.style.width = '40%';
+      progressPct.textContent = '40%';
+      progressText.innerHTML = '<i class="fas fa-list"></i> ✅ 질문 10가지 생성 완료! 아래에서 선택해주세요 👇';
+      
+      // Step 2: 10가지 질문 선택 UI 렌더링
+      const analysisCache = qData.analysis;
+      const selectedQ = await showQuestionSelector(qData.questions, analysisCache);
+      
+      if (!selectedQ) {
+        // 사용자가 취소한 경우
+        progressBox.style.display = 'none';
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        return;
+      }
+      
+      progressFill.style.width = '50%';
+      progressPct.textContent = '50%';
+      progressText.innerHTML = '<i class="fas fa-robot"></i> 🚀 선택한 질문으로 Q&A 콘텐츠 생성 중... (GPT-4o)';
+      
+      // Step 3: 선택된 질문으로 Q&A 생성
+      const qaRequestData = {
+        selectedQuestion: selectedQ,
+        analysisCache: analysisCache,
+        newsText: newsText
+      };
+      
+      // 이미지 재전송 불필요 (analysisCache로 OCR 데이터 전달)
+      const res = await fetch('/api/generate/news-qa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(qaRequestData)
+      });
+      
+      if (!res.ok || !res.body) throw new Error('Q&A 생성 API 오류');
+      
+      await processNewsQAStream(res, progressFill, progressPct, progressText);
+      
+    } else {
+      // 텍스트만 있는 경우 - 기존 방식 (바로 Q&A 생성)
+      progressFill.style.width = '10%';
+      progressPct.textContent = '10%';
+      progressText.innerHTML = '<i class="fas fa-file-alt"></i> GPT-4o 설계서 텍스트 분석 중...';
+      
+      const res = await fetch('/api/generate/news-qa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+      });
+      
+      if (!res.ok || !res.body) throw new Error('API 오류');
+      
+      await processNewsQAStream(res, progressFill, progressPct, progressText);
     }
     
   } catch (error) {
@@ -9670,6 +9864,113 @@ async function goGenerateNewsQA() {
     btn.disabled = false;
     btn.classList.remove('loading');
   }
+}
+
+// V2026.37.105 - news-qa 스트림 처리 공통 함수
+async function processNewsQAStream(res, progressFill, progressPct, progressText) {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let analysisData = null;
+  
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split(String.fromCharCode(10));
+    buffer = lines.pop() || '';
+    
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const event = JSON.parse(line);
+        switch (event.type) {
+          case 'step':
+            progressText.innerHTML = event.msg;
+            progressFill.style.width = (50 + event.step * 10) + '%';
+            progressPct.textContent = (50 + event.step * 10) + '%';
+            break;
+          case 'analysis':
+            analysisData = event.data;
+            console.log('[XIVIX] GPT-4o 분석:', analysisData);
+            break;
+          case 'complete':
+            progressFill.style.width = '100%';
+            progressPct.textContent = '100%';
+            progressText.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green)"></i> ✅ 보험 Q&A 생성 완료! (GPT-4o)';
+            renderInsuranceQAResults(event.data);
+            break;
+          case 'error':
+            throw new Error(event.message || event.msg);
+        }
+      } catch (e) {
+        if (e.message && !e.message.includes('JSON')) throw e;
+      }
+    }
+  }
+}
+
+// V2026.37.105 - 10가지 질문 선택 UI (CEO 핵심 지시)
+// "GPT가 10가지 질문을 풀어서 나오면 선택을 해라 → 선택하면 다시 출력"
+function showQuestionSelector(questions, analysisData) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.id = 'questionSelectorOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
+    
+    const productInfo = analysisData?.product_name ? 
+      '<div style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:13px">' +
+      '<div style="font-weight:700;margin-bottom:4px">📋 ' + (analysisData.company || '') + ' ' + (analysisData.product_name || '') + '</div>' +
+      '<div style="opacity:0.9">' + (analysisData.product_type || '보험') + ' | ' + (analysisData.insured_age ? analysisData.insured_age + '세' : '') + ' | 월 ' + (analysisData.monthly_premium || '?') + ' | ' + (analysisData.payment_period || '?') + '년납</div>' +
+      '</div>' : '';
+    
+    let questionsHTML = '';
+    questions.forEach((q, i) => {
+      const categoryColors = {
+        '특약': '#ff6b6b', '담보': '#ff6b6b',
+        '보험료': '#4ecdc4', '환급금': '#4ecdc4',
+        '비교': '#45b7d1',
+        '가입': '#96ceb4', '판단': '#96ceb4',
+      };
+      const color = categoryColors[q.category] || '#7c5cff';
+      questionsHTML += '<button onclick="selectQuestion(' + i + ')" style="display:flex;align-items:flex-start;gap:12px;width:100%;padding:14px 16px;border:2px solid #e8e8e8;border-radius:12px;background:white;cursor:pointer;text-align:left;transition:all 0.2s;font-size:14px;line-height:1.5" onmouseover="this.style.borderColor=\\'#7c5cff\\';this.style.background=\\'#f8f6ff\\'" onmouseout="this.style.borderColor=\\'#e8e8e8\\';this.style.background=\\'white\\'">' +
+        '<span style="flex-shrink:0;width:28px;height:28px;background:' + color + ';color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">' + (i + 1) + '</span>' +
+        '<div style="flex:1"><div style="font-weight:600;color:#333">' + q.text + '</div>' +
+        (q.related_data ? '<div style="font-size:11px;color:#999;margin-top:4px">📎 ' + q.related_data + '</div>' : '') +
+        '</div></button>';
+    });
+    
+    overlay.innerHTML = '<div style="background:white;border-radius:20px;padding:24px;max-width:500px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)">' +
+      '<div style="text-align:center;margin-bottom:16px">' +
+      '<div style="font-size:28px;margin-bottom:8px">🤔</div>' +
+      '<h2 style="font-size:18px;font-weight:700;color:#333;margin:0 0 4px">어떤 질문으로 글을 작성할까요?</h2>' +
+      '<p style="font-size:13px;color:#888;margin:0">설계서에서 추출한 내용을 바탕으로 초보자 질문 10가지를 만들었어요</p>' +
+      '</div>' +
+      productInfo +
+      '<div id="questionsList" style="display:flex;flex-direction:column;gap:8px">' + questionsHTML + '</div>' +
+      '<div style="margin-top:16px;display:flex;gap:8px">' +
+      '<button onclick="cancelQuestionSelector()" style="flex:1;padding:12px;border:2px solid #ddd;border-radius:10px;background:white;color:#888;font-weight:600;cursor:pointer;font-size:14px">취소</button>' +
+      '</div>' +
+      '</div>';
+    
+    document.body.appendChild(overlay);
+    
+    // 전역 함수로 선택/취소 처리
+    window._questionResolve = resolve;
+    window._questions = questions;
+    
+    window.selectQuestion = function(index) {
+      const q = window._questions[index];
+      overlay.remove();
+      resolve(q.text);
+    };
+    
+    window.cancelQuestionSelector = function() {
+      overlay.remove();
+      resolve(null);
+    };
+  });
 }
 
 // ✅ V2026.37.99 - 보험 설계서 Q&A 결과 렌더링 (GPT-4o)
