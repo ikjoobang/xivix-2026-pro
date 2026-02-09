@@ -3557,7 +3557,10 @@ JSON만 응답: {"company":"","product_name":"","product_type":"","insured_age":
     // Step 2: 초보자 관점 10가지 질문 생성
     const productName = analysisData.product_name || '보험상품'
     const company = analysisData.company || '보험사'
-    const benefits = (analysisData.key_benefits || []).join(', ')
+    // key_benefits가 객체 배열이면 "담보명(금액)" 형식으로, 문자열 배열이면 그대로 join
+    const benefits = (analysisData.key_benefits || []).map((b: any) => 
+      typeof b === 'string' ? b : (b.benefit_name || b.name || '') + (b.coverage_amount ? '(' + b.coverage_amount + ')' : '')
+    ).filter(Boolean).join(', ')
     
     const questionsPrompt = `[🔒 핵심 역할]
 당신은 보험에 대해 아무것도 모르는 "진짜 초보자"입니다.
@@ -3979,6 +3982,10 @@ JSON 형식으로만 응답 (마크다운 블록·설명 없이 순수 JSON만):
       const paymentPeriod = analysisData.payment_period || ''
       const monthlyPremium = analysisData.monthly_premium || ''
       const totalPremium = analysisData.total_premium || ''
+      // V2026.37.106 - 담보명 목록 (객체 배열/문자열 배열 모두 지원)
+      const benefits = (analysisData.key_benefits || []).map((b: any) => 
+        typeof b === 'string' ? b : (b.benefit_name || b.name || '') + (b.coverage_amount ? '(' + b.coverage_amount + ')' : '')
+      ).filter(Boolean).join(', ')
       
       // 해약환급금 정보 포맷팅
       let surrenderInfo = ''
@@ -4106,7 +4113,7 @@ ${selectedQuestion ? '(사용자가 10가지 질문 중 선택한 초보자 질�
 • 보험가입금액: ${analysisData.insurance_amount || '확인 필요'}
 • 해약환급금: ${surrenderInfo || '확인 필요'}
 • 공시이율: ${analysisData.interest_rate || '확인 필요'}
-• 특약/보장: ${(analysisData.key_benefits || []).join(', ') || '기본'}
+• 특약/보장: ${(analysisData.key_benefits || []).map((b: any) => typeof b === 'string' ? b : (b.benefit_name || b.name || '') + (b.coverage_amount ? '(' + b.coverage_amount + ')' : '')).filter(Boolean).join(', ') || '기본'}
 
 🚨🚨🚨 [보험 종류 자동 판별 규칙] 🚨🚨🚨
 - 담보에 "진단비", "수술비", "치료비", "입원" 등이 있으면 → "건강보험/보장성보험"
