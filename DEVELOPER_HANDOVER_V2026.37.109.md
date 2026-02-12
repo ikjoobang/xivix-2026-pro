@@ -8,6 +8,131 @@
 
 ---
 
+## 전체 링크 모음 (Quick Reference)
+
+### ■ 프로덕션 / 배포 URL
+
+| 구분 | URL | 설명 |
+|------|-----|------|
+| **프로덕션 (커스텀 도메인)** | https://xivix.ai.kr | 사용자 접속 URL (Cloudflare 커스텀 도메인) |
+| **Cloudflare Pages 기본** | https://xivix-2026-pro.pages.dev | Cloudflare Pages 기본 도메인 |
+| **최신 배포 프리뷰** | https://aaafe727.xivix-2026-pro.pages.dev | 마지막 배포 프리뷰 (배포마다 변경) |
+| **관리자 페이지** | https://xivix.ai.kr/admin | 관리자 대시보드 (방익주/김미경만 접근) |
+| **관리자 대시보드** | https://xivix.ai.kr/admin/dashboard | 관리자 전용 대시보드 UI |
+
+### ■ GitHub / 소스코드
+
+| 구분 | URL | 설명 |
+|------|-----|------|
+| **GitHub 리포지토리** | https://github.com/ikjoobang/xivix-2026-pro | 메인 소스코드 (branch: `main`) |
+| **최신 커밋** | https://github.com/ikjoobang/xivix-2026-pro/commit/697dad6 | V2026.37.109 인수인계 문서 |
+
+### ■ Cloudflare 관련 프로젝트 (같은 계정)
+
+| 프로젝트명 | URL | 커스텀 도메인 | 설명 |
+|-----------|-----|-------------|------|
+| **xivix-2026-pro** | https://xivix-2026-pro.pages.dev | `xivix.ai.kr` | ★ 본 프로젝트 (보험 콘텐츠 엔진) |
+| **xivix-xiim** | https://xivix-xiim.pages.dev | `xivix-cureair.store` | 이미지 생성 마이크로서비스 (XIIM) |
+| **xivix-ai-core** | https://xivix-ai-core.pages.dev | `studioaibotbot.com` | AI 코어 서비스 |
+| **xivix-ai-masterclass** | https://xivix-ai-masterclass.pages.dev | — | AI 마스터클래스 |
+| **xivix-best-map** | https://xivix-best-map.pages.dev | — | 지도 서비스 |
+| **xivix-jubjub** | https://xivix-jubjub.pages.dev | — | 줍줍 서비스 |
+| **xivix-seo-master** | https://xivix-seo-master.pages.dev | — | SEO 마스터 |
+| **xivix-blog-assistant** | https://xivix-blog-assistant.pages.dev | — | 블로그 어시스턴트 |
+| **xivix-blog-generator** | https://xivix-blog-generator.pages.dev | — | 블로그 생성기 |
+| **xivix-sales** | https://xivix-sales.pages.dev | `xivix.kr` / `www.xivix.kr` | 세일즈 페이지 |
+| **xivix-marketing** | https://xivix-marketing.pages.dev | — | 마케팅 |
+| **xivix-class** | https://xivix-class.pages.dev | `www.xivix-class.kr` | 클래스 |
+| **xivix-blog-automation** | https://xivix-blog-automation.pages.dev | — | 블로그 자동화 |
+| **xivix-automation** | https://xivix-automation.pages.dev | — | 자동화 |
+| **xivix-manufacturing** | https://xivix-manufacturing.pages.dev | — | 제조 |
+
+### ■ 외부 API 엔드포인트
+
+| 서비스 | 엔드포인트 URL | 용도 |
+|--------|---------------|------|
+| **OpenAI GPT-4o** | https://api.openai.com/v1/chat/completions | 보험 Q&A OCR + 생성 (핵심 엔진) |
+| **Google Gemini (일반)** | https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent | 키워드 콘텐츠 생성 |
+| **Google Gemini (스트리밍)** | https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse | SSE 스트리밍 |
+| **네이버 데이터랩** | https://openapi.naver.com/v1/datalab/search | 실시간 보험 검색 트렌드 |
+| **빗썸 (비트코인)** | https://api.bithumb.com/public/ticker/BTC_KRW | BTC 실시간 시세 |
+| **솔라피 SMS** | https://api.solapi.com/messages/v4/send | SMS/알림톡 발송 |
+| **네이버 톡톡** | https://gw.talk.naver.com/chatbot/v1/event | 관리자 가입 알림 |
+| **XIIM 이미지 서비스** | https://xivix-xiim.pages.dev/api/process | 마케팅 이미지 생성 프록시 |
+| **네이버 검색** | https://search.naver.com/search.naver?query= | 트렌드 키워드 네이버 검색 링크 |
+
+### ■ 앱 내 API 엔드포인트 (자체 서버)
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | https://xivix.ai.kr/ | 메인 페이지 |
+| GET | https://xivix.ai.kr/admin | 관리자 페이지 |
+| GET | https://xivix.ai.kr/admin/dashboard | 관리자 대시보드 |
+| GET | https://xivix.ai.kr/api/health | 헬스체크 + 버전/엔진 정보 |
+| GET | https://xivix.ai.kr/api/docs | API 문서 (JSON) |
+| GET | https://xivix.ai.kr/api/admin/stats | 시스템 통계 |
+| GET | https://xivix.ai.kr/api/trend | 보험 트렌드 키워드 8개 |
+| GET | https://xivix.ai.kr/api/market-data | 금/BTC/환율 시세 |
+| GET | https://xivix.ai.kr/api/insurance-news | 보험 뉴스 |
+| GET | https://xivix.ai.kr/manifest.json | PWA 매니페스트 |
+| POST | https://xivix.ai.kr/api/generate/news-qa | ★ 보험 Q&A 5단계 SSE |
+| POST | https://xivix.ai.kr/api/generate/questions | 10가지 초보자 질문 생성 |
+| POST | https://xivix.ai.kr/api/generate/full-package-stream | 키워드 콘텐츠 SSE |
+| POST | https://xivix.ai.kr/api/generate/full-package | 키워드 콘텐츠 (비스트리밍) |
+| POST | https://xivix.ai.kr/api/generate/master | 전문가 콘텐츠 SSE |
+| POST | https://xivix.ai.kr/api/generate/question | 초보 질문 생성 |
+| POST | https://xivix.ai.kr/api/generate/comments | 댓글 5개 생성 |
+| POST | https://xivix.ai.kr/api/login | 로그인 |
+| POST | https://xivix.ai.kr/api/registration | 가입 신청 |
+| POST | https://xivix.ai.kr/api/upload | 이미지 업로드 (Base64) |
+| POST | https://xivix.ai.kr/api/analyze/image | 이미지 OCR 분석 |
+| POST | https://xivix.ai.kr/api/xiim/process | XIIM 이미지 프록시 |
+| POST | https://xivix.ai.kr/api/xiim/openai/generate | SVG 설계서 이미지 생성 |
+| GET | https://xivix.ai.kr/api/admin/pending-users | 대기 가입 목록 |
+| POST | https://xivix.ai.kr/api/admin/approve | 사용자 승인 |
+| POST | https://xivix.ai.kr/api/admin/suspend | 사용자 정지 |
+| POST | https://xivix.ai.kr/api/admin/reject | 사용자 거절 |
+| POST | https://xivix.ai.kr/api/admin/extend | 멤버십 연장 |
+| GET | https://xivix.ai.kr/api/admin/settings | 설정 조회 |
+| POST | https://xivix.ai.kr/api/admin/settings | 설정 변경 |
+| POST | https://xivix.ai.kr/api/admin/test-sms | SMS 테스트 |
+| GET | https://xivix.ai.kr/api/admin/expiring-users | 만료 예정 사용자 |
+| POST | https://xivix.ai.kr/api/admin/send-expiry-reminders | 만료 알림 일괄 발송 |
+| POST | https://xivix.ai.kr/api/webhook/talktalk | 네이버 톡톡 Webhook 수신 |
+| GET | https://xivix.ai.kr/api/webhook/talktalk | 톡톡 Webhook 검증 |
+
+### ■ CDN / 정적 리소스
+
+| 리소스 | URL | 용도 |
+|--------|-----|------|
+| **Font Awesome 6.5** | https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css | 아이콘 (메인 페이지) |
+| **Font Awesome 6.4** | https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css | 아이콘 (관리자 페이지) |
+| **Google Fonts Inter** | https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap | 기본 폰트 |
+| **PWA 아이콘 192px** | https://res.cloudinary.com/df8yybjcg/image/upload/v1/xivix/icon-192.png | PWA 아이콘 (Cloudinary) |
+| **PWA 아이콘 512px** | https://res.cloudinary.com/df8yybjcg/image/upload/v1/xivix/icon-512.png | PWA 아이콘 (Cloudinary) |
+| **R2 골든 샘플** | https://pub-xivix-golden-samples.r2.dev | 이미지 골든 샘플 저장소 (R2) |
+
+### ■ 관리 콘솔 / 대시보드
+
+| 서비스 | 접속 URL | 용도 |
+|--------|---------|------|
+| **Cloudflare Dashboard** | https://dash.cloudflare.com → Workers & Pages → xivix-2026-pro | 배포/시크릿/로그/D1 관리 |
+| **Cloudflare D1 콘솔** | Cloudflare Dashboard → D1 → xivix-production | DB 직접 조회/실행 |
+| **OpenAI 대시보드** | https://platform.openai.com | API 키 관리, 사용량 확인 |
+| **Google AI Studio** | https://aistudio.google.com | Gemini API 키 관리 |
+| **네이버 개발자 센터** | https://developers.naver.com | 데이터랩 API 키 관리 |
+| **솔라피 대시보드** | https://solapi.com | SMS 발송 이력, 발신번호 관리 |
+| **네이버 톡톡 파트너센터** | https://partner.talk.naver.com | Webhook 설정, 채팅봇 관리 |
+| **Cloudinary** | https://cloudinary.com | PWA 아이콘 이미지 호스팅 |
+
+### ■ UI 디자인 참조
+
+| 구분 | URL | 설명 |
+|------|-----|------|
+| **Beyond Reality** | https://beyond-reality.pages.dev/ | UI/UX 디자인 참조 원본 |
+
+---
+
 ## 목차
 
 1. [프로젝트 개요](#1-프로젝트-개요)
